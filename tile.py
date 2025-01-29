@@ -1,4 +1,4 @@
-from PIL import Image
+from PIL import Image, ImageDraw
 import img2pdf
 import os.path, calendar
 
@@ -8,23 +8,57 @@ year = 2025
 month = 1
 img_dir = home / 'Documents' / 'screen' / f'{year}{month:02}'
 
+IMG_SIZE = (720, 1612)
+H_PAD = 20
+V_PAD = 40
+
 file_over = False
 
-node = f"{year}{month:02}"
+node = f"{year}-{month:02}"
+
+def convert_to_pdf():
+	a4inpt = (img2pdf.mm_to_pt(210),img2pdf.mm_to_pt(297))
+	layout_fun = img2pdf.get_layout_fun(a4inpt)
+	fullpath = img_dir / f"{node}.pdf"
+	with open(fullpath,"wb") as f:
+		names = [(img_dir / f"{year}-{month:02}-{p + 1}.png") for p in range(4)] #(img, name) in get_pages()]
+		for name in names:
+			assert Path(name).exists()
+		f.write(img2pdf.convert(layout_fun=layout_fun, *names) )
 
 def get_pdf():
 	fullpath = img_dir / f"{node}.pdf"
 	imges = list(get_pages())
 	imges[0].save(fullpath, "PDF" ,resolution=100.0, save_all=True, append_imges=imges[1:])
 
-def get_pages():
+def save_pages():
+	for page, name in get_pages():
+		fullpath = img_dir / name
+		page.save(fullpath, 'PNG')
+
+
+def get_pages(div=8, th=H_PAD / 2):
+	drc_tbl = [(0, 1), (1, 0), (0, -1), (-1, -1)]
+	def _to(n, xy):
+		x = xy[0]
+		y = xy[1]
+		drc = drc_tbl[n]
+		return x * drc[0], y * drc[1]
 	names = get_img_file_names() # generator
 	for pg in range(4):
-		img = get_8(names)
+		img = get_page(names)
+		assert img.width == IMG_SIZE[0] * 4 + H_PAD * 3
+		assert img.height == IMG_SIZE[1] * 2 + V_PAD
+		drw = ImageDraw.Draw(img)
+		ll = img.height // div
+		ct = [s // 2 for s in img.size]
+		dst = _to(pg, list(ct))
+		dstp = ct[0] + dst[0], ct[1] + dst[1]
+		drw.line((*ct, *dstp), fill=(255, 255, 255), width=int(th))
 		name = f"{node}-{pg + 1}.png"
-		yield img.convert('L') #.save(img_dir / name, 'PNG')
+		yield img, name #.convert('L') #.save(img_dir / name, 'PNG')
 
-def get_8(names):
+def get_page(names):
 	def dq():
 		return open_img(next(names))
 	def h2img():
@@ -43,7 +77,6 @@ def get_img_file_names(glob=True):
 	for n in range(pad):
 		yield None
 
-IMG_SIZE = (720, 1612)
 
 blank_img = Image.new('L', IMG_SIZE, (0xff,))
 
@@ -62,7 +95,7 @@ def open_img(name):
 	else:
 		return blank_img
 
-def get_concat_h(im1, im2, pad=20):
+def get_concat_h(im1, im2, pad=H_PAD):
 	dst = Image.new('RGB', (im1.width + pad + im2.width, im1.height))
 	dst.paste(im1, (0, 0))
 	if pad > 0:
@@ -71,7 +104,7 @@ def get_concat_h(im1, im2, pad=20):
 	dst.paste(im2, (im1.width + pad, 0))
 	return dst
 
-def get_concat_v(im1, im2, pad=40):
+def get_concat_v(im1, im2, pad=V_PAD):
 	dst = Image.new('RGB', (im1.width, im1.height + pad + im2.height))
 	dst.paste(im1, (0, 0))
 	if pad > 0:
@@ -81,4 +114,5 @@ def get_concat_v(im1, im2, pad=40):
 	return dst
 
 if __name__ == '__main__':
-	get_pdf()
+	save_pages()
+	#convert_to_pdf()
