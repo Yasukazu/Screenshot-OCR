@@ -4,9 +4,9 @@ import os.path, calendar
 
 from pathlib import Path
 home = Path(os.path.expanduser('~'))
-year = 2024
-month = 11
-img_dir = home / 'Documents' / 'screen' / f'2024{month:02}'
+year = 2025
+month = 1
+img_dir = home / 'Documents' / 'screen' / f'{year}{month:02}'
 
 file_over = False
 
@@ -14,10 +14,8 @@ node = f"{year}{month:02}"
 
 def get_pdf():
 	fullpath = img_dir / f"{node}.pdf"
-	imgs = list(get_pages())
-	pdf = img2pdf.convert(imgs)
-	with fullpath.open('w') as wf:
-		wf.write(pdf)
+	imges = list(get_pages())
+	imges[0].save(fullpath, "PDF" ,resolution=100.0, save_all=True, append_imges=imges[1:])
 
 def get_pages():
 	names = get_img_file_names() # generator
@@ -37,10 +35,10 @@ def get_8(names):
 	himg2 = h4img()
 	return get_concat_v(himg1, himg2)
 
-def get_img_file_names():
+def get_img_file_names(glob=True):
 	days = calendar.monthrange(year, month)[1]
 	for i in range(days):
-		yield f"{month}{(i + 1):02}.png"
+		yield f"{'??' if glob else month}{(i + 1):02}.png"
 	pad = 32 - days
 	for n in range(pad):
 		yield None
@@ -54,9 +52,11 @@ def open_img(name):
 		global file_over 
 		file_over = True
 		return blank_img
-	fullpath = img_dir / name
-	if fullpath.exists():
-		img = Image.open(fullpath).convert('L')
+	fullpath_list = list(img_dir.glob(name))
+	fpthslen = len(fullpath_list)
+	assert fpthslen < 2
+	if fpthslen == 1: #(fp:=fullpath_list[0]).exists():
+		img = Image.open(fullpath_list[0]).convert('L')
 		assert img.size == IMG_SIZE
 		return img
 	else:
