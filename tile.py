@@ -37,24 +37,41 @@ def save_pages():
 		page.save(fullpath, 'PNG')
 
 
-def get_pages(div=8, th=H_PAD / 2):
-	drc_tbl = [(0, 1), (1, 0), (0, -1), (-1, -1)]
+def get_pages(div=64, th=H_PAD // 2):
+	drc_tbl = [(0, -1), (1, 0), (0, 1), (-1, 0)]
+	ll_ww = [0, 0]
 	def _to(n, xy):
+		ll, ww = ll_ww[0], ll_ww[1]
 		x = xy[0]
 		y = xy[1]
 		drc = drc_tbl[n]
-		return x * drc[0], y * drc[1]
+		return x + ll * drc[0], y + ll * drc[1]
 	names = get_img_file_names() # generator
+	def yshift(*xy):
+		x, y = xy[0], xy[1]
+		return x, y - (V_PAD - 8)
+	def dots_line(ct, drw, n):
+		ll, ww = ll_ww[0], ll_ww[1]
+		op = list(ct)
+		for i in range(n):
+			dp = op[0] - ww, op[1]
+			drw.line((*op, *dp), (255,255,255), width=int(th))
+			op[0] -= 2 * ww
+
 	for pg in range(4):
 		img = get_page(names)
+		ct = (img.width // 2, img.height // 2) # s // 2 for s in img.size)
+		ll_ww[0] = img.height // div
+		ll_ww[1] = img.width // 128
 		assert img.width == IMG_SIZE[0] * 4 + H_PAD * 3
 		assert img.height == IMG_SIZE[1] * 2 + V_PAD
 		drw = ImageDraw.Draw(img)
-		ll = img.height // div
-		ct = [s // 2 for s in img.size]
 		dst = _to(pg, list(ct))
-		dstp = ct[0] + dst[0], ct[1] + dst[1]
-		drw.line((*ct, *dstp), fill=(255, 255, 255), width=int(th))
+		lct = list(ct)
+		dstp = lct[0] + dst[0], lct[1] + dst[1]
+		dots_line(ct, drw, pg + 1) # drw.line((*ct, *dstp), fill=(255, 255, 255), width=int(th))
+		text = f"{' ' * 8}{year}-{month:02}({pg + 1}/4)"
+		drw.text((*ct, *yshift(*dstp)), text, 'white')
 		name = f"{node}-{pg + 1}.png"
 		yield img, name #.convert('L') #.save(img_dir / name, 'PNG')
 
@@ -114,5 +131,5 @@ def get_concat_v(im1, im2, pad=V_PAD):
 	return dst
 
 if __name__ == '__main__':
-	save_pages()
-	#convert_to_pdf()
+	#save_pages()
+	convert_to_pdf()
