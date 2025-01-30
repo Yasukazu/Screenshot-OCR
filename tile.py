@@ -1,7 +1,7 @@
 from PIL import Image, ImageDraw
 import img2pdf
 import os.path, calendar
-
+import ttl
 from pathlib import Path
 home = Path(os.path.expanduser('~'))
 year = 2025
@@ -50,13 +50,19 @@ def get_pages(div=64, th=H_PAD // 2):
 	def yshift(*xy):
 		x, y = xy[0], xy[1]
 		return x, y - (V_PAD - 8)
-	def dots_line(ct, drw, n):
+	fill_white = (255,255,255)
+	def page_dots(ct, drw, n):
 		ll, ww = ll_ww[0], ll_ww[1]
 		op = list(ct)
 		for i in range(n):
 			dp = op[0] - ww, op[1]
-			drw.line((*op, *dp), (255,255,255), width=int(th))
+			drw.line((*op, *dp), fill_white, width=int(th))
 			op[0] -= 2 * ww
+	def month_dots(ct, drw, img_w):
+		ttl.set_pit_len(img_w // 32)
+		ttl.set_org(*(ct[0] + (img_w // 32), ct[1]))
+		for frm, to in ttl.plot(month, '>'):
+			drw.line((frm[0], frm[1], to[0], to[1]), fill_white, width=int(th))
 
 	for pg in range(4):
 		img = get_page(names)
@@ -69,7 +75,8 @@ def get_pages(div=64, th=H_PAD // 2):
 		dst = _to(pg, list(ct))
 		lct = list(ct)
 		dstp = lct[0] + dst[0], lct[1] + dst[1]
-		dots_line(ct, drw, pg + 1) # drw.line((*ct, *dstp), fill=(255, 255, 255), width=int(th))
+		month_dots(ct, drw, img.width)
+		page_dots(ct, drw, pg + 1) # drw.line((*ct, *dstp), fill=(255, 255, 255), width=int(th))
 		text = f"{' ' * 8}{year}-{month:02}({pg + 1}/4)"
 		drw.text((*ct, *yshift(*dstp)), text, 'white')
 		name = f"{node}-{pg + 1}.png"
@@ -131,5 +138,5 @@ def get_concat_v(im1, im2, pad=V_PAD):
 	return dst
 
 if __name__ == '__main__':
-	#save_pages()
-	convert_to_pdf()
+	save_pages()
+	#convert_to_pdf()
