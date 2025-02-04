@@ -26,7 +26,7 @@ def path_feeder(input_ext='.pdf', output_ext='.txt', rng=range(0, 31)):
 		if not input_path.exists():
 			continue
 		input_path_noext, _ext = os.path.splitext(input_path)
-		output_path = Path(input_path_noext + output_ext)
+		output_path = input_path_noext + output_ext if output_ext else ''
 		assert not output_path.exists()
 		yield input_path, output_path
 
