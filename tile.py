@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from PIL import Image, ImageDraw
 import img2pdf
 import os.path, calendar
@@ -35,17 +36,27 @@ def convert_to_pdf(names=paged_png_feeder(),
 
 def save_pages_as_pdf():
 	fullpath = img_dir / f"{node}.pdf"
-	imges = list(get_quad_pages())
+	imges = list(draw_onto_pages())
 	imges[0].save(fullpath, "PDF" ,resolution=100.0, save_all=True, append_imges=imges[1:])
 
 def save_pages():
-	for page, name in get_quad_pages():
+	for page, name in draw_onto_pages():
 		fullpath = img_dir / name
 		page.save(fullpath, 'PNG')
 
+from path_feeder import path_feeder, FileExt
+def get_png_file_names():
+	for path in path_feeder(input_type=FileExt.PNG):
+		yield path
+
+def get_quad_png_file_names():
+	for path in path_feeder(input_type=FileExt.QPNG):
+		yield path
+
 TXT_OFST = 80
 from load_csv_7 import draw_num
-def get_quad_pages(div=64, th=H_PAD // 2):
+def draw_onto_pages(div=64, th=H_PAD // 2,
+	names: Iterator[str]=get_png_file_names()):
 	drc_tbl = [(0, -1), (1, 0), (0, 1), (-1, 0)]
 	ll_ww = [0, 0]
 	def _to(n, xy):
@@ -54,7 +65,6 @@ def get_quad_pages(div=64, th=H_PAD // 2):
 		y = xy[1]
 		drc = drc_tbl[n]
 		return x + ll * drc[0], y + ll * drc[1]
-	names = list(get_quad_png_file_names()) # generator
 	def xshift(offset, *xy):
 		return xy[0] + offset, xy[1]
 	def yshift(*xy):
@@ -74,8 +84,11 @@ def get_quad_pages(div=64, th=H_PAD // 2):
 		for frm, to in ttl.plot(month, ttl.Direc.RT):
 			drw.line((frm[0], frm[1], to[0], to[1]), fill_white, width=int(th))
 
-	for pg, name in enumerate(names): #range(4):
-		img = Image.open(name) # get_quad_page(names)
+	def get_images():
+		for name in names:
+			yield concat_8_pages(name), name
+
+	for pg, (img, name) in enumerate(get_images): #range(4):
 		ct = (img.width // 2, img.height // 2) # s // 2 for s in img.size)
 		ll_ww[0] = img.height // div
 		ll_ww[1] = img.width // 128
@@ -93,7 +106,7 @@ def get_quad_pages(div=64, th=H_PAD // 2):
 		name = f"{node}-{pg + 1}.png"
 		yield img, name #.convert('L') #.save(img_dir / name, 'PNG')
 
-def get_quad_page(names):
+def concat_8_pages(names: Iterator[str])-> Image:
 	def dq():
 		return Image.open(next(names))
 	def h2img():
@@ -112,10 +125,6 @@ def get_img_file_names_(glob=True):
 	for n in range(pad):
 		yield None
 
-from path_feeder import path_feeder, FileExt
-def get_quad_png_file_names():
-	for path in path_feeder(input_type=FileExt.QPNG):
-		yield path
 
 blank_img = Image.new('L', IMG_SIZE, (0xff,))
 
@@ -137,7 +146,7 @@ def open_img(name,glob=True):
 	else:
 		return Image.open(name)
 
-def get_concat_h(im1, im2, pad=H_PAD):
+def get_concat_h(im1: Image, im2: Image, pad=H_PAD)->Image:
 	dst = Image.new('RGB', (im1.width + pad + im2.width, im1.height))
 	dst.paste(im1, (0, 0))
 	if pad > 0:
@@ -146,7 +155,7 @@ def get_concat_h(im1, im2, pad=H_PAD):
 	dst.paste(im2, (im1.width + pad, 0))
 	return dst
 
-def get_concat_v(im1, im2, pad=V_PAD):
+def get_concat_v(im1: Image, im2: Image, pad=V_PAD)->Image:
 	dst = Image.new('RGB', (im1.width, im1.height + pad + im2.height))
 	dst.paste(im1, (0, 0))
 	if pad > 0:
