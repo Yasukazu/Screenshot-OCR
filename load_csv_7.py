@@ -88,32 +88,3 @@ if __name__ == '__main__':
 		draw_num(i, drw, offset=offset, scale=scale, width=8)
 
 		img.save(f"digi-{i}.png", 'PNG')
-
-	pprint(np_strk_dict)
-	pprint(Digi7.dic)
-	for u in seg7_list:
-		print(u.a, u.b, u.c, u.d, u.e, u.f, u.g, u.h)
-from PIL import Image, ImageDraw
-
-def draw_num(n, drw, offset=(0,0), scale=16, width=8, fill=(0,)):
-	offset = np.array(offset, int)
-	strk = get_strok(n)
-	for stk in strk:
-		seq = [tuple(st * scale + offset) for st in stk]
-		drw.line(seq, fill=fill, width=width)
-
-if __name__ == '__main__':
-	from pprint import pprint
-	scale = 40
-	offset = np.array([20, 20], int)
-	for i in range(10):
-		img = Image.new('L', (80, 160), (0xff,))
-		drw = ImageDraw.Draw(img)
-		draw_num(i, drw, width=20)
-
-		img.save(f"digi-{i}.png", 'PNG')
-
-	pprint(np_strk_dict)
-	pprint(Digi7.dic)
-	for u in seg7_list:
-		print(u.a, u.b, u.c, u.d, u.e, u.f, u.g, u.h)
