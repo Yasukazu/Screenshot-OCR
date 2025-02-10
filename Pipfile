@@ -5,6 +5,9 @@ name = "pypi"
 
 [packages]
 pdfplumber = "*"
+img2pdf = "*"
+pillow = "*"
+numpy = "*"
 
 [dev-packages]
 
