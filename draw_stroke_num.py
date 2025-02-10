@@ -34,9 +34,10 @@ if __name__ == '__main__':
 	from PIL import Image, ImageDraw
 	percent = 40
 	offset = np.array([20, 20], int)
-	for i in range(10):
+	for i in range(16):
 		img = Image.new('L', (80, 160), (0xff,))
 		drw = ImageDraw.Draw(img)
 		draw_num(i, img, offset=offset, percent=percent, line_width_percent=25)
 		breakpoint()
-		img.save(f"digi-{i}.png", 'PNG')
+		img.show()
+		#img.save(f"digi-{i}.png", 'PNG')
