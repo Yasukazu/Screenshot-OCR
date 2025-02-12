@@ -1,48 +1,48 @@
 import csv
 import pickle
+import numpy as np
+import numpy.typing as npt
 
-def conv(i):
-	return 0 if i == '' else int(i)
+def conv(i: str)-> bool:
+	return False if i == '' else bool(int(i))
 class Seg7:
-	def __init__(self, a, b, c, d, e, f, g, h):
-		self.a = conv(a)
-		self.b = conv(b)
-		self.c = conv(c)
-		self.d = conv(d)
-		self.e = conv(e)
-		self.f = conv(f)
-		self.g = conv(g)
-		self.h = conv(h)
+	def __init__(self, a: str, b: str, c: str, d: str, e: str, f: str, g: str, h: str):
+		self.a: bool = conv(a)
+		self.b: bool = conv(b)
+		self.c: bool = conv(c)
+		self.d: bool = conv(d)
+		self.e: bool = conv(e)
+		self.f: bool = conv(f)
+		self.g: bool = conv(g)
+		self.h: int = int(h)
 
+PICKLE_EXT = '.pkl'
+from strok7 import SegLine
+
+from seven_seg import SEVEN_SEG_STEM
+# return np.loadtxt(fname, delimiter=',')
 # with open('7-seg.csv', encoding='utf8') as csv_file:
 #	csv_reader = csv.reader(csv_file)
 	#next(csv_reader)  # skipping the header
-def load_seg7(pkl='7-seg.pkl'):
+def _load_seg7(fname: str=SEVEN_SEG_STEM + '.csv'):
+	with open(fname, encoding='ASCII') as f:
+		reader = csv.reader(f)
+		csv_7_seg_list = [r for r in reader]
 	seg7_list = []
-	rf = open(pkl, 'rb').read()
-	csv_reader = pickle.loads(rf)
-	for i, row in enumerate(csv_reader):
+	for i, row in enumerate(csv_7_seg_list):
 		seg = Seg7(*row)
 		assert seg.h == i
 		seg7_list.append(seg)
 	assert len(seg7_list) == 16
 	return seg7_list
 
-seg7_list = load_seg7()
+def get_seg7_list():
+	from num_to_strokes import load_seg7
+	return load_seg7()
+
+seg7_list = get_seg7_list()
 
 assert len(seg7_list) == 16
-
-class Digi7:
-	dic = [(0,)] * 16
-	def __init__(self, s: Seg7):
-		self.dic[seg.h] = (s.a, s.b, s.c, s.d, s.e, s.f, s.g)
-
-for seg in seg7_list:
-	Digi7(seg)
-digi7_list = [
-	Digi7(seg) for seg in seg7_list
-]
-
 
 import numpy as np
 
@@ -51,7 +51,8 @@ def load_np_strk_dic(pklf=NP_STRK_DICT_PKL):
 	with open(pklf, 'rb') as buf:
 		return pickle.load(buf)
 
-np_strk_dict = load_np_strk_dic() # {k: np.array(v, int) for (k, v) in strk_dic.items() }
+from strok7 import get_np_strk_dict
+np_strk_dict = get_np_strk_dict() # load_np_strk_dic() # {k: np.array(v, int) for (k, v) in strk_dic.items() }
 
 def get_strok(n):
 	seg7 = seg7_list[n]
@@ -62,29 +63,37 @@ def get_strok(n):
 			strks.append(np_strk_dict[k])
 	return strks
 
-from num_to_strokes_pkl import get_stroke_list
-stroke_list = get_stroke_list()
+#stroke_list = get_stroke_list()
+_seg7_set_list = []
+def load_seg7_set_list():
+	from num_to_strokes import get_seg7_list
+	seg7_set_list = get_seg7_list()
+	for seg_set in seg7_set_list:
+		_seg7_set_list.append(np.array([seg.value for seg in seg_set]))
+load_seg7_set_list()
 
-def get_stroke(n: int):
-	assert 0 <= n < 16
-	return stroke_list[n]
+def get_seg_lines(n: int):
+	return _seg7_set_list[n]
 
-from PIL import Image, ImageDraw
-
-def draw_num(n, drw, offset=(0,0), scale=16, width=8, fill=(0,)):
-	offset = np.array(offset, int)
-	strk = get_stroke(n)
+from PIL import ImageDraw
+def draw_num(n, drw: ImageDraw, offset=(0,0), scale=16, width=8, fill=(0,)):
+	if type(offset) != npt.NDArray:
+		offset = np.array(offset, int)
+	strk = get_seg_lines(n)
 	for stk in strk:
 		seq = [tuple(st * scale + offset) for st in stk]
 		drw.line(seq, fill=fill, width=width)
 
 if __name__ == '__main__':
+	from PIL import Image, ImageDraw
 	from pprint import pprint
+	save = False
 	scale = 40
 	offset = np.array([20, 20], int)
 	for i in range(10):
 		img = Image.new('L', (80, 160), (0xff,))
 		drw = ImageDraw.Draw(img)
 		draw_num(i, drw, offset=offset, scale=scale, width=8)
-
-		img.save(f"digi-{i}.png", 'PNG')
+		img.show()
+		if save:
+			img.save(f"digi-{i}.png", 'PNG')
