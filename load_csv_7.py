@@ -78,15 +78,14 @@ def get_num_strokes(n: int, slant=0.25):
 	from num_to_strokes import _segpath_array
 	segpath = _segpath_array[n]
 	for path in segpath:
-		yield path.slanted(slant)
+		yield list(path.slanted(slant))
 
 from PIL import ImageDraw
 def draw_num(n, drw: ImageDraw, offset=(0,0), scale=16, width=8, fill=(0,), slant=0.25):
 	if type(offset) != npt.NDArray:
 		offset = np.array(offset, int)
-	for strokes in get_num_strokes(n, slant=slant):
-		strks = np.array(strokes)
-		for strk in strks:
+	for stroke in get_num_strokes(n, slant=slant):
+			strk = np.array(stroke, np.float16)
 			seq = [tuple(st * scale + offset) for st in strk]
 			drw.line(seq, fill=fill, width=width)
 
