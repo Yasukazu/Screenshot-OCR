@@ -1,5 +1,34 @@
-from enum import Enum
+from enum import Enum, StrEnum, Flag, auto
 import csv
+
+type ii_ii = tuple[tuple[int, int], tuple[int, int]]
+type i_i_tpl_tpl = dict[str, ii_ii]
+
+
+class SegName(StrEnum):
+	A = auto()
+	B = auto()
+	C = auto()
+	D = auto()
+	E = auto()
+	F = auto()
+	G = auto()
+
+class Sp0:
+	Y = 0
+	def __init__(self, x: int):
+		self.x = x
+	def slant(self, s=0):
+		return self.x + s, self.Y
+class Sp1(Sp0):
+	Y = 1
+	def slant(self, s=0):
+		return (s / 2.0) + self.x, self.Y
+class Sp2(Sp0):
+	Y = 2
+	def slant(self, s=0):
+		return self.x, self.Y
+
 abcdef_seg = ((0, 0),
 	(1, 0),
 	(1, 1),
@@ -7,6 +36,34 @@ abcdef_seg = ((0, 0),
 	(0, 2),
 	(0, 1),
 	(0, 0))
+
+SEG_POINTS = [Sp0(0),
+	Sp0(1),
+	Sp1(1),
+	Sp2(1),
+	Sp2(0),
+	Sp1(0),
+	Sp0(0)]
+
+class SegPath:
+	def __init__(self, *spsp): # f_sp: Sp0, t_sp: Sp0):
+		self.path = spsp # self.f = f_sp self.t = t_sp
+	def get_path(self):
+		for pt in self.path:
+			yield pt
+		# return self.f, self.t
+	def get_slants(self):
+		for pt in self.path:
+			yield pt.slant() # self.f.slant(), self.t.slant()
+
+class SegElem(Enum):
+	A = SegPath(SEG_POINTS[0], SEG_POINTS[1])
+	B = SegPath(SEG_POINTS[1], SEG_POINTS[2])
+	C = SegPath(SEG_POINTS[2], SEG_POINTS[3])
+	D = SegPath(SEG_POINTS[3], SEG_POINTS[4])
+	E = SegPath(SEG_POINTS[4], SEG_POINTS[5])
+	F = SegPath(SEG_POINTS[5], SEG_POINTS[6])
+	G = SegPath(Sp1(0), Sp1(1))
 
 class SegLine(Enum):
 	a = (abcdef_seg[0], abcdef_seg[1])
@@ -22,6 +79,19 @@ class SegLine(Enum):
 		abcdefg = [cls.a, cls.b, cls.c, cls.d, cls.e, cls.f, cls.g]
 		return abcdefg["abcdefg".index(c)]
 
+class SegFlag(Flag):
+	a = auto()
+	b = auto()
+	c = auto()
+	d = auto()
+	e = auto()
+	f = auto()
+	g = auto()
+	
+	@classmethod
+	def get(cls, c: str):
+		abcdefg = [cls.a, cls.b, cls.c, cls.d, cls.e, cls.f, cls.g]
+		return abcdefg["abcdefg".index(c)]
 class Segment7:
 	dic = {c: (abcdef_seg[i], abcdef_seg[i + 1]) for i, c in enumerate('abcdef')}
 	dic['g'] = ((0, 1), (1, 1))
@@ -41,7 +111,6 @@ with open('abcdef-7.csv', encoding='utf8') as csv_file:
 		seg = Segment7(*row)
 		strk7.append(seg)
 
-type i_i_tpl_tpl = dict[str, tuple[tuple[int, int], tuple[int, int]]]
 strk_dic: i_i_tpl_tpl = {}
 
 for i, j in enumerate('abcdef'):
