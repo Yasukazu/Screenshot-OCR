@@ -21,7 +21,7 @@ SEVEN_SEG_MAX = 15
 from strok7 import SegElem, _SEGELEM7DICT
 _segelem_array: list[tuple[Seg7]] = [set()] * 16
 
-_segpath_array = [] * 16
+_segpath_array = [None] * 16
 def load_segpath_array():
 	'''call "slanted" for each element'''
 	from seven_seg import load_7_seg_num_csv_as_df
@@ -73,4 +73,6 @@ def get_seg_lines(n):
 	return [line.value for line in seg_line_set]
 
 if __name__ == '__main__':
-	pass
+	from pprint import pp
+	seg_list = get_seg_list()
+	pp(seg_list[0])
