@@ -52,9 +52,9 @@ class SegPath:
 		for pt in self.path:
 			yield pt
 		# return self.f, self.t
-	def get_slants(self):
+	def slanted(self, s=0.0):
 		for pt in self.path:
-			yield pt.slant() # self.f.slant(), self.t.slant()
+			yield pt.slant(s) # self.f.slant(), self.t.slant()
 
 class SegElem(Enum):
 	A = SegPath(SEG_POINTS[0], SEG_POINTS[1])
@@ -65,6 +65,18 @@ class SegElem(Enum):
 	F = SegPath(SEG_POINTS[5], SEG_POINTS[6])
 	G = SegPath(Sp1(0), Sp1(1))
 
+SEGELEM7 = (
+        SegElem.A,
+        SegElem.B,
+        SegElem.C,
+        SegElem.D,
+        SegElem.E,
+        SegElem.F,
+        SegElem.G,
+			)
+_SEGELEM7DICT = {e.name.lower(): e.value for e in SEGELEM7}
+def get_segelem7dict():
+	return _SEGELEM7DICT
 class SegLine(Enum):
 	a = (abcdef_seg[0], abcdef_seg[1])
 	b = (abcdef_seg[1], abcdef_seg[2])
