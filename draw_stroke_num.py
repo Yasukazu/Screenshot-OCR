@@ -1,14 +1,19 @@
 from collections import namedtuple
 import numpy as np
+import numpy.typing as npt
 from PIL import Image, ImageDraw
 
-from num_to_strokes_pkl import get_stroke_list
 
-stroke_list = get_stroke_list()
+_stroke_list = []
+
+def set_stroke_list():
+	from num_to_strokes_pkl import get_stroke_list
+	pass
+
 
 def get_stroke(n: int):
 	assert 0 <= n < 16
-	return stroke_list[n]
+	return _stroke_list[n]
 
 WH = namedtuple('WH', ['w', 'h'])
 
@@ -29,6 +34,10 @@ def draw_num(n: int, img: Image, offset: tuple[int, int]=(0, 0), percent: int=10
 	for stk in strk:
 		seq = [tuple(st * scl + offset) for st in stk]
 		drw.line(seq, fill=fill, width=line_width)
+
+def get_draw_num(n: int, scl: int=1, offset: npt.NDArray=np.ndarray((0, 0), int)):
+	strk = get_stroke(n)
+	return (((st * scl + offset) for st in stk) for stk in strk)
 
 if __name__ == '__main__':
 	from PIL import Image, ImageDraw

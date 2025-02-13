@@ -63,7 +63,7 @@ def get_strok(n):
 			strks.append(np_strk_dict[k])
 	return strks
 
-#stroke_list = get_stroke_list()
+
 _seg7_set_list = []
 def load_seg7_set_list():
 	from num_to_strokes import get_seg7_list
@@ -71,18 +71,24 @@ def load_seg7_set_list():
 	for seg_set in seg7_set_list:
 		_seg7_set_list.append(np.array([seg.value for seg in seg_set]))
 load_seg7_set_list()
-
 def get_seg_lines(n: int):
 	return _seg7_set_list[n]
+_segelem7dict = {}
+def get_num_strokes(n: int, slant=0.25):
+	from num_to_strokes import _segpath_array
+	segpath = _segpath_array[n]
+	for path in segpath:
+		yield path.slanted(slant)
 
 from PIL import ImageDraw
-def draw_num(n, drw: ImageDraw, offset=(0,0), scale=16, width=8, fill=(0,)):
+def draw_num(n, drw: ImageDraw, offset=(0,0), scale=16, width=8, fill=(0,), slant=0.25):
 	if type(offset) != npt.NDArray:
 		offset = np.array(offset, int)
-	strk = get_seg_lines(n)
-	for stk in strk:
-		seq = [tuple(st * scale + offset) for st in stk]
-		drw.line(seq, fill=fill, width=width)
+	for strokes in get_num_strokes(n, slant=slant):
+		strks = np.array(strokes)
+		for strk in strks:
+			seq = [tuple(st * scale + offset) for st in strk]
+			drw.line(seq, fill=fill, width=width)
 
 if __name__ == '__main__':
 	from PIL import Image, ImageDraw
