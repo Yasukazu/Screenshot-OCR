@@ -91,12 +91,12 @@ class NumStrokes:
 
 import numpy as np
 from PIL import ImageDraw
-def draw_num(n: int, drw: ImageDraw, offset=(0,0), scale=16, width=8, fill=(0,), num_strokes=NumStrokes(0.25)):
+def draw_num(n: int, drw: ImageDraw, offset=(0,0), scale=16, width=8, fill=(0,), strokes=NumStrokes(0.25).strokes):
 	'''draw number as 7-segment digital: 0 to 9 makes [0123456789], 10 to 15 makes [ABCDEF], 16 makes hyphen(-)'''
 	assert 0 <= n < SEVEN_SEG_SIZE
 	if not isinstance(offset, np.ndarray): #, npt.generic)):
 		offset = np.array(offset, int)
-	for stroke in num_strokes.strokes[n]: #get_num_strokes(n, slant=slant):
+	for stroke in strokes[n]: #get_num_strokes(n, slant=slant):
 			strk = np.array(stroke, np.float16)
 			seq = [tuple(st * scale + offset) for st in strk]
 			drw.line(seq, fill=fill, width=width)
@@ -109,11 +109,11 @@ if __name__ == '__main__':
 	show_list = [SEVEN_SEG_SIZE - 1]
 	scale = 40
 	offset = np.array([20, 20], int)
-	num_strokes = NumStrokes(0.25)
+	strokes = NumStrokes(0.25).strokes
 	for i in show_list:
 		img = Image.new('L', (80, 160), (0xff,))
 		drw = ImageDraw.Draw(img)
-		draw_num(i, drw, offset=offset, scale=scale, width=8, num_strokes=num_strokes)
+		draw_num(i, drw, offset=offset, scale=scale, width=8, strokes=strokes)
 		img.show()
 		if save:
 			img.save(f"digi-{i}.png", 'PNG')	
