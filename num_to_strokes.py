@@ -79,13 +79,13 @@ def get_num_strokes(n: int, slant=0.25):
 		yield list(path.slanted(slant))
 
 from functools import cached_property
-
+from collections.abc import Sequence
 class NumStrokes:
 	def __init__(self, slant=0.25):
 		self._strokes = [get_num_strokes(n, slant) for n in range(SEVEN_SEG_SIZE)]
 
 	@property
-	def strokes(self):#, n: int):
+	def strokes(self)-> Sequence:#, n: int):
 		#assert 0 <= n < SEVEN_SEG_SIZE
 		return self._strokes #[n]
 
