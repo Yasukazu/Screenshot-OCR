@@ -90,9 +90,31 @@ class NumStrokes:
 		return self._strokes #[n]
 
 import numpy as np
-from PIL import ImageDraw
-def draw_num(n: int, drw: ImageDraw, offset=(0,0), scale=16, width=8, fill=(0,), strokes=NumStrokes(0.25).strokes):
-	'''draw number as 7-segment digital: 0 to 9 makes [0123456789], 10 to 15 makes [ABCDEF], 16 makes hyphen(-)'''
+from PIL import ImageDraw, Image
+def get_number_image(n: int, width: int): #, slant=0.25, padding=0.2):
+	from solve import WSolve
+	n_str = "%s" % n
+	b_str = conv_num_to_bin(n_str)
+	ws = WSolve(width, len(b_str))
+	img = Image.new('L', ws.box_size, (0xff,))
+	drw = ImageDraw.Draw(img)
+	for i, offset in enumerate(ws.offsets):
+		d = int(b_str[i])
+		draw_digit(d, drw, offset, ws.scale)
+	return img
+def conv_num_to_bin(num: int):
+	n_str = "%s" % num
+	bb = bytearray(len(n_str))
+	for i, c in enumerate(n_str):
+		if c == '-':
+			bb[i] = 16
+		else:
+			bb[i] = int(c)
+	return bb
+
+
+def draw_digit(n: int, drw: ImageDraw, offset=(0,0), scale=16, width=8, fill=(0,), strokes=NumStrokes(0.25).strokes):
+	'''draw a digit as 7-segment shape: 0 to 9 makes [0123456789], 10 to 15 makes [ABCDEF], 16 makes hyphen(-)'''
 	assert 0 <= n < SEVEN_SEG_SIZE
 	if not isinstance(offset, np.ndarray): #, npt.generic)):
 		offset = np.array(offset, int)
@@ -104,7 +126,11 @@ def draw_num(n: int, drw: ImageDraw, offset=(0,0), scale=16, width=8, fill=(0,),
 if __name__ == '__main__':
 	import sys
 	from pprint import pp
-	from PIL import Image
+	num = -23
+	width = 160
+	img = get_number_image(num, width)
+	img.show()
+	sys.exit(0)
 	save = False
 	show_list = [SEVEN_SEG_SIZE - 1]
 	scale = 40
@@ -113,7 +139,7 @@ if __name__ == '__main__':
 	for i in show_list:
 		img = Image.new('L', (80, 160), (0xff,))
 		drw = ImageDraw.Draw(img)
-		draw_num(i, drw, offset=offset, scale=scale, width=8, strokes=strokes)
+		draw_digit(i, drw, offset=offset, scale=scale, width=8, strokes=strokes)
 		img.show()
 		if save:
 			img.save(f"digi-{i}.png", 'PNG')	
