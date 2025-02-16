@@ -94,22 +94,31 @@ class NumStrokes:
 
 from format_num import FormatNum, HexFormatNum, conv_num_to_bin
 
-def get_number_image(width: int, *nn: Sequence[int | FormatNum]): #, slant=0.25, padding=0.2):
+class ImageFill(Enum):
+	BLACK = (0,)
+	WHITE = (0xff,)
+	@classmethod
+	def invert(cls, fill):
+		if fill == ImageFill.BLACK:
+			return ImageFill.WHITE
+		return ImageFill.BLACK
+
+def get_number_image(width: int, nn: Sequence[int | FormatNum], fill=ImageFill.WHITE): #, slant=0.25, padding=0.2):
 	b_str = []
 	for n in nn:
 		b_s = n.conv_to_bin() if isinstance(n, FormatNum) else conv_num_to_bin(n)
 		b_str.extend(b_s)
 	from solve import WSolve
 	ws = WSolve(width, len(b_str))
-	img = Image.new('L', ws.box_size, (0xff,))
+	img = Image.new('L', ws.box_size, color=fill.value)
 	drw = ImageDraw.Draw(img)
 	for i, offset in enumerate(ws.offsets):
 		d = int(b_str[i])
-		draw_digit(d, drw, offset, ws.scale)
+		draw_digit(d, drw, offset, ws.scale, fill=fill.invert(fill))
 	return img
 
 
-def draw_digit(n: int, drw: ImageDraw, offset=(0,0), scale=16, width=8, fill=(0,), strokes=NumStrokes(0.25).strokes):
+def draw_digit(n: int, drw: ImageDraw, offset=(0,0), scale=16, width=8, fill=ImageFill.BLACK, strokes=NumStrokes(0.25).strokes):
 	'''draw a digit as 7-segment shape: 0 to 9 makes [0123456789], 10 to 15 makes [ABCDEF], 16 makes hyphen(-)'''
 	assert 0 <= n < SEVEN_SEG_SIZE
 	if not isinstance(offset, np.ndarray): #, npt.generic)):
@@ -117,14 +126,14 @@ def draw_digit(n: int, drw: ImageDraw, offset=(0,0), scale=16, width=8, fill=(0,
 	for stroke in strokes[n]: #get_num_strokes(n, slant=slant):
 			strk = np.array(stroke, np.float16)
 			seq = [tuple(st * scale + offset) for st in strk]
-			drw.line(seq, fill=fill, width=width)
+			drw.line(seq, fill=fill.value, width=width)
 
 if __name__ == '__main__':
 	import sys
 	from pprint import pp
 	num = -23
 	width = 160
-	img = get_number_image(width, 24, HexFormatNum(-0xa))
+	img = get_number_image(width, [24, HexFormatNum(-0xa)], fill=ImageFill.BLACK)
 	img.show()
 	sys.exit(0)
 	save = False
