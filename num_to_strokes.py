@@ -1,4 +1,7 @@
+from enum import Enum
 import pickle
+import numpy as np
+from PIL import ImageDraw, Image
 from numpy.typing import NDArray
 from strok7 import STRK_DICT_STEM
 
@@ -89,12 +92,14 @@ class NumStrokes:
 		#assert 0 <= n < SEVEN_SEG_SIZE
 		return self._strokes #[n]
 
-import numpy as np
-from PIL import ImageDraw, Image
-def get_number_image(n: int, width: int): #, slant=0.25, padding=0.2):
+from format_num import FormatNum, HexFormatNum, conv_num_to_bin
+
+def get_number_image(width: int, *nn: Sequence[int | FormatNum]): #, slant=0.25, padding=0.2):
+	b_str = []
+	for n in nn:
+		b_s = n.conv_to_bin() if isinstance(n, FormatNum) else conv_num_to_bin(n)
+		b_str.extend(b_s)
 	from solve import WSolve
-	n_str = "%s" % n
-	b_str = conv_num_to_bin(n_str)
 	ws = WSolve(width, len(b_str))
 	img = Image.new('L', ws.box_size, (0xff,))
 	drw = ImageDraw.Draw(img)
@@ -102,15 +107,6 @@ def get_number_image(n: int, width: int): #, slant=0.25, padding=0.2):
 		d = int(b_str[i])
 		draw_digit(d, drw, offset, ws.scale)
 	return img
-def conv_num_to_bin(num: int):
-	n_str = "%s" % num
-	bb = bytearray(len(n_str))
-	for i, c in enumerate(n_str):
-		if c == '-':
-			bb[i] = 16
-		else:
-			bb[i] = int(c)
-	return bb
 
 
 def draw_digit(n: int, drw: ImageDraw, offset=(0,0), scale=16, width=8, fill=(0,), strokes=NumStrokes(0.25).strokes):
@@ -128,7 +124,7 @@ if __name__ == '__main__':
 	from pprint import pp
 	num = -23
 	width = 160
-	img = get_number_image(num, width)
+	img = get_number_image(width, 24, HexFormatNum(-0xa))
 	img.show()
 	sys.exit(0)
 	save = False
