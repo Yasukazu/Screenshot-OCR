@@ -103,13 +103,13 @@ class ImageFill(Enum):
 			return ImageFill.WHITE
 		return ImageFill.BLACK
 
-def get_number_image(width: int, nn: Sequence[int | FormatNum], fill=ImageFill.WHITE): #, slant=0.25, padding=0.2):
+def get_number_image(ht: int, nn: Sequence[int | FormatNum], fill=ImageFill.WHITE): #, slant=0.25, padding=0.2):
 	b_str = []
 	for n in nn:
 		b_s = n.conv_to_bin() if isinstance(n, FormatNum) else conv_num_to_bin(n)
 		b_str.extend(b_s)
-	from solve import WSolve
-	ws = WSolve(width, len(b_str))
+	from wh_solve import solve_wh
+	ws = solve_wh(ht=ht, n=len(b_str)) # WHSolve(width, len(b_str))
 	img = Image.new('L', ws.box_size, color=fill.value)
 	drw = ImageDraw.Draw(img)
 	for i, offset in enumerate(ws.offsets):
@@ -131,9 +131,8 @@ def draw_digit(n: int, drw: ImageDraw, offset=(0,0), scale=16, width=8, fill=Ima
 if __name__ == '__main__':
 	import sys
 	from pprint import pp
-	num = -23
-	width = 160
-	img = get_number_image(width, [24, HexFormatNum(-0xa)], fill=ImageFill.BLACK)
+	hgt = 80
+	img = get_number_image(hgt, [24, HexFormatNum(-0xa)], fill=ImageFill.BLACK)
 	img.show()
 	sys.exit(0)
 	save = False
