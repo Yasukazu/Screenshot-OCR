@@ -8,8 +8,11 @@ pdfplumber = "*"
 img2pdf = "*"
 pillow = "*"
 numpy = "*"
+pandas = "*"
+sympy = "*"
 
 [dev-packages]
+ipython = "*"
 
 [requires]
 python_version = "3.12"
