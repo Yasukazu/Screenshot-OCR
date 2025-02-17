@@ -2,17 +2,7 @@ class WSolve:
     def __init__(self, wt: int, n: int, pdr: float=0.3, er=0.8):
         self.wt = wt
         self.n = n
-        # pdr = pdr # = pdp / 100
-        ww = 0 # [0] * 2
-        diff = 0
-        w = 1
-        for i in range(wt):
-            diff = wt - (w * (1 + pdr) * n + w * pdr)
-            if diff <= 0:
-                break
-            ww = w # [i % 2] = w
-            w += 1
-        self.w = ww
+        self.w = int(wt / ((1 + pdr) * n + pdr))
         self.ew = int(self.w * er)
         self.eh = self.ew * 2
         self.pd = int(self.w * pdr)
