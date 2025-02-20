@@ -10,6 +10,7 @@ pillow = "*"
 numpy = "*"
 pandas = "*"
 sympy = "*"
+pdf2image = "*"
 
 [dev-packages]
 ipython = "*"
