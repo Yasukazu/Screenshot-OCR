@@ -41,8 +41,8 @@ def get_seg7_list():
 	return load_seg7()
 
 seg7_list = get_seg7_list()
-
-assert len(seg7_list) == 16
+from seven_seg import SEVEN_SEG_SIZE
+assert len(seg7_list) == SEVEN_SEG_SIZE
 
 import numpy as np
 
@@ -74,22 +74,10 @@ load_seg7_set_list()
 def get_seg_lines(n: int):
 	return _seg7_set_list[n]
 _segelem7dict = {}
-def get_num_strokes(n: int, slant=0.25):
-	from num_to_strokes import _segpath_array
-	segpath = _segpath_array[n]
-	for path in segpath:
-		yield list(path.slanted(slant))
 
-from PIL import ImageDraw
-def draw_num(n, drw: ImageDraw, offset=(0,0), scale=16, width=8, fill=(0,), slant=0.25):
-	if type(offset) != npt.NDArray:
-		offset = np.array(offset, int)
-	for stroke in get_num_strokes(n, slant=slant):
-			strk = np.array(stroke, np.float16)
-			seq = [tuple(st * scale + offset) for st in strk]
-			drw.line(seq, fill=fill, width=width)
 
 if __name__ == '__main__':
+	from num_to_strokes import draw_digit
 	from PIL import Image, ImageDraw
 	from pprint import pprint
 	save = False
@@ -98,7 +86,7 @@ if __name__ == '__main__':
 	for i in range(10):
 		img = Image.new('L', (80, 160), (0xff,))
 		drw = ImageDraw.Draw(img)
-		draw_num(i, drw, offset=offset, scale=scale, width=8)
+		draw_digit(i, drw, offset=offset, scale=scale, line_width_ratio=8)
 		img.show()
 		if save:
 			img.save(f"digi-{i}.png", 'PNG')

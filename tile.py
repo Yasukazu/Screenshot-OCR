@@ -1,3 +1,4 @@
+from typing import Sequence
 from collections.abc import Iterator
 from PIL import Image, ImageDraw
 import img2pdf
@@ -47,7 +48,7 @@ def save_pages(ext_dir=FileExt.QPNG, arc=False):
 	if arc:
 		imgs: list[Image.Image] = list(draw_onto_pages())
 		save_dir = img_dir / ext_dir.value.dir
-		fullpath = img_dir / f"{year}-{month}-img32.tif"
+		fullpath = img_dir / f"{year}-{month:02}-img32.tif"
 		imgs[0].save(fullpath, compression="tiff_deflate", save_all=True, append_images=imgs[1:])
 		return
 	save_dir = img_dir / ext_dir.value.dir
@@ -66,7 +67,7 @@ def get_quad_png_file_names():
 
 TXT_OFST = 80
 from _collections_abc import Generator
-from load_csv_7 import draw_num
+from num_to_strokes import draw_digit
 def draw_onto_pages(div=64, th=H_PAD // 2,
 	file_names: Iterator[str]=get_png_file_names())-> Generator[Image.Image, None, None]:
 	drc_tbl = [(0, -1), (1, 0), (0, 1), (-1, 0)]
@@ -120,7 +121,7 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		page_dots(ct, drw, pg + 1) # drw.line((*ct, *dstp), fill=(255, 255, 255), width=int(th))
 		text = f"{' ' * 8}{year}-{month:02}({pg + 1}/4)"
 		drw.text((*xshift(TXT_OFST, *ct), *yshift(*dstp)), text, 'white')
-		draw_num(pg + 1, drw, offset=(10, 10), scale=30, width=8)
+		draw_digit(pg + 1, drw, offset=(10, 10), scale=30, line_width_ratio=8)
 		#name = f"{year_month_name}-{pg + 1}.png"
 		yield img #, name #.convert('L') #.save(img_dir / name, 'PNG')
 
@@ -164,22 +165,27 @@ def open_img(name, glob=False):
 	else:
 		return Image.open(name)
 
-def get_concat_h(im1: Image, im2: Image, pad=H_PAD)->Image:
-	dst = Image.new('RGB', (im1.width + pad + im2.width, im1.height))
+def get_concat_h(im1: Image, im2: Image, pad=H_PAD, mode='L')-> Image:
+	dst = Image.new(mode, (im1.width + pad + im2.width, im1.height))
 	dst.paste(im1, (0, 0))
 	if pad > 0:
-		pad_img = Image.new('RGB', (pad, im1.height))
+		pad_img = Image.new(mode, (pad, im1.height))
 		dst.paste(pad_img, (im1.width, 0))
 	dst.paste(im2, (im1.width + pad, 0))
 	return dst
 
-def get_concat_v(im1: Image, im2: Image, pad=V_PAD)->Image:
-	dst = Image.new('RGB', (im1.width, im1.height + pad + im2.height))
-	dst.paste(im1, (0, 0))
-	if pad > 0:
-		pad_img = Image.new('RGB', (im1.width, pad))
-		dst.paste(pad_img, (0, im1.height))
-	dst.paste(im2, (0, im1.height + pad))
+def get_concat_v(*imim: Sequence[Image.Image], pad=V_PAD, mode='L')-> Image.Image: # im1: Image, im2: Image, 
+	dst_size = (imim[0].width, sum(im.height for im in imim))
+	dst = Image.new(mode, dst_size)
+	pad_img = Image.new(mode, (imim[0].width, pad)) if pad > 0 else None
+	imim_len = len(imim)
+	ypos = 0
+	for i, im in enumerate(imim):
+		dst.paste(im, (0, ypos))
+		ypos += im.height
+		if pad and i < imim_len - 1:
+			dst.paste(pad_img, (0, ypos))
+			ypos += pad_img.height
 	return dst
 
 if __name__ == '__main__':
