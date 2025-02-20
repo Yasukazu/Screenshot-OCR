@@ -103,24 +103,25 @@ class ImageFill(Enum):
 			return ImageFill.WHITE
 		return ImageFill.BLACK
 
-def get_number_image(ht: int, nn: Sequence[int | FormatNum], fill=ImageFill.WHITE): #, slant=0.25, padding=0.2):
+def get_number_image(ht: int, wt: int, nn: Sequence[int | FormatNum], bgcolor=ImageFill.WHITE): #, slant=0.25, padding=0.2):
 	b_str = []
 	for n in nn:
 		b_s = n.conv_to_bin() if isinstance(n, FormatNum) else conv_num_to_bin(n)
 		b_str.extend(b_s)
 	from wh_solve import solve_wh
 	ws = solve_wh(ht=ht, n=len(b_str)) # WHSolve(width, len(b_str))
-	img = Image.new('L', ws.box_size, color=fill.value)
+	img = Image.new('L', ws.box_size, color=bgcolor.value)
 	drw = ImageDraw.Draw(img)
 	for i, offset in enumerate(ws.offsets):
 		d = int(b_str[i])
-		draw_digit(d, drw, offset, ws.scale, fill=fill.invert(fill))
+		draw_digit(d, drw, offset, ws.scale, fill=bgcolor.invert(bgcolor))
 	return img
 
 
-def draw_digit(n: int, drw: ImageDraw, offset=(0,0), scale=16, width=8, fill=ImageFill.BLACK, strokes=NumStrokes(0.25).strokes):
+def draw_digit(n: int, drw: ImageDraw, offset=(0,0), scale=16, width_ratio=0.2, fill=ImageFill.BLACK, strokes=NumStrokes(0.25).strokes):
 	'''draw a digit as 7-segment shape: 0 to 9 makes [0123456789], 10 to 15 makes [ABCDEF], 16 makes hyphen(-)'''
 	assert 0 <= n < SEVEN_SEG_SIZE
+	width = int(scale * width_ratio) or 1
 	if not isinstance(offset, np.ndarray): #, npt.generic)):
 		offset = np.array(offset, int)
 	for stroke in strokes[n]: #get_num_strokes(n, slant=slant):
@@ -131,8 +132,9 @@ def draw_digit(n: int, drw: ImageDraw, offset=(0,0), scale=16, width=8, fill=Ima
 if __name__ == '__main__':
 	import sys
 	from pprint import pp
-	hgt = 80
-	img = get_number_image(hgt, [24, HexFormatNum(-0xa)], fill=ImageFill.BLACK)
+	hgt = 30
+	wdt = 80
+	img = get_number_image(hgt, wdt, [24, HexFormatNum(-0xa)], bgcolor=ImageFill.BLACK)
 	img.show()
 	sys.exit(0)
 	save = False
@@ -143,7 +145,7 @@ if __name__ == '__main__':
 	for i in show_list:
 		img = Image.new('L', (80, 160), (0xff,))
 		drw = ImageDraw.Draw(img)
-		draw_digit(i, drw, offset=offset, scale=scale, width=8, strokes=strokes)
+		draw_digit(i, drw, offset=offset, scale=scale, width_ratio=8, strokes=strokes)
 		img.show()
 		if save:
 			img.save(f"digi-{i}.png", 'PNG')	
