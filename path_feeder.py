@@ -34,14 +34,35 @@ from calendar import monthrange
 
 YearMonth = namedtuple('YearMonth', ['year', 'month'] )
 
-def path_feeder(year=0, month=0, from_=1, to=-1, input_type:FileExt=FileExt.PNG, pad=True): 
-	'''to=0:glob, -1:end of month'''
+YEAR_FORMAT = "{:04}"
+MONTH_FORMAT = "{:02}"
+
+def get_last_month_path(year=0, month=0)-> Path:
 	last_month = get_last_month()
 	if not year:
 		year = last_month.year
 	if not month:
 		month = last_month.month
-	ymstr = f"{year}{month:02}"
+	return input_dir / ("%d" % year) / ("%02d" % month)
+	# MONTH_FORMAT.format(month)
+	# ymstr = f"{year}{month:02}"
+
+def get_ymstr(year=0, month=0, sep=False)-> str:
+	last_month = get_last_month()
+	if not year:
+		year = last_month.year
+	if not month:
+		month = last_month.month
+	sepr = '-' if sep else ''
+	return f"{year}{sepr}{month:02}"
+
+def get_input_path(year=0, month=0)-> Path:
+	ymstr = get_ymstr(year=year, month=month)
+	return input_dir / ymstr
+
+def path_feeder(year=0, month=0, from_=1, to=-1, input_type:FileExt=FileExt.PNG, pad=True): 
+	'''to=0:glob, -1:end of month'''
+	ymstr = get_ymstr(year=year, month=month) # f"{year}{month:02}"
 	input_path = input_dir / ymstr / input_type.value.dir
 	#if direc: input_path = input_path / direc
 	if to < 0:
@@ -70,3 +91,20 @@ def get_last_month()-> YearMonth:
 	ym = last_month.strftime("%Y,%m").split(',')
 	iym = [int(i) for i in ym]
 	return YearMonth(*iym)
+
+def get_cur_month()-> YearMonth:
+	'''returns (year, month)'''
+	today = datetime.date.today()
+	ym = today.strftime("%Y,%m").split(',')
+	iym = [int(i) for i in ym]
+	return YearMonth(*iym)
+
+from enum import StrEnum
+
+TIFF_EXT = '.tif'
+def get_imgnum_sfx(n):
+	return '-img%02d' % n
+
+def get_tiff_fullpath(year=0, month=0)-> Path:
+	ym_str = get_ymstr(year=year, month=month, sep=True)
+	return input_dir / ''.join([ym_str, get_imgnum_sfx(32), TIFF_EXT])
