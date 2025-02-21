@@ -5,12 +5,14 @@ import img2pdf
 import os.path, calendar
 import ttl
 from pathlib import Path
-home = Path(os.path.expanduser('~'))
+home_dir = Path(os.path.expanduser('~'))
 from path_feeder import get_last_month #, YearMonth
-last_month = get_last_month()
-year = last_month.year
-month = last_month.month
-img_dir = home / 'Documents' / 'screen' / f'{year}{month:02}'
+last_month_date = get_last_month()
+year = last_month_date.year
+month = last_month_date.month
+img_dir = home_dir / 'Documents' / 'screen' / str(year) / f'{month:02}'
+if not img_dir.exists():
+	img_dir.mkdir()
 
 IMG_SIZE = (720, 1612)
 H_PAD = 20
@@ -55,21 +57,28 @@ def save_pages(ext_dir=FileExt.QPNG, arc=False):
 	for pg, img in enumerate(draw_onto_pages()):
 		fullpath = save_dir / f"8-img-{pg + 1}{ext_dir.value.ext}"
 		img.save(fullpath) #, 'PNG')
-
+from typing import Generator
 from path_feeder import path_feeder, FileExt
-def get_png_file_names():
-	for path in path_feeder(input_type=FileExt.PNG):
-		yield path
+def get_png_file_names()-> Generator[tuple[Path, str, int], None, None]:
+	for path, stem, m in path_feeder(input_type=FileExt.PNG):
+		yield path, stem, m
 
-def get_quad_png_file_names():
-	for path in path_feeder(input_type=FileExt.QPNG):
-		yield path
+def get_quad_png_file_names()-> Generator[tuple[Path, str, int], None, None]:
+	for path, stem, m in path_feeder(input_type=FileExt.QPNG):
+		yield path, stem, m
 
 TXT_OFST = 80
 from _collections_abc import Generator
 from num_to_strokes import draw_digit
+from path_feeder import PathFeeder
 def draw_onto_pages(div=64, th=H_PAD // 2,
-	file_names: Iterator[str]=get_png_file_names())-> Generator[Image.Image, None, None]:
+	file_name_feeder: PathFeeder=PathFeeder() # file_names: Iterator[Path, str, int]=get_png_file_names()
+	, h_pad=16, v_pad=8)-> Iterator[Image.Image]:
+	first_fullpath = file_name_feeder.first_fullpath()
+	if not first_fullpath:
+		raise ValueError(f"No '{file_name_feeder.ext}' file in {file_name_feeder.dir}!")
+	first_img_size = Image.open(first_fullpath).size
+
 	drc_tbl = [(0, -1), (1, 0), (0, 1), (-1, 0)]
 	ll_ww = [0, 0]
 	def _to(n, xy):
@@ -98,14 +107,12 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 			drw.line((frm[0], frm[1], to[0], to[1]), fill_white, width=int(th))
 
 	def get_images():
-		names = [n for (n,d,i) in file_names]
+		names = list(file_name_feeder.feed())
 		name_blocks = [names[:8], names[8:16], names[16:24], names[24:]]
 		pad_size = 8 - len(name_blocks[-1])
 		name_blocks[-1] += ([None] * pad_size)
 		for block in name_blocks:
-			assert len(block) == 8
-		for block in name_blocks:
-			yield concat_8_pages(n for n in block)
+			yield concat_8_pages(first_img_size, file_name_feeder.dir, file_name_feeder.ext, (n for n in block), h_pad=h_pad, v_pad=v_pad)
 
 	for pg, img in enumerate(get_images()):
 		ct = (img.width // 2, img.height // 2) # s // 2 for s in img.size)
@@ -121,20 +128,34 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		page_dots(ct, drw, pg + 1) # drw.line((*ct, *dstp), fill=(255, 255, 255), width=int(th))
 		text = f"{' ' * 8}{year}-{month:02}({pg + 1}/4)"
 		drw.text((*xshift(TXT_OFST, *ct), *yshift(*dstp)), text, 'white')
-		draw_digit(pg + 1, drw, offset=(10, 10), scale=30, line_width_ratio=8)
+		draw_digit(pg + 1, drw, offset=(10, 10), scale=30, width_ratio=8)
 		#name = f"{year_month_name}-{pg + 1}.png"
 		yield img #, name #.convert('L') #.save(img_dir / name, 'PNG')
+from collections import namedtuple
+WidthHeight = namedtuple('WidthHeight', ['width', 'height'])
+def concat_8_pages(img_size: tuple[int, int], dir: Path, ext: str, names: Iterator[str], h_pad: int=0, v_pad: int=0)-> Image:
+	pad_img = Image.new('L', img_size, (0xff,))
+	def open_img(f: str)-> Image.Image | None:
+		fullpath = dir / (f + ext)
+		img =  Image.open(fullpath) if fullpath.exists() else None
+		return img
+	names_1 = list(names[:4])
+	names_2 = list(names[4:])
+	def sum_size(acc: list[int, int], nn: list[str]):
+		for n in nn:
+			img = open_img(n)
+			acc[0] += img.width
+			acc[1] += img.height
+	size_1 = [0, 0]
+	sum_size(size_1, names_1)
+	size_2 = [0, 0]
+	sum_size(size_2, names_2)
 
-def concat_8_pages(names: Iterator[str])-> Image:
-	def dq():
-		return open_img(next(names))
-	def h2img():
-		return get_concat_h(dq(), dq())
-	def h4img():
-		return get_concat_h(h2img(), h2img())
-	himg1 = h4img()
-	himg2 = h4img()
-	return get_concat_v(himg1, himg2)
+	himg1 = get_concat_h([img_size] * len(names_1), (open_img(n) for n in names_1), pad=h_pad) # (dq()))
+	himg2 = get_concat_h([img_size] * len(names_2), (open_img(n) for n in names_2), pad=h_pad) # (dq()))h4img()
+	def sum_hgt(nn):
+		return sum(get_img_width(f) for f in nn)
+	return get_concat_v(himg1, himg2, pad=v_pad)
 
 def get_img_file_names_(glob=True):
 	days = calendar.monthrange(year, month)[1]
@@ -147,13 +168,13 @@ def get_img_file_names_(glob=True):
 
 blank_img = Image.new('L', IMG_SIZE, (0xff,))
 
-def open_img(name, glob=False):
+def open_image(dir: Path, name: str, glob=False):
 	if not name:
 		global file_over 
 		file_over = True
 		return blank_img
 	if glob:
-		fullpath_list = list(img_dir.glob(name))
+		fullpath_list = list(dir.glob(name))
 		fpthslen = len(fullpath_list)
 		assert fpthslen < 2
 		if fpthslen == 1: #(fp:=fullpath_list[0]).exists():
@@ -163,24 +184,44 @@ def open_img(name, glob=False):
 		else:
 			return blank_img
 	else:
-		return Image.open(name)
-
-def get_concat_h(im1: Image, im2: Image, pad=H_PAD, mode='L')-> Image:
-	dst = Image.new(mode, (im1.width + pad + im2.width, im1.height))
-	dst.paste(im1, (0, 0))
-	if pad > 0:
-		pad_img = Image.new(mode, (pad, im1.height))
-		dst.paste(pad_img, (im1.width, 0))
-	dst.paste(im2, (im1.width + pad, 0))
+		assert (dir / name).exists()
+		return Image.open(dir/ name)
+from typing import Iterable
+def get_concat_h(im_sizes: Iterable[tuple[int, int]], imim: Sequence[Image.Image | None], pad=0, mode='L')-> Image:
+	max_height = max([s[1] for s in im_sizes])
+	pad_img = dst = None
+	xpos = 0
+	width_sum = sum([s[0] for s in im_sizes])
+	height_sum = sum([s[1] for s in im_sizes])
+	dst_size = (width_sum, height_sum) # (im_width_sum + pad * (imim_len - 1), im.height)
+	dst = Image.new(mode, dst_size)
+	pad_img = Image.new(mode, (pad, max_height)) if pad > 0 else None
+	for i, im in enumerate(imim):
+		assert im
+		if not dst:
+			dst_size = (imim_len * im.width + pad * (imim_len - 1), im.height)
+			dst = Image.new(mode, dst_size)
+			pad_img = Image.new(mode, (im.width, pad)) if pad > 0 else None
+		if not im:
+			continue
+		dst.paste(im, (xpos, 0))
+		xpos += im.width
+		if pad and i < imim_len - 1:
+			dst.paste(pad_img, (xpos, 0))
+			xpos += pad_img.width
+	# if pad > 0: pad_img = Image.new(mode, (pad, im1.height)) dst.paste(pad_img, (im1.width, 0))
+	# dst.paste(im2, (im1.width + pad, 0))
 	return dst
 
-def get_concat_v(*imim: Sequence[Image.Image], pad=V_PAD, mode='L')-> Image.Image: # im1: Image, im2: Image, 
-	dst_size = (imim[0].width, sum(im.height for im in imim))
+def get_concat_v(*imim: Sequence[Image.Image | None], pad: int=0, mode='L')-> Image.Image: # im1: Image, im2: Image, 
+	imim_len = len(list(imim))
+	dst_size = (imim[0].width, sum(im.height for im in imim) + pad * (imim_im - 1))
 	dst = Image.new(mode, dst_size)
 	pad_img = Image.new(mode, (imim[0].width, pad)) if pad > 0 else None
-	imim_len = len(imim)
 	ypos = 0
 	for i, im in enumerate(imim):
+		if not im:
+			continue
 		dst.paste(im, (0, ypos))
 		ypos += im.height
 		if pad and i < imim_len - 1:
