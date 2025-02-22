@@ -102,23 +102,43 @@ class ImageFill(Enum):
 		if fill == ImageFill.BLACK:
 			return ImageFill.WHITE
 		return ImageFill.BLACK
-
-def get_number_image(ht: int, wt: int, nn: Sequence[int | FormatNum], bgcolor=ImageFill.WHITE): #, slant=0.25, padding=0.2):
+from collections import namedtuple
+Size = namedtuple('Size', ['w', 'h'])
+def get_number_image(size: Size, nn: Sequence[int | FormatNum], bgcolor=ImageFill.WHITE, padding=0.4)-> tuple[Image.Image, Size]: #, slant=0.25, padding=0.2):
+	'''returns Image, margins'''
 	b_str = []
 	for n in nn:
 		b_s = n.conv_to_bin() if isinstance(n, FormatNum) else conv_num_to_bin(n)
 		b_str.extend(b_s)
-	from wh_solve import solve_wh
-	ws = solve_wh(ht=ht, n=len(b_str)) # WHSolve(width, len(b_str))
-	img = Image.new('L', ws.box_size, color=bgcolor.value)
+	def scale_margins()-> tuple[int, Size]:
+		'''returns scale, margin-size'''
+		img_ratio = len(b_str) / 2
+		w = size[0]
+		h = size[1]
+		win_ratio = w / h
+		x_margin = y_margin = 0
+		if win_ratio > img_ratio:
+			scale = h / 2
+			x_margin = (w - h * img_ratio) / 2
+			return int(scale) or 1, Size(int(x_margin), 0)
+		scale = w / len(b_str)
+		y_margin = (h - w / img_ratio) / 2
+		return int(scale) or 1, Size(0, int(y_margin))
+	scale, margins = scale_margins()
+	img_size = np.array(tuple(Size(w=len(b_str)*scale, h=2*scale)))
+	font_scale = int(scale * (1 - padding))
+	offset = (np.array([scale, 2 * scale]) - np.array([font_scale, 2 * font_scale])) / 2
+	pitch = np.array([scale, 0])
+	img_tuple = list(int(i) for i in img_size)
+	img = Image.new('L', img_tuple, color=bgcolor.value)
 	drw = ImageDraw.Draw(img)
-	for i, offset in enumerate(ws.offsets):
+	for i in range(len(b_str)): # offset in enumerate(ws.offsets):
 		d = int(b_str[i])
-		draw_digit(d, drw, offset, ws.scale, fill=bgcolor.invert(bgcolor))
-	return img
+		draw_digit(d, drw, i * pitch + offset, scale=font_scale, width_ratio=0.4, fill=bgcolor.invert(bgcolor))
+	return img, margins
 
 
-def draw_digit(n: int, drw: ImageDraw, offset=(0,0), scale=16, width_ratio=0.2, fill=ImageFill.BLACK, strokes=NumStrokes(0.25).strokes):
+def draw_digit(n: int, drw: ImageDraw, offset: np.ndarray | tuple[int, int]=(0,0), scale=16, width_ratio=0.2, fill=ImageFill.BLACK, strokes=NumStrokes(0.25).strokes):
 	'''draw a digit as 7-segment shape: 0 to 9 makes [0123456789], 10 to 15 makes [ABCDEF], 16 makes hyphen(-)'''
 	assert 0 <= n < SEVEN_SEG_SIZE
 	width = int(scale * width_ratio) or 1
@@ -132,9 +152,10 @@ def draw_digit(n: int, drw: ImageDraw, offset=(0,0), scale=16, width_ratio=0.2, 
 if __name__ == '__main__':
 	import sys
 	from pprint import pp
-	hgt = 30
-	wdt = 80
-	img = get_number_image(hgt, wdt, [24, HexFormatNum(-0xa)], bgcolor=ImageFill.BLACK)
+	h = 30
+	w = 80
+	img, margins = get_number_image((w, h), [24, HexFormatNum(-0xa)], bgcolor=ImageFill.WHITE)
+	pp(margins)
 	img.show()
 	sys.exit(0)
 	save = False
