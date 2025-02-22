@@ -70,11 +70,11 @@ def get_quad_png_file_names()-> Generator[tuple[Path, str, int], None, None]:
 
 TXT_OFST = 80
 from _collections_abc import Generator
-from num_to_strokes import draw_digit
+from num_to_strokes import get_number_image
 from path_feeder import PathFeeder
 def draw_onto_pages(div=64, th=H_PAD // 2,
 	file_name_feeder: PathFeeder=PathFeeder() # file_names: Iterator[Path, str, int]=get_png_file_names()
-	, h_pad=16, v_pad=8, mode='L', dst_bg=(0xff,))-> Iterator[Image.Image]:
+	, h_pad=16, v_pad=8, mode='L', dst_bg=(0xff,), number_offset=(20, 30), number_size=(120, 30))-> Iterator[Image.Image]:
 	name_feeder = file_name_feeder.feed
 	first_fullpath = file_name_feeder.first_fullpath
 	if not first_fullpath:
@@ -113,10 +113,10 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		name_blocks = [names[:8], names[8:16], names[16:24], names[24:]]
 		pad_size = 8 - len(name_blocks[-1])
 		name_blocks[-1] += [''] * pad_size
-		for block in name_blocks:
-			yield concat_8_pages(block)
+		for i, block in enumerate(name_blocks):
+			yield concat_8_pages(i, block)
 
-	def concat_8_pages(names: Iterator[str])-> Image:
+	def concat_8_pages(i: int, names: Iterator[str])-> Image:
 
 		names_1 = list(names[:4])
 		names_2 = list(names[4:])
@@ -148,9 +148,11 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		dst.paste(im2, (0, im1.height + pad))
 		return dst
 
-	def open_img(f: str)-> Image.Image | None:
-		fullpath = file_name_feeder.dir / (f + file_name_feeder.ext)
+	def open_img(fn: str)-> Image.Image | None:
+		fullpath = file_name_feeder.dir / (fn + file_name_feeder.ext)
 		img = Image.open(fullpath) if fullpath.exists() else None
+		number_image = get_number_image(size=number_size, nn=[int(c) for c in fn])
+		img.paste(number_image, number_offset)
 		return img
 
 	for pg, img in enumerate(get_image_blocks()):
@@ -167,9 +169,10 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		page_dots(ct, drw, pg + 1) # drw.line((*ct, *dstp), fill=(255, 255, 255), width=int(th))
 		text = f"{' ' * 8}{year}-{month:02}({pg + 1}/4)"
 		drw.text((*xshift(TXT_OFST, *ct), *yshift(*dstp)), text, 'white')
-		draw_digit(pg + 1, drw, offset=(10, 10), scale=30, width_ratio=8)
+		# draw_digit(pg + 1, drw, offset=(10, 10), scale=30, width_ratio=8)
 		#name = f"{year_month_name}-{pg + 1}.png"
 		yield img #, name #.convert('L') #.save(img_dir / name, 'PNG')
+
 from collections import namedtuple
 WidthHeight = namedtuple('WidthHeight', ['width', 'height'])
 def concat_8_pages(img_size: tuple[int, int], dir: Path, ext: str, names: Iterator[str], h_pad: int=0, v_pad: int=0)-> Image:

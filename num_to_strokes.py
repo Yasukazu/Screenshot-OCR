@@ -125,8 +125,8 @@ def get_number_image(size: Size, nn: Sequence[int | FormatNum], bgcolor=ImageFil
 		y_margin = (h - w / img_ratio) / 2
 		return int(scale) or 1, Size(0, int(y_margin))
 	scale, margins = scale_margins()
-	img_size = np.array(tuple(Size(w=len(b_str)*scale, h=2*scale)))
 	font_scale = int(scale * (1 - padding))
+	img_size = np.array(tuple(Size(w=len(b_str) * scale * (1 + (scale / font_scale) / scale), h=2 * scale)))
 	offset = (np.array([scale, 2 * scale]) - np.array([font_scale, 2 * font_scale])) / 2
 	pitch = np.array([scale, 0])
 	img_tuple = list(int(i) for i in img_size)
@@ -152,11 +152,16 @@ def draw_digit(n: int, drw: ImageDraw, offset: np.ndarray | tuple[int, int]=(0,0
 if __name__ == '__main__':
 	import sys
 	from pprint import pp
-	h = 30
-	w = 80
-	img, margins = get_number_image((w, h), [24, HexFormatNum(-0xa)], bgcolor=ImageFill.WHITE)
-	pp(margins)
-	img.show()
+	import numpy as np
+	from path_feeder import PathFeeder
+	feeder = PathFeeder()
+	first_fullpath = feeder.first_fullpath
+	item_img = Image.open(first_fullpath)
+	first_stem = first_fullpath.stem
+	name_num_array = [int(c) for c in first_stem]
+	num_img, margins = get_number_image((100, 50), name_num_array)
+	item_img.paste(num_img, tuple(np.array(margins) + np.array([0, 10])))
+	item_img.show()
 	sys.exit(0)
 	save = False
 	show_list = [SEVEN_SEG_SIZE - 1]
