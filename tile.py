@@ -1,3 +1,4 @@
+from typing import Iterable
 from typing import Sequence
 from collections.abc import Iterator
 from PIL import Image, ImageDraw
@@ -73,8 +74,9 @@ from num_to_strokes import draw_digit
 from path_feeder import PathFeeder
 def draw_onto_pages(div=64, th=H_PAD // 2,
 	file_name_feeder: PathFeeder=PathFeeder() # file_names: Iterator[Path, str, int]=get_png_file_names()
-	, h_pad=16, v_pad=8)-> Iterator[Image.Image]:
-	first_fullpath = file_name_feeder.first_fullpath()
+	, h_pad=16, v_pad=8, mode='L', dst_bg=(0xff,))-> Iterator[Image.Image]:
+	name_feeder = file_name_feeder.feed
+	first_fullpath = file_name_feeder.first_fullpath
 	if not first_fullpath:
 		raise ValueError(f"No '{file_name_feeder.ext}' file in {file_name_feeder.dir}!")
 	first_img_size = Image.open(first_fullpath).size
@@ -106,15 +108,52 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		for frm, to in ttl.plot(month, ttl.Direc.RT):
 			drw.line((frm[0], frm[1], to[0], to[1]), fill_white, width=int(th))
 
-	def get_images():
-		names = list(file_name_feeder.feed())
+	def get_image_blocks():
+		names = list(file_name_feeder.feed(padding=True))
 		name_blocks = [names[:8], names[8:16], names[16:24], names[24:]]
 		pad_size = 8 - len(name_blocks[-1])
-		name_blocks[-1] += ([None] * pad_size)
+		name_blocks[-1] += [''] * pad_size
 		for block in name_blocks:
-			yield concat_8_pages(first_img_size, file_name_feeder.dir, file_name_feeder.ext, (n for n in block), h_pad=h_pad, v_pad=v_pad)
+			yield concat_8_pages(block)
 
-	for pg, img in enumerate(get_images()):
+	def concat_8_pages(names: Iterator[str])-> Image:
+
+		names_1 = list(names[:4])
+		names_2 = list(names[4:])
+
+		himg1 = concat_h(names_1)
+		himg2 = concat_h(names_2)
+		return concat_v(himg1, himg2)
+
+	img_size = Image.open(file_name_feeder.first_fullpath).size
+	def concat_h(names: list[str], pad=h_pad)-> Image:
+		imim_len = len(names)
+		imim = (open_img(n) for n in names)
+		max_height = img_size[1]
+		im_width = img_size[0]
+		width_sum = imim_len * img_size[0]
+		dst_size = (width_sum + (imim_len - 1) * pad, max_height)
+		dst: Image.Image = Image.new(mode, dst_size, dst_bg)
+		cur = 0
+		for im in imim:
+			if im:
+				dst.paste(im, (cur, 0))
+			cur += im_width + pad
+		return dst
+	def concat_v(im1: Image.Image, im2: Image.Image)-> Image.Image:
+		pad = v_pad
+		dst_size = (im1.width, im1.height + pad + im2.height)
+		dst: Image.Image = Image.new(mode, dst_size, dst_bg)
+		dst.paste(im1, (0, 0))
+		dst.paste(im2, (0, im1.height + pad))
+		return dst
+
+	def open_img(f: str)-> Image.Image | None:
+		fullpath = file_name_feeder.dir / (f + file_name_feeder.ext)
+		img = Image.open(fullpath) if fullpath.exists() else None
+		return img
+
+	for pg, img in enumerate(get_image_blocks()):
 		ct = (img.width // 2, img.height // 2) # s // 2 for s in img.size)
 		ll_ww[0] = img.height // div
 		ll_ww[1] = img.width // 128
@@ -134,28 +173,18 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 from collections import namedtuple
 WidthHeight = namedtuple('WidthHeight', ['width', 'height'])
 def concat_8_pages(img_size: tuple[int, int], dir: Path, ext: str, names: Iterator[str], h_pad: int=0, v_pad: int=0)-> Image:
-	pad_img = Image.new('L', img_size, (0xff,))
 	def open_img(f: str)-> Image.Image | None:
 		fullpath = dir / (f + ext)
 		img =  Image.open(fullpath) if fullpath.exists() else None
 		return img
+
 	names_1 = list(names[:4])
 	names_2 = list(names[4:])
-	def sum_size(acc: list[int, int], nn: list[str]):
-		for n in nn:
-			img = open_img(n)
-			acc[0] += img.width
-			acc[1] += img.height
-	size_1 = [0, 0]
-	sum_size(size_1, names_1)
-	size_2 = [0, 0]
-	sum_size(size_2, names_2)
 
-	himg1 = get_concat_h([img_size] * len(names_1), (open_img(n) for n in names_1), pad=h_pad) # (dq()))
-	himg2 = get_concat_h([img_size] * len(names_2), (open_img(n) for n in names_2), pad=h_pad) # (dq()))h4img()
-	def sum_hgt(nn):
-		return sum(get_img_width(f) for f in nn)
-	return get_concat_v(himg1, himg2, pad=v_pad)
+	img_count = len(list(names))
+	himg1 = get_concat_h(img_count, img_size, (open_img(n) for n in names_1), pad=h_pad) # (dq()))
+	himg2 = get_concat_h(img_count, img_size, (open_img(n) for n in names_2), pad=h_pad) # (dq()))h4img()
+	return get_concat_v(2, img_size, (himg1, himg2), pad=v_pad)
 
 def get_img_file_names_(glob=True):
 	days = calendar.monthrange(year, month)[1]
@@ -186,47 +215,30 @@ def open_image(dir: Path, name: str, glob=False):
 	else:
 		assert (dir / name).exists()
 		return Image.open(dir/ name)
-from typing import Iterable
-def get_concat_h(im_sizes: Iterable[tuple[int, int]], imim: Sequence[Image.Image | None], pad=0, mode='L')-> Image:
-	max_height = max([s[1] for s in im_sizes])
-	pad_img = dst = None
-	xpos = 0
-	width_sum = sum([s[0] for s in im_sizes])
-	height_sum = sum([s[1] for s in im_sizes])
-	dst_size = (width_sum, height_sum) # (im_width_sum + pad * (imim_len - 1), im.height)
-	dst = Image.new(mode, dst_size)
-	pad_img = Image.new(mode, (pad, max_height)) if pad > 0 else None
-	for i, im in enumerate(imim):
-		assert im
-		if not dst:
-			dst_size = (imim_len * im.width + pad * (imim_len - 1), im.height)
-			dst = Image.new(mode, dst_size)
-			pad_img = Image.new(mode, (im.width, pad)) if pad > 0 else None
-		if not im:
-			continue
-		dst.paste(im, (xpos, 0))
-		xpos += im.width
-		if pad and i < imim_len - 1:
-			dst.paste(pad_img, (xpos, 0))
-			xpos += pad_img.width
-	# if pad > 0: pad_img = Image.new(mode, (pad, im1.height)) dst.paste(pad_img, (im1.width, 0))
-	# dst.paste(im2, (im1.width + pad, 0))
+def get_concat_h(imim_len: int, img_size: tuple[int, int], imim: Sequence[Image.Image | None], pad=0, mode='L', dst_bg=(0xff,))-> Image:
+	max_height = img_size[1]
+	im_width = img_size[0]
+	width_sum = imim_len * img_size[0]
+	dst_size = (width_sum + (imim_len - 1) * pad, max_height)
+	dst: Image.Image = Image.new(mode, dst_size, dst_bg)
+	cur = 0
+	for im in imim:
+		if im:
+			dst.paste(im, (cur, 0))
+		cur += im_width + pad
 	return dst
 
-def get_concat_v(*imim: Sequence[Image.Image | None], pad: int=0, mode='L')-> Image.Image: # im1: Image, im2: Image, 
-	imim_len = len(list(imim))
-	dst_size = (imim[0].width, sum(im.height for im in imim) + pad * (imim_im - 1))
-	dst = Image.new(mode, dst_size)
-	pad_img = Image.new(mode, (imim[0].width, pad)) if pad > 0 else None
-	ypos = 0
-	for i, im in enumerate(imim):
-		if not im:
-			continue
-		dst.paste(im, (0, ypos))
-		ypos += im.height
-		if pad and i < imim_len - 1:
-			dst.paste(pad_img, (0, ypos))
-			ypos += pad_img.height
+def get_concat_v(imim_len: int, img_size: tuple[int, int], imim: Sequence[Image.Image | None], pad: int=0, mode='L', dst_bg=(0xff,))-> Image.Image:
+	max_width = img_size[0]
+	im_height = img_size[1]
+	height_sum = imim_len * img_size[1]
+	dst_size = (max_width, height_sum + (imim_len - 1) * pad)
+	dst: Image.Image = Image.new(mode, dst_size, dst_bg)
+	cur = 0
+	for im in imim:
+		if im:
+			dst.paste(im, (0, cur))
+		cur += im_height + pad
 	return dst
 
 if __name__ == '__main__':
