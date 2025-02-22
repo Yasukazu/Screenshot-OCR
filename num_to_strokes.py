@@ -149,13 +149,47 @@ def draw_digit(n: int, drw: ImageDraw, offset: np.ndarray | tuple[int, int]=(0,0
 			seq = [tuple(st * scale + offset) for st in strk]
 			drw.line(seq, fill=fill.value, width=width)
 
+from functools import wraps
+import numpy as np
+from path_feeder import PathFeeder
+def add_number(size: tuple[int, int]=(100, 50)):
+	def _embed_number(func):
+		@wraps(func)
+		def wrapper(*ag, **kw):
+			item_img = func(*ag, **kw)
+			if item_img:
+				name_num_array = [int(c) for c in ag[0]]
+				num_img, margins = get_number_image(size, name_num_array)
+				item_img.paste(num_img, tuple(np.array(margins) + np.array([0, 10])))
+				return item_img
+		return wrapper
+	return _embed_number
+def embed_number(func):
+	@wraps(func)
+	def wrapper(*ag, **kw):
+		item_img = func(*ag, **kw)
+		if item_img:
+			name_num_array = [int(c) for c in ag[0]]
+			num_img, margins = get_number_image((100, 50), name_num_array)
+			item_img.paste(num_img, tuple(np.array(margins) + np.array([0, 10])))
+			return item_img
+	return wrapper
 if __name__ == '__main__':
 	import sys
 	from pprint import pp
-	import numpy as np
-	from path_feeder import PathFeeder
-	feeder = PathFeeder()
-	first_fullpath = feeder.first_fullpath
+	path_feeder = PathFeeder()
+
+	@add_number(size=(90, 45))
+	def img_open(stem: str):
+		fullpath = path_feeder.dir / (stem + path_feeder.ext)
+		if fullpath.exists():
+			img = Image.open(fullpath)
+			return img
+
+	embed_img = img_open('01')
+	embed_img.show()
+	sys.exit(0)
+	first_fullpath = path_feeder.first_fullpath
 	item_img = Image.open(first_fullpath)
 	first_stem = first_fullpath.stem
 	name_num_array = [int(c) for c in first_stem]

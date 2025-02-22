@@ -1,6 +1,7 @@
 from typing import Iterable
 from typing import Sequence
 from collections.abc import Iterator
+import numpy as np
 from PIL import Image, ImageDraw
 import img2pdf
 import os.path, calendar
@@ -73,12 +74,12 @@ from _collections_abc import Generator
 from num_to_strokes import get_number_image
 from path_feeder import PathFeeder
 def draw_onto_pages(div=64, th=H_PAD // 2,
-	file_name_feeder: PathFeeder=PathFeeder() # file_names: Iterator[Path, str, int]=get_png_file_names()
+	path_feeder: PathFeeder=PathFeeder() # file_names: Iterator[Path, str, int]=get_png_file_names()
 	, h_pad=16, v_pad=8, mode='L', dst_bg=(0xff,), number_offset=(20, 30), number_size=(120, 30))-> Iterator[Image.Image]:
-	name_feeder = file_name_feeder.feed
-	first_fullpath = file_name_feeder.first_fullpath
+	name_feeder = path_feeder.feed
+	first_fullpath = path_feeder.first_fullpath
 	if not first_fullpath:
-		raise ValueError(f"No '{file_name_feeder.ext}' file in {file_name_feeder.dir}!")
+		raise ValueError(f"No '{path_feeder.ext}' file in {path_feeder.dir}!")
 	first_img_size = Image.open(first_fullpath).size
 
 	drc_tbl = [(0, -1), (1, 0), (0, 1), (-1, 0)]
@@ -109,7 +110,7 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 			drw.line((frm[0], frm[1], to[0], to[1]), fill_white, width=int(th))
 
 	def get_image_blocks():
-		names = list(file_name_feeder.feed(padding=True))
+		names = list(path_feeder.feed(padding=True))
 		name_blocks = [names[:8], names[8:16], names[16:24], names[24:]]
 		pad_size = 8 - len(name_blocks[-1])
 		name_blocks[-1] += [''] * pad_size
@@ -125,10 +126,10 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		himg2 = concat_h(names_2)
 		return concat_v(himg1, himg2)
 
-	img_size = Image.open(file_name_feeder.first_fullpath).size
+	img_size = Image.open(path_feeder.first_fullpath).size
 	def concat_h(names: list[str], pad=h_pad)-> Image:
 		imim_len = len(names)
-		imim = (open_img(n) for n in names)
+		imim = (get_numbered_img(n) for n in names)
 		max_height = img_size[1]
 		im_width = img_size[0]
 		width_sum = imim_len * img_size[0]
@@ -148,12 +149,17 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		dst.paste(im2, (0, im1.height + pad))
 		return dst
 
-	def open_img(fn: str)-> Image.Image | None:
-		fullpath = file_name_feeder.dir / (fn + file_name_feeder.ext)
-		img = Image.open(fullpath) if fullpath.exists() else None
-		number_image = get_number_image(size=number_size, nn=[int(c) for c in fn])
-		img.paste(number_image, number_offset)
-		return img
+	from num_to_strokes import add_number
+	@add_number(size=(100, 50)) # (feeder=path_feeder) # .feed(padding=True))
+	def get_numbered_img(fn: str)-> Image.Image | None:
+		fullpath = path_feeder.dir / (fn + path_feeder.ext)
+		if fullpath.exists():
+			img = Image.open(fullpath)
+			return img
+			'''number_image, margin = get_number_image(size=number_size, nn=[int(c) for c in fn])
+			offset = [s for s in (np.array(margin) + np.array(number_offset))]
+			img.paste(number_image, offset)
+			return img'''
 
 	for pg, img in enumerate(get_image_blocks()):
 		ct = (img.width // 2, img.height // 2) # s // 2 for s in img.size)
