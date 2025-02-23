@@ -8,6 +8,7 @@ import os.path, calendar
 import ttl
 from pathlib import Path
 home_dir = Path(os.path.expanduser('~'))
+import path_feeder
 from path_feeder import get_last_month #, YearMonth
 last_month_date = get_last_month()
 year = last_month_date.year
@@ -41,13 +42,13 @@ def convert_to_pdf(names=paged_png_feeder(),
 			assert Path(name).exists()
 		f.write(img2pdf.convert(layout_fun=layout_fun, *names, rotation=img2pdf.Rotation.ifvalid))
 
-def save_pages_as_pdf():
+from path_feeder import PathFeeder
+def save_pages_as_pdf(fullpath=PathFeeder().first_fullpath):
 	fullpath = img_dir / f"{year_month_name}.pdf"
 	imges = list(draw_onto_pages())
 	imges[0].save(fullpath, "PDF" ,resolution=100.0, save_all=True, append_imges=imges[1:])
 
 from path_feeder import ext_to_dir, FileExt, ExtDir
-
 def save_pages(ext_dir=FileExt.QPNG, arc=False):
 	if arc:
 		imgs: list[Image.Image] = list(draw_onto_pages())
@@ -75,7 +76,7 @@ from num_to_strokes import get_number_image
 from path_feeder import PathFeeder
 def draw_onto_pages(div=64, th=H_PAD // 2,
 	path_feeder: PathFeeder=PathFeeder() # file_names: Iterator[Path, str, int]=get_png_file_names()
-	, h_pad=16, v_pad=8, mode='L', dst_bg=(0x0,), number_offset=(20, 30), number_size=(120, 30))-> Iterator[Image.Image]:
+	, v_pad=16, h_pad=8, mode='L', dst_bg=(0x0,), number_offset=(20, 30), number_size=(120, 30))-> Iterator[Image.Image]:
 	name_feeder = path_feeder.feed
 	first_fullpath = path_feeder.first_fullpath
 	if not first_fullpath:
@@ -129,7 +130,7 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 	img_size = Image.open(path_feeder.first_fullpath).size
 	def concat_h(names: list[str], pad=h_pad)-> Image:
 		imim_len = len(names)
-		imim = [get_numbered_img(n) for n in names]
+		imim = [get_numbered_img(n, add_number=n) for n in names]
 		max_height = img_size[1]
 		im_width = img_size[0]
 		width_sum = imim_len * img_size[0]
@@ -151,7 +152,7 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 
 	from num_to_strokes import add_number, AddPos, ImageFill
 	@add_number(size=(first_img_size[0], 50), pos=AddPos.L, bgcolor=ImageFill.BLACK) # (feeder=path_feeder) # .feed(padding=True))
-	def get_numbered_img(fn: str)-> Image.Image | None:
+	def get_numbered_img(fn: str, add_number: str)-> Image.Image | None:
 		fullpath = path_feeder.dir / (fn + path_feeder.ext)
 		if fullpath.exists():
 			img = Image.open(fullpath)

@@ -110,10 +110,10 @@ class ImageFill(Enum):
 		return ImageFill.BLACK
 from collections import namedtuple
 Size = namedtuple('Size', ['w', 'h'])
-def get_number_image(size: Size, nn: Sequence[int | FormatNum], bgcolor=ImageFill.WHITE, padding=0.4)-> tuple[Image.Image, Size]: #, slant=0.25, padding=0.2):
+def get_number_image(size: Size, nn: Sequence[int | FormatNum] | bytearray, bgcolor=ImageFill.WHITE, padding=0.4)-> tuple[Image.Image, Size]: #, slant=0.25, padding=0.2):
 	'''returns Image, margins'''
 	from format_num import formatnums_to_bytearray
-	b_array = formatnums_to_bytearray(nn)
+	b_array = nn if isinstance(nn, bytearray) else formatnums_to_bytearray(nn)
 
 	def scale_margins()-> tuple[int, Size]:
 		'''returns scale, margin-size'''
@@ -167,12 +167,14 @@ class AddPos(IntEnum):
 	R = 1
 
 def add_number(size: tuple[int, int]=(100, 50), pos: AddPos=AddPos.C, bgcolor=ImageFill.WHITE): # tuple[int, int]=(0, 0)):
+	from format_num import HexFormatNum
 	def _embed_number(func):
 		@wraps(func)
 		def wrapper(*ag, **kw):
 			item_img = func(*ag, **kw)
-			if item_img:
-				name_num_array = [int(c) for c in ag[0]]
+			if item_img and 'add_number' in kw:
+				add_number = kw['add_number']
+				name_num_array = HexFormatNum.str_to_bin(add_number) #ag[0]) # [int(c) for c in ag[0]]
 				num_img, margins = get_number_image(size, name_num_array, bgcolor=bgcolor)
 				margins = (0, 0) if pos < 0 else 2 * np.array(margins) if pos > 0 else margins
 				item_img.paste(num_img, [int(v) for v in margins] )
@@ -201,7 +203,7 @@ if __name__ == '__main__':
 			img = Image.open(fullpath)
 			return img
 
-	embed_img = img_open('01')
+	embed_img = img_open('02A1')
 	embed_img.show()
 	sys.exit(0)
 	first_fullpath = path_feeder.first_fullpath
