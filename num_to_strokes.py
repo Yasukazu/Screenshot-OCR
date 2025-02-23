@@ -166,14 +166,14 @@ class AddPos(IntEnum):
 	C = 0
 	R = 1
 
-def add_number(size: tuple[int, int]=(100, 50), pos: AddPos=AddPos.C): # tuple[int, int]=(0, 0)):
+def add_number(size: tuple[int, int]=(100, 50), pos: AddPos=AddPos.C, bgcolor=ImageFill.WHITE): # tuple[int, int]=(0, 0)):
 	def _embed_number(func):
 		@wraps(func)
 		def wrapper(*ag, **kw):
 			item_img = func(*ag, **kw)
 			if item_img:
 				name_num_array = [int(c) for c in ag[0]]
-				num_img, margins = get_number_image(size, name_num_array)
+				num_img, margins = get_number_image(size, name_num_array, bgcolor=bgcolor)
 				margins = (0, 0) if pos < 0 else 2 * np.array(margins) if pos > 0 else margins
 				item_img.paste(num_img, [int(v) for v in margins] )
 				return item_img

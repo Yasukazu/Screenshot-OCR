@@ -149,8 +149,8 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		dst.paste(im2, (0, im1.height + pad))
 		return dst
 
-	from num_to_strokes import add_number, AddPos
-	@add_number(size=(first_img_size[0], 50), pos=AddPos.L) # (feeder=path_feeder) # .feed(padding=True))
+	from num_to_strokes import add_number, AddPos, ImageFill
+	@add_number(size=(first_img_size[0], 50), pos=AddPos.L, bgcolor=ImageFill.BLACK) # (feeder=path_feeder) # .feed(padding=True))
 	def get_numbered_img(fn: str)-> Image.Image | None:
 		fullpath = path_feeder.dir / (fn + path_feeder.ext)
 		if fullpath.exists():
