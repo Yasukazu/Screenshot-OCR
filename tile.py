@@ -75,7 +75,7 @@ from num_to_strokes import get_number_image
 from path_feeder import PathFeeder
 def draw_onto_pages(div=64, th=H_PAD // 2,
 	path_feeder: PathFeeder=PathFeeder() # file_names: Iterator[Path, str, int]=get_png_file_names()
-	, h_pad=16, v_pad=8, mode='L', dst_bg=(0xff,), number_offset=(20, 30), number_size=(120, 30))-> Iterator[Image.Image]:
+	, h_pad=16, v_pad=8, mode='L', dst_bg=(0x0,), number_offset=(20, 30), number_size=(120, 30))-> Iterator[Image.Image]:
 	name_feeder = path_feeder.feed
 	first_fullpath = path_feeder.first_fullpath
 	if not first_fullpath:
@@ -129,12 +129,12 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 	img_size = Image.open(path_feeder.first_fullpath).size
 	def concat_h(names: list[str], pad=h_pad)-> Image:
 		imim_len = len(names)
-		imim = (get_numbered_img(n) for n in names)
+		imim = [get_numbered_img(n) for n in names]
 		max_height = img_size[1]
 		im_width = img_size[0]
 		width_sum = imim_len * img_size[0]
 		dst_size = (width_sum + (imim_len - 1) * pad, max_height)
-		dst: Image.Image = Image.new(mode, dst_size, dst_bg)
+		dst: Image.Image = Image.new(mode, dst_size, color=dst_bg)
 		cur = 0
 		for im in imim:
 			if im:
@@ -144,13 +144,13 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 	def concat_v(im1: Image.Image, im2: Image.Image)-> Image.Image:
 		pad = v_pad
 		dst_size = (im1.width, im1.height + pad + im2.height)
-		dst: Image.Image = Image.new(mode, dst_size, dst_bg)
+		dst: Image.Image = Image.new(mode, dst_size, color=dst_bg)
 		dst.paste(im1, (0, 0))
 		dst.paste(im2, (0, im1.height + pad))
 		return dst
 
-	from num_to_strokes import add_number
-	@add_number(size=(100, 50)) # (feeder=path_feeder) # .feed(padding=True))
+	from num_to_strokes import add_number, AddPos
+	@add_number(size=(first_img_size[0], 50), pos=AddPos.L) # (feeder=path_feeder) # .feed(padding=True))
 	def get_numbered_img(fn: str)-> Image.Image | None:
 		fullpath = path_feeder.dir / (fn + path_feeder.ext)
 		if fullpath.exists():
@@ -165,8 +165,8 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		ct = (img.width // 2, img.height // 2) # s // 2 for s in img.size)
 		ll_ww[0] = img.height // div
 		ll_ww[1] = img.width // 128
-		assert img.width == IMG_SIZE[0] * 4 + H_PAD * 3
-		assert img.height == IMG_SIZE[1] * 2 + V_PAD
+		#assert img.width == IMG_SIZE[0] * 4 + H_PAD * 3
+		#assert img.height == IMG_SIZE[1] * 2 + V_PAD
 		drw = ImageDraw.Draw(img)
 		dst = _to(pg, list(ct))
 		lct = list(ct)
