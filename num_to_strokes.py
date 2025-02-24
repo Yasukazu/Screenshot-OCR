@@ -100,7 +100,7 @@ def get_num_strokes(n: int, slant=NUMSTROKE_SLANT, segpath_list: list[list[segpa
 	segpath: list[segpath_dict] = segpath_list[n]
 	return [path.slanted(slant) for path in segpath]
 
-class ImageFill(Enum):
+class ImageFill(Enum): # single element tuple for ImageDraw color
 	BLACK = (0,)
 	WHITE = (0xff,)
 	@classmethod

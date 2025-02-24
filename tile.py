@@ -70,13 +70,13 @@ def get_quad_png_file_names()-> Generator[tuple[Path, str, int], None, None]:
 	for path, stem, m in path_feeder(input_type=FileExt.QPNG):
 		yield path, stem, m
 
-TXT_OFST = 80
+TXT_OFST = 0 # width-direction / horizontal
 from _collections_abc import Generator
-from num_to_strokes import get_number_image
+from num_to_strokes import get_number_image, ImageFill
 from path_feeder import PathFeeder
 def draw_onto_pages(div=64, th=H_PAD // 2,
 	path_feeder: PathFeeder=PathFeeder() # file_names: Iterator[Path, str, int]=get_png_file_names()
-	, v_pad=16, h_pad=8, mode='L', dst_bg=(0x0,), number_offset=(20, 30), number_size=(120, 30))-> Iterator[Image.Image]:
+	, v_pad=16, h_pad=8, mode='L', dst_bg=ImageFill.BLACK, number_offset=(20, 30), number_size=(120, 30))-> Iterator[Image.Image]:
 	name_feeder = path_feeder.feed
 	first_fullpath = path_feeder.first_fullpath
 	if not first_fullpath:
@@ -96,19 +96,19 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 	def yshift(*xy):
 		x, y = xy[0], xy[1]
 		return x, y - (V_PAD - 8)
-	fill_white = (255,255,255)
+	# fill_white = (255,255,255)
 	def page_dots(ct, drw, n):
 		ll, ww = ll_ww[0], ll_ww[1]
 		op = list(ct)
 		for i in range(n):
 			dp = op[0] - ww, op[1]
-			drw.line((*op, *dp), fill_white, width=int(th))
+			drw.line((*op, *dp), fill=ImageFill.invert(dst_bg).value, width=int(th))
 			op[0] -= 2 * ww
 	def month_dots(ct, drw, img_w):
 		ttl.set_pit_len(img_w // 32)
 		ttl.set_org(*(ct[0] + (img_w // 32), ct[1]))
 		for frm, to in ttl.plot(month, ttl.Direc.RT):
-			drw.line((frm[0], frm[1], to[0], to[1]), fill_white, width=int(th))
+			drw.line((frm[0], frm[1], to[0], to[1]), fill=ImageFill.invert(dst_bg).value, width=int(th))
 
 	def get_image_blocks():
 		names = list(path_feeder.feed(padding=True))
@@ -135,7 +135,7 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		im_width = img_size[0]
 		width_sum = imim_len * img_size[0]
 		dst_size = (width_sum + (imim_len - 1) * pad, max_height)
-		dst: Image.Image = Image.new(mode, dst_size, color=dst_bg)
+		dst: Image.Image = Image.new(mode, dst_size, color=dst_bg.value)
 		cur = 0
 		for im in imim:
 			if im:
@@ -145,13 +145,13 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 	def concat_v(im1: Image.Image, im2: Image.Image)-> Image.Image:
 		pad = v_pad
 		dst_size = (im1.width, im1.height + pad + im2.height)
-		dst: Image.Image = Image.new(mode, dst_size, color=dst_bg)
+		dst: Image.Image = Image.new(mode, dst_size, color=dst_bg.value)
 		dst.paste(im1, (0, 0))
 		dst.paste(im2, (0, im1.height + pad))
 		return dst
 
 	from num_to_strokes import add_number, AddPos, ImageFill
-	@add_number(size=(first_img_size[0], 50), pos=AddPos.L, bgcolor=ImageFill.BLACK) # (feeder=path_feeder) # .feed(padding=True))
+	@add_number(size=(first_img_size[0], 50), pos=AddPos.L, bgcolor=ImageFill.WHITE) # (feeder=path_feeder) # .feed(padding=True))
 	def get_numbered_img(fn: str, add_number: str)-> Image.Image | None:
 		fullpath = path_feeder.dir / (fn + path_feeder.ext)
 		if fullpath.exists():
@@ -175,7 +175,7 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		month_dots(ct, drw, img.width)
 		page_dots(ct, drw, pg + 1) # drw.line((*ct, *dstp), fill=(255, 255, 255), width=int(th))
 		text = f"{' ' * 8}{year}-{month:02}({pg + 1}/4)"
-		drw.text((*xshift(TXT_OFST, *ct), *yshift(*dstp)), text, 'white')
+		drw.text((*xshift(TXT_OFST, *ct), *yshift(*dstp)), text, fill=ImageFill.invert(dst_bg).value)
 		# draw_digit(pg + 1, drw, offset=(10, 10), scale=30, width_ratio=8)
 		#name = f"{year_month_name}-{pg + 1}.png"
 		yield img #, name #.convert('L') #.save(img_dir / name, 'PNG')
