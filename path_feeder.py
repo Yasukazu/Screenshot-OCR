@@ -37,13 +37,13 @@ YearMonth = namedtuple('YearMonth', ['year', 'month'] )
 YEAR_FORMAT = "{:04}"
 MONTH_FORMAT = "{:02}"
 
-def get_last_month_path(year=0, month=0)-> Path:
+def get_last_month_path(dir: Path=input_dir, year=0, month=0)-> Path:
 	last_month = get_last_month()
 	if not year:
 		year = last_month.year
 	if not month:
 		month = last_month.month
-	return input_dir / ("%d" % year) / ("%02d" % month)
+	return dir / ("%d" % year) / ("%02d" % month)
 	# MONTH_FORMAT.format(month)
 	# ymstr = f"{year}{month:02}"
 from datetime import date
@@ -72,13 +72,13 @@ from typing import Generator, Iterator
 class PathFeeder:
 	def __init__(self, year=0, month=0, from_=1, to=-1, input_type:FileExt=FileExt.PNG):
 		last_date = get_year_month(year=year, month=month)
-		year = last_date.year
-		month = last_date.month
-		input_path = input_dir / str(year) / ("%02d" % month) / input_type.value.dir
+		self.year = last_date.year
+		self.month = last_date.month
+		input_path = input_dir / str(self.year) / ("%02d" % self.month) / input_type.value.dir
 		if not input_path.exists():
 			raise ValueError(f"No path: {input_path}")
 		self.input_path = input_path
-		self.to = monthrange(year, month)[1] if to < 0 else to
+		self.to = monthrange(self.year, self.month)[1] if to < 0 else to
 		self.from_ = from_
 		self.input_type = input_type
 	
@@ -103,6 +103,13 @@ class PathFeeder:
 		else:
 			stems = [f.stem for f in self.input_path.glob("??" + self.input_type.value.ext)]
 			yield from sorted(stems)
+
+	@property
+	def first_name(self)-> str:
+		stem = ''
+		for stem in self.feed(padding=False):
+			break
+		return stem
 
 	@property
 	def first_fullpath(self)-> Path | None:
@@ -167,5 +174,4 @@ def get_tiff_fullpath(year=0, month=0)-> Path:
 
 if __name__ == '__main__':
 	path_feeder = PathFeeder()
-	first_fulpath = path_feeder.first_fullpath
-	print(first_fullpath)
+	print ( path_feeder.first_fullpath)

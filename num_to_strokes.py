@@ -172,12 +172,16 @@ def add_number(size: tuple[int, int]=(100, 50), pos: AddPos=AddPos.C, bgcolor=Im
 		@wraps(func)
 		def wrapper(*ag, **kw):
 			item_img = func(*ag, **kw)
-			if item_img and 'add_number' in kw:
-				add_number = kw['add_number']
-				name_num_array = HexFormatNum.str_to_bin(add_number) #ag[0]) # [int(c) for c in ag[0]]
+			if item_img and kw['number_str']:
+				name_num_array = HexFormatNum.str_to_bin(kw['number_str'])
 				num_img, margins = get_number_image(size, name_num_array, bgcolor=bgcolor)
-				margins = (0, 0) if pos < 0 else 2 * np.array(margins) if pos > 0 else margins
-				item_img.paste(num_img, [int(v) for v in margins] )
+				margin_list = list(margins)
+				match pos:
+					case AddPos.L:
+						margin_list[0] = 0
+					case AddPos.R:
+						margin_list[0] = item_img.width - num_img.width
+				item_img.paste(num_img, [int(v) for v in margin_list] )
 				return item_img
 		return wrapper
 	return _embed_number

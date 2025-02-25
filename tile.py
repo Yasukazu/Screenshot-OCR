@@ -1,6 +1,4 @@
-from typing import Iterable
-from typing import Sequence
-from collections.abc import Iterator
+from typing import Sequence, Iterator, Generator
 import numpy as np
 from PIL import Image, ImageDraw
 import img2pdf
@@ -9,7 +7,8 @@ import ttl
 from pathlib import Path
 home_dir = Path(os.path.expanduser('~'))
 import path_feeder
-from path_feeder import get_last_month #, YearMonth
+from path_feeder import PathFeeder, get_last_month #, YearMonth
+from num_to_strokes import add_number, AddPos, ImageFill
 last_month_date = get_last_month()
 year = last_month_date.year
 month = last_month_date.month
@@ -69,15 +68,12 @@ def get_png_file_names()-> Generator[tuple[Path, str, int], None, None]:
 def get_quad_png_file_names()-> Generator[tuple[Path, str, int], None, None]:
 	for path, stem, m in path_feeder(input_type=FileExt.QPNG):
 		yield path, stem, m
-
+DAY_NOMBRE_H = 50
 TXT_OFST = 0 # width-direction / horizontal
-from _collections_abc import Generator
-from num_to_strokes import get_number_image, ImageFill
-from path_feeder import PathFeeder
 def draw_onto_pages(div=64, th=H_PAD // 2,
-	path_feeder: PathFeeder=PathFeeder() # file_names: Iterator[Path, str, int]=get_png_file_names()
-	, v_pad=16, h_pad=8, mode='L', dst_bg=ImageFill.BLACK, number_offset=(20, 30), number_size=(120, 30))-> Iterator[Image.Image]:
-	name_feeder = path_feeder.feed
+	path_feeder: PathFeeder=PathFeeder(),
+	v_pad=16, h_pad=8, mode='L', dst_bg=ImageFill.BLACK)-> Iterator[Image.Image]:
+	# name_feeder = path_feeder.feed
 	first_fullpath = path_feeder.first_fullpath
 	if not first_fullpath:
 		raise ValueError(f"No '{path_feeder.ext}' file in {path_feeder.dir}!")
@@ -116,9 +112,10 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		pad_size = 8 - len(name_blocks[-1])
 		name_blocks[-1] += [''] * pad_size
 		for i, block in enumerate(name_blocks):
-			yield concat_8_pages(i, block)
+			yield concat_8_pages(block, number_str=f"{path_feeder.month:02}{(-0xa - i):x}")
 
-	def concat_8_pages(i: int, names: Iterator[str])-> Image:
+	@add_number(size=(DAY_NOMBRE_H * 4, DAY_NOMBRE_H * 2), pos=AddPos.R, bgcolor=ImageFill.BLACK)
+	def concat_8_pages(names: Iterator[str], number_str: str)-> Image:
 
 		names_1 = list(names[:4])
 		names_2 = list(names[4:])
@@ -130,7 +127,7 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 	img_size = Image.open(path_feeder.first_fullpath).size
 	def concat_h(names: list[str], pad=h_pad)-> Image:
 		imim_len = len(names)
-		imim = [get_numbered_img(n, add_number=n) for n in names]
+		imim = [get_numbered_img(n, number_str=n) for n in names]
 		max_height = img_size[1]
 		im_width = img_size[0]
 		width_sum = imim_len * img_size[0]
@@ -150,9 +147,8 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		dst.paste(im2, (0, im1.height + pad))
 		return dst
 
-	from num_to_strokes import add_number, AddPos, ImageFill
-	@add_number(size=(first_img_size[0], 50), pos=AddPos.L, bgcolor=ImageFill.WHITE) # (feeder=path_feeder) # .feed(padding=True))
-	def get_numbered_img(fn: str, add_number: str)-> Image.Image | None:
+	@add_number(size=(first_img_size[0], DAY_NOMBRE_H), pos=AddPos.L, bgcolor=ImageFill.WHITE) # (feeder=path_feeder) # .feed(padding=True))
+	def get_numbered_img(fn: str, number_str: str)-> Image.Image | None:
 		fullpath = path_feeder.dir / (fn + path_feeder.ext)
 		if fullpath.exists():
 			img = Image.open(fullpath)
