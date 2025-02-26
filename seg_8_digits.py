@@ -1,4 +1,4 @@
-digits = (
+seg_8_digits = (
 	# abcdefgh
 	0b11111100, # 00:252
 	0b01100000, # 01:96
@@ -18,3 +18,14 @@ digits = (
 	0b10001110, # 0F:142
 	0b00000010, # 10:2
 )
+def get_seg_8_set(set_list=[]):
+	if len(set_list) == 0:
+		for i in seg_8_digits:
+			st = set()
+			n = i >> 1
+			for j, c in enumerate(reversed('abcdefg')):
+				bp = 1 << j
+				if n & bp:
+					st.add(c)
+			set_list.append(st)
+	return set_list
