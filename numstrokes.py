@@ -6,6 +6,8 @@ from strok7 import SEGPATH_SLANT, get_segpath_for_c, Sp0
 from seg_7_digits import homo_seg_7_array
 from seven_seg import SEVEN_SEG_SIZE
 
+NUMSTROKE_SLANT = SEGPATH_SLANT
+
 class NumStrokes:
 	f'''strokes[{SEVEN_SEG_SIZE}]: slanted strokes]'''
 	def __init__(self, scale: float=1.0, offset: tuple[int, int]=(0, 0)):
@@ -22,11 +24,38 @@ class NumStrokes:
 				else:
 					spth_list.append([(0,0),(0,0)])
 			segpath_list.append(spth_list)
-		_strokes = np.array(segpath_list)
-		self._stroke_list: NDArray = scale * _strokes + np.array(offset)
+		_stroke_list = np.array(segpath_list)
+		self._stroke_list: NDArray = scale * _stroke_list + np.array(offset)
 
 	def strokes(self, n: int)-> NDArray:
 		return self._stroke_list[n]
+
+def make_basic_segpath_list(segpath_list = [], homo=True):
+		for i, segs in enumerate(homo_seg_7_array):
+			spth_list = []
+			for c in segs:
+				if c:
+					path: tuple[Sp0,Sp0] = get_segpath_for_c(c).path
+					spth_list.append(path)
+				else:
+					if homo:
+						spth_list.append([(0,0),(0,0)])
+			segpath_list.append(spth_list)
+		return segpath_list
+
+def make_basic_strokes(segpath_list = [], homo=True):
+		for i, segs in enumerate(homo_seg_7_array):
+			spth_list = []
+			for c in segs:
+				if c:
+					path: tuple[Sp0,Sp0] = get_segpath_for_c(c).path
+					path_list = [pt.xy for pt in path]
+					spth_list.append(path_list)
+				else:
+					if homo:
+						spth_list.append([(0,0),(0,0)])
+			segpath_list.append(spth_list)
+		return segpath_list
 
 class SlantedNumStrokes(NumStrokes):
 	def __init__(self, max_cache=SEVEN_SEG_SIZE, scale = 1, offset = (0, 0),slant=SEGPATH_SLANT):
@@ -42,7 +71,10 @@ def my_round2(x, decimals=0):
 
 if __name__ == '__main__':
 	from pprint import pp
-
+	basic_segpath_list = make_basic_segpath_list(homo=False)
+	pp(basic_segpath_list)
+	basic_strokes = make_basic_strokes(homo=False)
+	pp(basic_strokes)
 	num_strokes = NumStrokes()
 	for i in range(SEVEN_SEG_SIZE):
 		stroke = num_strokes.strokes(i)
