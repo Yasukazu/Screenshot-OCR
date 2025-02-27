@@ -95,6 +95,12 @@ SEGELEMS = (
 			)
 def get_segelem_dict(segelem_dict={e.name.lower(): e.value for e in SEGELEMS}):
 	return segelem_dict
+def get_segpath_for_c(c: str, segelem_dict={e.name.lower(): e.value for e in SEGELEMS})-> SegPath:
+	_c = c.lower()[0]
+	seg_names = 'abcdefgh'
+	if _c not in seg_names:
+		raise ValueError(f"'{c[0]}' needs be in {seg_names}!")
+	return segelem_dict[_c]
 def get_segpath_dict(segelem_dict=get_segelem_dict()):
 	return {k: v.slanted() for (k,v) in segelem_dict.items()}
 class SegLine(Enum):

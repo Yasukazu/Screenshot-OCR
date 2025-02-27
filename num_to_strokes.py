@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from functools import cached_property
 from collections.abc import Sequence
 from enum import Enum
@@ -25,26 +26,34 @@ class Seg7:
 SEVEN_SEG_STEM = '7-seg'
 PICKLE_EXT = '.pkl'
 
-from strok7 import SegPath, _SEGELEM7DICT
+from strok7 import SegPath, get_segelem_dict, get_segpath_for_c
 _segelem_array: list[tuple[Seg7]] = [set()] * 16
 
 from seven_seg import SEVEN_SEG_SIZE, load_7_seg_num_pkl # load_7_seg_num_csv_as_df
 type segpath_dict = dict[str, SegPath]
-def load_segpath_array(_segpath_array = [None] * SEVEN_SEG_SIZE, df: DataFrame=load_7_seg_num_pkl())-> list[list[segpath_dict]]:
+def load_segpath_array(segelem_dict=get_segelem_dict(), _segpath_array = [None] * SEVEN_SEG_SIZE, df: DataFrame=load_7_seg_num_pkl())-> list[list[segpath_dict]]:
 	'''call "slanted" for each element'''
 	if not _segpath_array[0]:
 		for i in range(SEVEN_SEG_SIZE):
 			elem_list: list[dict[str, SegPath]] = []
 			for c in 'abcdefg':
 				if (df[c])[i] > 0:
-					segpath: dict[str, SegPath] = _SEGELEM7DICT[c]
+					segpath: dict[str, SegPath] = segelem_dict[c]
 					elem_list.append(segpath)
 			_segpath_array[i] = elem_list
 	return _segpath_array
 
+from seg_7_digits import get_seg_7_list, seg_7_array
 
-def get_segpath_list(_segpath_array: list[list[segpath_dict]] = load_segpath_array())-> list[list[segpath_dict]]:
+def load_segpath_array_b(segelem_dict=get_segelem_dict(), _segpath_array = [None] * SEVEN_SEG_SIZE, segment_array: tuple[tuple[str]]=seg_7_array)-> list[list[segpath_dict]]:
+	'''call "slanted" for each element'''
+	if not _segpath_array[0]:
+		for i, df in enumerate(segment_array):
+			_segpath_array[i] = [get_segpath_for_c(c) for c in df]
 	return _segpath_array
+
+def get_segpath_list(load_func: Callable[[], list[list[segpath_dict]]] = load_segpath_array)-> list[list[segpath_dict]]:
+	return load_func()
 
 from strok7 import SegLine
 
@@ -79,20 +88,7 @@ def get_seg_lines(n):
 	seg_line_set = _seg7_array[n]
 	return [line.value for line in seg_line_set]
 
-NUMSTROKE_SLANT = 0.25
-
-class NumStrokes:
-	f'''strokes[{SEVEN_SEG_SIZE}]: slanted strokes]'''
-	def __init__(self, slant=NUMSTROKE_SLANT):
-		self._strokes: list[list[tuple[float, float]]] = [get_num_strokes(n, slant) for n in range(SEVEN_SEG_SIZE)]
-		self.slant: float = slant
-
-	@property
-	def strokes(self)-> Sequence[Sequence[tuple[float, float]]]:#, n: int):
-		return self._strokes #[n]
-	@property
-	def stroke(self, n: int)-> Sequence[tuple[float, float]]:#, n: int):
-		return self._strokes[n] #[n]
+from numstrokes import NumStrokes, NUMSTROKE_SLANT
 
 def get_num_strokes(n: int, slant=NUMSTROKE_SLANT, segpath_list: list[list[segpath_dict]]=get_segpath_list())-> list[list[tuple[float, float]]]:
 	if not 0 <= n < SEVEN_SEG_SIZE:
@@ -144,18 +140,24 @@ def get_number_image(size: Size, nn: Sequence[int | FormatNum] | bytearray, bgco
 
 def my_round2(x, decimals=0):
     return np.sign(x) * np.floor(np.abs(x) * 10**decimals + 0.5) / 10**decimals
-def draw_digit(n: int, drw: ImageDraw, offset: np.ndarray | tuple[int, int]=(0,0), scale=16, width_ratio=0.2, fill=ImageFill.BLACK, num_strokes=[list(stroke) for stroke in NumStrokes(slant=NUMSTROKE_SLANT).strokes]):
+
+def draw_digit(n: int, img: Image.Image, offset: np.ndarray | tuple[int, int]=(0,0), scale=16, width_ratio=0.2, fill=ImageFill.BLACK, stroke_feeder=NumStrokes(), feeder_params=False):
 	'''draw a digit as 7-segment shape: 0 to 9 makes [0123456789], 10 to 15 makes [ABCDEF], 16 makes hyphen(-)'''
 	assert 0 <= n < SEVEN_SEG_SIZE
+	drw = ImageDraw.Draw(img)
 	width = int(scale * width_ratio) or 1
-	if not isinstance(offset, np.ndarray): #, npt.generic)):
-		offset = np.array(offset, int)
-	for stroke in num_strokes[n]: #get_num_strokes(n, slant=slant):
-			strk = np.array((stroke), np.float16)
-			seq = [my_round2(st * scale + offset) for st in strk]
+	if feeder_params:
+		for seq in stroke_feeder.strokes(n):
 			jseq = [(int(i), int(j)) for i, j in seq]
-
 			drw.line(jseq, fill=fill.value, width=width)
+	else:
+		if not isinstance(offset, np.ndarray): #, npt.generic)):
+			offset = np.array(offset, int)
+		strokes = stroke_feeder.pure_strokes(n)
+		for stroke in strokes: # np.array((stroke), np.float16)
+				seq = [my_round2(st * scale + offset) for st in stroke]
+				jseq = [(int(i), int(j)) for i, j in seq]
+				drw.line(jseq, fill=fill.value, width=width)
 
 from functools import wraps
 import numpy as np
@@ -196,7 +198,21 @@ def embed_number(func):
 			return item_img
 	return wrapper
 if __name__ == '__main__':
+	image_size = (80, 40)
+	stroke_feeder = NumStrokes(scale=8, offset=(20, 10))
+	for n in range(17):
+		img = Image.new('L', image_size, (0xff,))
+		draw_digit(n, img, stroke_feeder=stroke_feeder, feeder_params=True)
+		img.show()
+	sys.exit(0)
+	a_list = load_segpath_array()
+	b_list = load_segpath_array_b()
+	num_strokes=[list(stroke) for stroke in NumStrokes(slant=NUMSTROKE_SLANT, segpath_list=b_list).strokes]
 	import sys
+	for n in range(17):
+		draw_digit(n, num_strokes=num_strokes)
+		break
+	sys.exit(0)
 	from pprint import pp
 	path_feeder = PathFeeder()
 
