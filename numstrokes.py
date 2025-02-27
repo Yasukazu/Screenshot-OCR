@@ -2,38 +2,52 @@ from typing import Callable, Iterator
 from functools import lru_cache
 import numpy as np
 from numpy.typing import NDArray
-from strok7 import SEGPATH_SLANT, get_segpath_for_c
-from seg_7_digits import seg_7_array
-
-NUMSTROKE_SLANT = 0.25
+from strok7 import SEGPATH_SLANT, get_segpath_for_c, Sp0
+from seg_7_digits import homo_seg_7_array
+from seven_seg import SEVEN_SEG_SIZE
 
 class NumStrokes:
-	from seven_seg import SEVEN_SEG_SIZE
 	f'''strokes[{SEVEN_SEG_SIZE}]: slanted strokes]'''
-	def __init__(self, slant=SEGPATH_SLANT, max_cache=SEVEN_SEG_SIZE, scale: float=1.0, offset: tuple[int, int]=(0, 0)):
-		self.slant: float = slant
+	def __init__(self, scale: float=1.0, offset: tuple[int, int]=(0, 0)):
 		self.scale = scale
 		self.offset: NDArray = np.array(offset)
-		self.pure_strokes: Callable[[int], NDArray] = lru_cache(maxsize=max_cache)(self._strokes)
-		self.strokes: Callable[[int], NDArray] = lru_cache(maxsize=max_cache)(self._scaled_offset_strokes)
+		segpath_list = []
+		for i, segs in enumerate(homo_seg_7_array):
+			spth_list = []
+			for c in segs:
+				if c:
+					path: tuple[Sp0,Sp0] = get_segpath_for_c(c).path
+					path_list = [pt.xy for pt in path]
+					spth_list.append(path_list)
+				else:
+					spth_list.append([(0,0),(0,0)])
+			segpath_list.append(spth_list)
+		_strokes = np.array(segpath_list)
+		self._stroke_list: NDArray = scale * _strokes + np.array(offset)
 
-	def _strokes(self, n: int)-> NDArray:
-		slanted = np.array([get_segpath_for_c(c).slanted(self.slant) for c in seg_7_array[n]], np.float16)
-		return slanted
+	def strokes(self, n: int)-> NDArray:
+		return self._stroke_list[n]
 
-	def _scaled_offset_strokes(self, n: int)-> list[tuple[int, int]]:
-		strokes = [my_round2(st * self.scale + self.offset) for st in self._strokes(n)]
+class SlantedNumStrokes(NumStrokes):
+	def __init__(self, max_cache=SEVEN_SEG_SIZE, scale = 1, offset = (0, 0),slant=SEGPATH_SLANT):
+		super().__init__(scale, offset)
+		self.slant: float = slant
+		self.strokes: Callable[[int], NDArray] = lru_cache(maxsize=max_cache)(self._strokes)
+	def _strokes(self, n: int)-> list[tuple[int, int]]:
+		strokes = [my_round2(st * self.scale + self.offset) for st in super().strokes(n)]
 		return strokes
-
-
 
 def my_round2(x, decimals=0):
     return np.sign(x) * np.floor(np.abs(x) * 10**decimals + 0.5) / 10**decimals
 
 if __name__ == '__main__':
 	from pprint import pp
-	from seven_seg import SEVEN_SEG_SIZE
+
 	num_strokes = NumStrokes()
+	for i in range(SEVEN_SEG_SIZE):
+		stroke = num_strokes.strokes(i)
+		pp(stroke)
+	num_strokes = SlantedNumStrokes()
 	for i in range(SEVEN_SEG_SIZE):
 		stroke = num_strokes.strokes(i)
 		pp(stroke)
