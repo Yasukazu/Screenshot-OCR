@@ -159,6 +159,17 @@ def draw_digit(n: int, img: Image.Image, offset: np.ndarray | tuple[int, int]=(0
 				jseq = [(int(i), int(j)) for i, j in seq]
 				drw.line(jseq, fill=fill.value, width=width)
 
+def get_digit_strokes(n: int, offset: np.ndarray | tuple[int, int]=(0,0), scale=16, stroke_feeder=NumStrokes(), feeder_params=False):
+	'''to get strokes to draw a digit as 7-segment shape: 0 to 9 makes [0123456789], 10 to 15 makes [ABCDEF], 16 makes hyphen(-)'''
+	assert 0 <= n < SEVEN_SEG_SIZE
+	if feeder_params:
+		return stroke_feeder.strokes(n)
+	else:
+		if not isinstance(offset, np.ndarray): #, npt.generic)):
+			offset = np.array(offset, int)
+		strokes = stroke_feeder.pure_strokes(n)
+		return [my_round2(st * scale + offset) for st in [stroke for stroke in strokes]]
+
 from functools import wraps
 import numpy as np
 from path_feeder import PathFeeder
@@ -168,7 +179,7 @@ class AddPos(IntEnum):
 	C = 0
 	R = 1
 
-def add_number(size: tuple[int, int]=(100, 50), pos: AddPos=AddPos.C, bgcolor=ImageFill.WHITE): # tuple[int, int]=(0, 0)):
+def add_number(size: tuple[int, int]=(100, 50), pos: AddPos=AddPos.C, bgcolor=ImageFill.WHITE, stroke_feeder=None): # tuple[int, int]=(0, 0)):
 	from format_num import HexFormatNum
 	def _embed_number(func):
 		@wraps(func)
@@ -200,8 +211,15 @@ def embed_number(func):
 if __name__ == '__main__':
 	image_size = (80, 40)
 	stroke_feeder = NumStrokes(scale=8, offset=(20, 10))
+	stroke_dict = {}
 	for n in range(17):
+		strks = get_digit_strokes(n, stroke_feeder=stroke_feeder, feeder_params=True)
+		stroke_dict[n] = strks
 		img = Image.new('L', image_size, (0xff,))
+		drw = ImageDraw.Draw(img)
+		for seq in strks:
+			jseq = [(int(i), int(j)) for i, j in seq]
+			drw.line(jseq)
 		draw_digit(n, img, stroke_feeder=stroke_feeder, feeder_params=True)
 		img.show()
 	sys.exit(0)
