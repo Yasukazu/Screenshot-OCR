@@ -22,16 +22,16 @@ class BasicNumStrokes:
 	f'''strokes[{SEVEN_SEG_SIZE}]: slanted strokes]'''
 	_segpath_list = get_segpath_list()
 	def __init__(self, max_cache=2 * SEVEN_SEG_SIZE):
-		self.strokes: Callable[[int], list] = lru_cache(maxsize=max_cache)(self._strokes)
+		self.strokes: Callable[[int, float, int, tuple[int, int]], list[tuple[tuple[int, int]]]] = lru_cache(maxsize=max_cache)(self._strokes)
 
-	def _strokes(self, n: int, slant=0, scale=1, offset=(0, 0)):
+	def _strokes(self, n: int, slant: float=0, scale: int=1, offset: tuple[int, int]=(0, 0))-> list[tuple[tuple[int, int]]]:
 		stroke_list = [(p1.slant(s=slant, scale=scale, offset=offset),
 		p2.slant(s=slant, scale=scale, offset=offset),) for (p1, p2) in self._segpath_list[n]]
 		return stroke_list
 
 
 
-class NumStrokes:
+class NumStrokes(BasicNumStrokes):
 	f'''strokes[{SEVEN_SEG_SIZE}]: slanted strokes]'''
 	def __init__(self, scale: float=1.0, offset: tuple[int, int]=(0, 0), slant=NUMSTROKE_SLANT, max_cache=len(homo_seg_7_array)):
 		self.scale = scale
@@ -41,7 +41,7 @@ class NumStrokes:
 
 	def _strokes(self, n: int)-> NDArray:
 		stroke_list = [(p1.slant(s=self.slant, scale=self.scale, offset=self.offset),
-		p2.slant(s=self.slant, scale=self.scale, offset=self.offset)) for (p1, p2) in segpath_list[n]]
+		p2.slant(s=self.slant, scale=self.scale, offset=self.offset)) for (p1, p2) in self._segpath_list[n]]
 		return stroke_list
 
 if __name__ == '__main__':

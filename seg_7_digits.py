@@ -59,7 +59,7 @@ homo_seg_7_array: tuple[seg_7_tuple] = (
         ('a', '', '', '', 'e', 'f', 'g'), # F
         ('', '', '', '', '', '', 'g'), # 10
 )
-def get_seg_7_list(set_list=[], digits_list=seg_7_digits)-> list[set[str]]:
+def get_seg_7_set(set_list=[], digits_list=seg_7_digits)-> list[set[str]]:
 	if len(set_list) == 0:
 		for i in digits_list:
 			st = set()

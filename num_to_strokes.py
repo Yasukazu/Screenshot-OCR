@@ -72,24 +72,13 @@ def load_seg7(df: DataFrame=load_7_seg_num_pkl())-> list[set[SegLine]]:
 def get_seg7_list():
 	return _seg7_array
 
-'''def _load_seg7(pkl: str=SEVEN_SEG_STEM + PICKLE_EXT):
-	rf = open(pkl, 'rb').read()
-	csv_reader = pickle.loads(rf)
-	for i, row in enumerate(csv_reader):
-		seg = Seg7(*row)
-		assert seg.h == i
-		_seg7_array.append(seg)
-	assert len(_seg7_array) == 16
-	return _seg7_array
-
-assert len(_seg7_array) == 16'''
 
 
 def get_seg_lines(n):
 	seg_line_set = _seg7_array[n]
 	return [line.value for line in seg_line_set]
 
-from num_strokes import NumStrokes, NUMSTROKE_SLANT #, SlantedNumStrokes
+from num_strokes import NumStrokes, NUMSTROKE_SLANT, BasicNumStrokes #, SlantedNumStrokes
 
 def get_num_strokes(n: int, slant=NUMSTROKE_SLANT, segpath_list: list[list[segpath_dict]]=get_segpath_list())-> list[list[tuple[float, float]]]:
 	if not 0 <= n < SEVEN_SEG_SIZE:
@@ -142,13 +131,13 @@ def get_number_image(size: Size, nn: Sequence[int | FormatNum] | bytearray, bgco
 def my_round2(x, decimals=0):
     return np.sign(x) * np.floor(np.abs(x) * 10**decimals + 0.5) / 10**decimals
 
-def draw_digit(n: int, img: Image.Image, offset: np.ndarray | tuple[int, int]=(0,0), scale=16, width_ratio=0.2, fill=ImageFill.BLACK, stroke_feeder=NumStrokes(), feeder_params=False):
+def draw_digit(n: int, img: Image.Image, offset: np.ndarray | tuple[int, int]=(0,0), scale=16, width_ratio=0.2, fill=ImageFill.BLACK, stroke_feeder=BasicNumStrokes(), feeder_params=False):
 	'''draw a digit as 7-segment shape: 0 to 9 makes [0123456789], 10 to 15 makes [ABCDEF], 16 makes hyphen(-)'''
 	assert 0 <= n < SEVEN_SEG_SIZE
 	drw = ImageDraw.Draw(img)
 	width = int(scale * width_ratio) or 1
 	if feeder_params:
-		for seq in stroke_feeder.strokes(n):
+		for seq in stroke_feeder.strokes(n, scale=scale, offset=offset):
 			jseq = [(int(i), int(j)) for i, j in seq]
 			drw.line(jseq, fill=fill.value, width=width)
 	else:
@@ -209,65 +198,22 @@ def embed_number(func):
 			item_img.paste(num_img, tuple(np.array(margins) + np.array([0, 10])))
 			return item_img
 	return wrapper
+
 if __name__ == '__main__':
 	image_size = (80, 40)
-	stroke_feeder = NumStrokes(scale=8, offset=(20, 10))
+	stroke_feeder = BasicNumStrokes()
 	stroke_dict = {}
 	for n in range(17):
-		strks = get_digit_strokes(n, stroke_feeder=stroke_feeder, feeder_params=True)
-		stroke_dict[n] = strks
 		img = Image.new('L', image_size, (0xff,))
 		drw = ImageDraw.Draw(img)
-		for seq in strks:
+		strokes = stroke_feeder.strokes(n, slant=0.2, scale=8, offset=(20, 10))
+		for stroke in strokes:
+			drw.line(stroke)
+		img.show()
+		# strks = get_digit_strokes(n, stroke_feeder=stroke_feeder, feeder_params=True)
+		# stroke_dict[n] = strks
+		'''for seq in strks:
 			jseq = [(int(i), int(j)) for i, j in seq]
 			if jseq[0] != jseq[1]:
 				drw.line(jseq)
-		draw_digit(n, img, stroke_feeder=stroke_feeder, feeder_params=True)
-		img.show()
-	sys.exit(0)
-	a_list = load_segpath_array()
-	b_list = load_segpath_array_b()
-	num_strokes=[list(stroke) for stroke in NumStrokes(slant=NUMSTROKE_SLANT, segpath_list=b_list).strokes]
-	import sys
-	for n in range(17):
-		draw_digit(n, num_strokes=num_strokes)
-		break
-	sys.exit(0)
-	from pprint import pp
-	path_feeder = PathFeeder()
-
-	@add_number(size=(90, 45), pos=AddPos.R)
-	def img_open(stem: str):
-		fullpath = path_feeder.dir / (stem + path_feeder.ext)
-		if fullpath.exists():
-			img = Image.open(fullpath)
-			return img
-
-	embed_img = img_open('02A1')
-	embed_img.show()
-	sys.exit(0)
-	first_fullpath = path_feeder.first_fullpath
-	item_img = Image.open(first_fullpath)
-	first_stem = first_fullpath.stem
-	name_num_array = [int(c) for c in first_stem]
-	num_img, margins = get_number_image((100, 50), name_num_array)
-	item_img.paste(num_img, tuple(np.array(margins) + np.array([0, 10])))
-	item_img.show()
-	sys.exit(0)
-	save = False
-	show_list = [SEVEN_SEG_SIZE - 1]
-	scale = 40
-	offset = np.array([20, 20], int)
-	strokes = NumStrokes(0.25).strokes
-	for i in show_list:
-		img = Image.new('L', (80, 160), (0xff,))
-		drw = ImageDraw.Draw(img)
-		draw_digit(i, drw, offset=offset, scale=scale, width_ratio=8, num_strokes=strokes)
-		img.show()
-		if save:
-			img.save(f"digi-{i}.png", 'PNG')	
-	sys.exit(0)
-	sgp_array = load_segpath_array()
-	seg_list = get_segpath_list()
-	from pprint import pprint
-	pp(seg_list[0])
+		draw_digit(n, img, stroke_feeder=stroke_feeder, feeder_params=True)'''
