@@ -3,14 +3,15 @@ from functools import lru_cache
 import numpy as np
 from numpy.typing import NDArray
 from strok7 import SEGPATH_SLANT, get_segpath_for_c, Sp0
-from seg_7_digits import homo_seg_7_array
+from seg_7_digits import seg_7_array
 from seven_seg import SEVEN_SEG_SIZE
 
 NUMSTROKE_SLANT = SEGPATH_SLANT
 
-segpath_list = [None] * len(homo_seg_7_array)
 
-for i, segs in enumerate(homo_seg_7_array):
+segpath_list = [None] * len(seg_7_array)
+
+for i, segs in enumerate(seg_7_array):
 	spth_list = []
 	for c in segs:
 		if c:
@@ -27,17 +28,15 @@ class NumStrokes:
 		self.strokes: Callable[[int], NDArray] = lru_cache(maxsize=max_cache)(self._strokes)
 
 	def _strokes(self, n: int)-> NDArray:
-		stroke_list = [path.slant(s=self.slant, scale=self.scale, offset=self.offset) for path in segpath_list[n]]
+		stroke_list = [(p1.slant(s=self.slant, scale=self.scale, offset=self.offset),
+		p2.slant(s=self.slant, scale=self.scale, offset=self.offset)) for (p1, p2) in segpath_list[n]]
 		return stroke_list
-
-
-
-
 
 if __name__ == '__main__':
 	from pprint import pp
-
-	num_strokes = NumStrokes()
+	offset=(7,3)
+	scale=2
+	num_strokes = NumStrokes(scale=scale, offset=offset)
 	for i in range(SEVEN_SEG_SIZE):
 		stroke = num_strokes.strokes(i)
 		pp(stroke)

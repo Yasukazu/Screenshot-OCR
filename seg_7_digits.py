@@ -37,6 +37,28 @@ seg_7_array = (
         ('a', 'e', 'f', 'g'),
         ('g',),
 )
+
+type seg_7_tuple = tuple[str,str,str,str,str,str,str]
+
+homo_seg_7_array: tuple[seg_7_tuple] = (
+        ('a', 'b', 'c', 'd', 'e', 'f', ''), # 0
+        ('', 'b', 'c', '', '', '', ''), # 1
+        ('a', 'b', '', 'd', 'e', '', 'g'), # 2
+        ('a', 'b', 'c', 'd', '', '', 'g'), # 3
+        ('', 'b', 'c', '', '', 'f', 'g'), # 4
+        ('a', '', 'c', 'd', '', 'f', 'g'), # 5
+        ('a', '', 'c', 'd', 'e', 'f', 'g'), # 6
+        ('a', 'b', 'c', '', '', '', ''), # 7
+        ('a', 'b', 'c', 'd', 'e', 'f', 'g'), # 8
+        ('a', 'b', 'c', '', '', 'f', 'g'), # 9
+        ('a', 'b', 'c', '', 'e', 'f', 'g'), # A
+        ('', '', 'c', 'd', 'e', 'f', 'g'), # B
+        ('', '', '', 'd', 'e', '', 'g'), # C
+        ('', 'b', 'c', 'd', 'e', '', 'g'), # D
+        ('a', '', '', 'd', 'e', 'f', 'g'), # E
+        ('a', '', '', '', 'e', 'f', 'g'), # F
+        ('', '', '', '', '', '', 'g'), # 10
+)
 def get_seg_7_list(set_list=[], digits_list=seg_7_digits)-> list[set[str]]:
 	if len(set_list) == 0:
 		for i in digits_list:
@@ -55,8 +77,7 @@ def get_seg_7_list(set_list=[], digits_list=seg_7_digits)-> list[set[str]]:
 			n = i >> 1
 			for j, c in enumerate(reversed('abcdefg')):
 				bp = 1 << j
-				if n & bp:
-					st.insert(0, c)
+				st.insert(0, c if n & bp else '')
 			set_list.append(tuple(st))
 	return set_list
 if __name__ == '__main__':
