@@ -1,3 +1,4 @@
+import sys
 from collections.abc import Callable
 from functools import cached_property
 from collections.abc import Sequence
@@ -43,9 +44,9 @@ def load_segpath_array(segelem_dict=get_segelem_dict(), _segpath_array = [None] 
 			_segpath_array[i] = elem_list
 	return _segpath_array
 
-from seg_7_digits import get_seg_7_list, seg_7_array
+from seg_7_digits import get_seg_7_list, homo_seg_7_array
 
-def load_segpath_array_b(segelem_dict=get_segelem_dict(), _segpath_array = [None] * SEVEN_SEG_SIZE, segment_array: tuple[tuple[str]]=seg_7_array)-> list[list[segpath_dict]]:
+def load_segpath_array_b(segelem_dict=get_segelem_dict(), _segpath_array = [None] * SEVEN_SEG_SIZE, segment_array: tuple[tuple[str]]=homo_seg_7_array)-> list[list[segpath_dict]]:
 	'''call "slanted" for each element'''
 	if not _segpath_array[0]:
 		for i, df in enumerate(segment_array):
@@ -88,7 +89,7 @@ def get_seg_lines(n):
 	seg_line_set = _seg7_array[n]
 	return [line.value for line in seg_line_set]
 
-from numstrokes import NumStrokes, NUMSTROKE_SLANT
+from num_strokes import NumStrokes, NUMSTROKE_SLANT #, SlantedNumStrokes
 
 def get_num_strokes(n: int, slant=NUMSTROKE_SLANT, segpath_list: list[list[segpath_dict]]=get_segpath_list())-> list[list[tuple[float, float]]]:
 	if not 0 <= n < SEVEN_SEG_SIZE:
@@ -159,7 +160,7 @@ def draw_digit(n: int, img: Image.Image, offset: np.ndarray | tuple[int, int]=(0
 				jseq = [(int(i), int(j)) for i, j in seq]
 				drw.line(jseq, fill=fill.value, width=width)
 
-def get_digit_strokes(n: int, offset: np.ndarray | tuple[int, int]=(0,0), scale=16, stroke_feeder=NumStrokes(), feeder_params=False):
+def get_digit_strokes(n: int, offset: np.ndarray | tuple[int, int]=(0,0), scale=1, stroke_feeder=NumStrokes(), feeder_params=False):
 	'''to get strokes to draw a digit as 7-segment shape: 0 to 9 makes [0123456789], 10 to 15 makes [ABCDEF], 16 makes hyphen(-)'''
 	assert 0 <= n < SEVEN_SEG_SIZE
 	if feeder_params:
@@ -219,7 +220,8 @@ if __name__ == '__main__':
 		drw = ImageDraw.Draw(img)
 		for seq in strks:
 			jseq = [(int(i), int(j)) for i, j in seq]
-			drw.line(jseq)
+			if jseq[0] != jseq[1]:
+				drw.line(jseq)
 		draw_digit(n, img, stroke_feeder=stroke_feeder, feeder_params=True)
 		img.show()
 	sys.exit(0)
