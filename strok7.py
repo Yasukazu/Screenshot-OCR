@@ -18,6 +18,8 @@ class Sp0:
 		self.x: int = 1 if x else 0
 	def slant(self, slant: StrokeSlant=STANDARD_SLANT)-> f_i_tpl:
 		return slant.value * self._slr + self.x, self.y #) + offset[0]), round(scale * (self.y) + offset[1])
+	def scale_offset(self, slant: StrokeSlant=STANDARD_SLANT, scale: int=1, offset: tuple[int, int]=(0, 0))-> i_i_tpl:
+		return round(scale * (slant.value * self._slr + self.x)) + offset[0], (scale * self.y + offset[1])
 	@property
 	def _slr(self):
 		return 1

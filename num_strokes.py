@@ -2,7 +2,7 @@ from typing import Callable, Sequence
 from types import MappingProxyType
 from functools import lru_cache
 from numpy.typing import NDArray
-from strok7 import SEG_POINTS, SEGPATH_SLANT, get_segpath_for_c, Sp0, StrokeSlant, f_i_tpl
+from strok7 import SEG_POINTS, SEGPATH_SLANT, get_segpath_for_c, Sp0, StrokeSlant, i_i_tpl
 from seg_7_digits import Seg7, SEG7_ARRAY, seg_7_array, homo_seg_7_array
 from seven_seg import SEVEN_SEG_SIZE
 
@@ -57,7 +57,7 @@ class DigitStrokes:
 	f'''strokes[{SEVEN_SEG_SIZE}]: slanted strokes]'''
 	#_segpath_list: list[tuple[Sp0, Sp0]] = get_segpath_list()
 	def __init__(self, cache_factor: int=1): #, max_cache=SEVEN_SEG_SIZE):
-		self.strokes: Callable[[int], list[tuple[tuple[int, int]]]] = lru_cache(maxsize=SEGPOINTS_MAX * cache_factor)(self._strokes)
+		self.strokes: Callable[[int, StrokeSlant, int, tuple[int, int]], Sequence[tuple[i_i_tpl, i_i_tpl]]] = lru_cache(maxsize=SEGPOINTS_MAX * cache_factor)(self._strokes)
 
 	def _strokes(self, n: int, slant: StrokeSlant=StrokeSlant.SLANT02, scale: int=1, offset: tuple[int, int]=(0, 0))-> Sequence[tuple[i_i_tpl, i_i_tpl]]:
 		stroke_list = []
