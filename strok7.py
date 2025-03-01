@@ -5,14 +5,19 @@ import csv
 type ii_ii = tuple[tuple[int, int], tuple[int, int]]
 type i_i_tpl_tpl = dict[str, ii_ii]
 
+type i_i_tpl = tuple[int, int]
 type f_i_tpl = tuple[float, int]
+type f_f_tpl = tuple[float, float]
 
-STANDARD_SLANT = 0.2
+class StrokeSlant(Enum):
+	SLANT02 = 0.2
+
+STANDARD_SLANT = StrokeSlant.SLANT02
 class Sp0:
-	def __init__(self, x: int):
-		self.x: int = x
-	def slant(self, s=STANDARD_SLANT)-> f_i_tpl:
-		return s * self._slr + self.x, self.y
+	def __init__(self, x: bool):
+		self.x: int = 1 if x else 0
+	def slant(self, slant: StrokeSlant=STANDARD_SLANT)-> f_i_tpl:
+		return slant.value * self._slr + self.x, self.y #) + offset[0]), round(scale * (self.y) + offset[1])
 	@property
 	def _slr(self):
 		return 1
@@ -67,8 +72,8 @@ class SegPath:
 	def get_path(self):
 		return list(self.path)
 
-	def _slanted(self, s=SEGPATH_SLANT):
-		return [pt.slant(s) for pt in self.path]
+	def _slanted(self, s=SEGPATH_SLANT, scale=1.0, offset=(0,0)):
+		return [pt.slant(s=s, scale=scale, offset=offset) for pt in self.path]
 
 
 class SegElem(Enum):

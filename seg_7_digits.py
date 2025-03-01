@@ -1,4 +1,7 @@
-seg_7_digits = (
+from typing import Sequence, Callable
+from enum import Flag
+
+seg_7_digits: Sequence[int] = (
 	# abcdefgh
 	0b11111100, # 00:252
 	0b01100000, # 01:96
@@ -18,7 +21,49 @@ seg_7_digits = (
 	0b10001110, # 0F:142
 	0b00000010, # 10:2
 )
-seg_7_array = (
+
+class Seg7(Flag):
+	'''MSB is A, LSB is for comma'''
+	A = 1 << 7
+	B = 1 << 6
+	C = 1 << 5
+	D = 1 << 4
+	E = 1 << 3
+	F = 1 << 2
+	G = 1 << 1
+
+def c_to_seg_7(c: str, C_TO_SEG7 = {
+        'a': Seg7.A,
+        'b': Seg7.B,
+        'c': Seg7.C,
+        'd': Seg7.D,
+        'e': Seg7.E,
+        'f': Seg7.F,
+        'g': Seg7.G,
+})-> Callable[[str], Seg7]:
+	return C_TO_SEG7[c]
+
+SEG7_ARRAY = (
+	(Seg7.A, Seg7.B, Seg7.C, Seg7.D, Seg7.E, Seg7.F),
+	(Seg7.B, Seg7.C),
+	(Seg7.A, Seg7.B, Seg7.D, Seg7.E, Seg7.G),
+	(Seg7.A, Seg7.B, Seg7.C, Seg7.D, Seg7.G),
+	(Seg7.B, Seg7.C, Seg7.F, Seg7.G),
+	(Seg7.A, Seg7.C, Seg7.D, Seg7.F, Seg7.G),
+	(Seg7.A, Seg7.C, Seg7.D, Seg7.E, Seg7.F, Seg7.G),
+	(Seg7.A, Seg7.B, Seg7.C),
+	(Seg7.A, Seg7.B, Seg7.C, Seg7.D, Seg7.E, Seg7.F, Seg7.G),
+	(Seg7.A, Seg7.B, Seg7.C, Seg7.F, Seg7.G),
+	(Seg7.A, Seg7.B, Seg7.C, Seg7.E, Seg7.F, Seg7.G),
+	(Seg7.C, Seg7.D, Seg7.E, Seg7.F, Seg7.G),
+	(Seg7.D, Seg7.E, Seg7.G),
+	(Seg7.B, Seg7.C, Seg7.D, Seg7.E, Seg7.G),
+	(Seg7.A, Seg7.D, Seg7.E, Seg7.F, Seg7.G),
+	(Seg7.A, Seg7.E, Seg7.F, Seg7.G),
+	(Seg7.G,),
+)
+
+seg_7_array: Sequence[Sequence[str]] = (
         ('a', 'b', 'c', 'd', 'e', 'f'),
         ('b', 'c'),
         ('a', 'b', 'd', 'e', 'g'),
@@ -40,7 +85,7 @@ seg_7_array = (
 
 type seg_7_tuple = tuple[str,str,str,str,str,str,str]
 
-homo_seg_7_array: tuple[seg_7_tuple] = (
+homo_seg_7_array: Sequence[seg_7_tuple] = (
         ('a', 'b', 'c', 'd', 'e', 'f', ''), # 0
         ('', 'b', 'c', '', '', '', ''), # 1
         ('a', 'b', '', 'd', 'e', '', 'g'), # 2
@@ -81,6 +126,12 @@ def get_seg_7_list(set_list=[], digits_list=seg_7_digits)-> list[set[str]]:
 			set_list.append(tuple(st))
 	return set_list
 if __name__ == '__main__':
+	print("SEG7_DICT={")
+	for c in 'ABCDEFG':
+		print(f"\t'{c.lower()}': Seg7.{c},")
+	print("}")
+
+
 	seg_7_set = get_seg_7_list()
 	print("seg_7_array = (")
 	for i, seg in enumerate(seg_7_set):

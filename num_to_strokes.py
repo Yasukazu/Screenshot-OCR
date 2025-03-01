@@ -78,7 +78,7 @@ def get_seg_lines(n):
 	seg_line_set = _seg7_array[n]
 	return [line.value for line in seg_line_set]
 
-from num_strokes import NumStrokes, NUMSTROKE_SLANT, BasicNumStrokes #, SlantedNumStrokes
+from num_strokes import NumStrokes, NUMSTROKE_SLANT, DigitStrokes #, SlantedNumStrokes
 
 def get_num_strokes(n: int, slant=NUMSTROKE_SLANT, segpath_list: list[list[segpath_dict]]=get_segpath_list())-> list[list[tuple[float, float]]]:
 	if not 0 <= n < SEVEN_SEG_SIZE:
@@ -131,14 +131,16 @@ def get_number_image(size: Size, nn: Sequence[int | FormatNum] | bytearray, bgco
 def my_round2(x, decimals=0):
     return np.sign(x) * np.floor(np.abs(x) * 10**decimals + 0.5) / 10**decimals
 
-def draw_digit(n: int, img: Image.Image, offset: np.ndarray | tuple[int, int]=(0,0), scale=16, width_ratio=0.2, fill=ImageFill.BLACK, stroke_feeder=BasicNumStrokes(), feeder_params=False):
+def draw_digit(n: int, img: Image.Image, offset: np.ndarray | tuple[int, int]=(0,0), scale=16, width_ratio=0.2, fill=ImageFill.BLACK, stroke_feeder=DigitStrokes(), feeder_params=False):
 	'''draw a digit as 7-segment shape: 0 to 9 makes [0123456789], 10 to 15 makes [ABCDEF], 16 makes hyphen(-)'''
 	assert 0 <= n < SEVEN_SEG_SIZE
+	def scale_offset(v: float, pos: int)-> int:
+		return round(scale * v + offset[pos])
 	drw = ImageDraw.Draw(img)
 	width = int(scale * width_ratio) or 1
-	if feeder_params:
-		for seq in stroke_feeder.strokes(n, scale=scale, offset=offset):
-			jseq = [(int(i), int(j)) for i, j in seq]
+	if isinstance(stroke_feeder, DigitStrokes):
+		for seq in stroke_feeder.strokes(n): #, scale=scale, offset=offset):
+			jseq = [(scale_offset(i, 0), scale_offset(j, 1)) for i, j in seq]
 			drw.line(jseq, fill=fill.value, width=width)
 	else:
 		if not isinstance(offset, np.ndarray): #, npt.generic)):
@@ -201,7 +203,7 @@ def embed_number(func):
 
 if __name__ == '__main__':
 	image_size = (80, 40)
-	stroke_feeder = BasicNumStrokes()
+	stroke_feeder = DigitStrokes()
 	stroke_dict = {}
 	for n in range(17):
 		img = Image.new('L', image_size, (0xff,))
