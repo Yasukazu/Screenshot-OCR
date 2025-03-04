@@ -10,39 +10,61 @@ type f_i_tpl = tuple[float, int]
 type f_f_tpl = tuple[float, float]
 
 class StrokeSlant(Enum):
+	SLANT00 = 0
 	SLANT02 = 0.2
 
+NO_SLANT = StrokeSlant.SLANT00
 STANDARD_SLANT = StrokeSlant.SLANT02
-class Sp0:
-	def __init__(self, x: bool):
-		self.x: int = 1 if x else 0
-	def slant(self, slant: StrokeSlant=STANDARD_SLANT)-> f_i_tpl:
-		return slant.value * self._slr + self.x, self.y #) + offset[0]), round(scale * (self.y) + offset[1])
-	def scale_offset(self, slant: StrokeSlant=STANDARD_SLANT, scale: int=1, offset: tuple[int, int]=(0, 0))-> i_i_tpl:
-		return round(scale * (slant.value * self._slr + self.x)) + offset[0], (scale * self.y + offset[1])
-	@property
-	def _slr(self):
-		return 1
+class Sp:
+	'''
+	slant p0 p1
+	slant/2 p5 p2
+	p4 p3
+	'''
+	def __init__(self, x: int, y: int):
+		assert x in (0, 1, 2) # 2 for comma
+		assert y in (0, 1, 2)
+		self.x = x
+		self.y = y
+		self._slr = (1, 0.5, 0)[y]
+
 	@property
 	def xy(self)-> tuple[int, int]:
 		return self.x, self.y
-	@property
-	def y(self)-> int:
-		return 0
-class Sp1(Sp0):
-	@property
-	def _slr(self):
-		return 0.5
-	@property
-	def y(self)-> int:
-		return 1
-class Sp2(Sp0):
-	@property
-	def _slr(self):
-		return 0
-	@property
-	def y(self)-> int:
-		return 2
+
+	def offset(self, offset=(0, 0)):
+		self.x += offset[0]
+		self.y += offset[1]
+
+	def scale(self, n: int=1):
+		self.x *= n
+		self.y *= n
+
+	def slant_x(self, slant: StrokeSlant=STANDARD_SLANT)-> float:
+		return self.x + slant.value * self._slr
+
+	def slant(self, slant: StrokeSlant=STANDARD_SLANT)-> f_i_tpl:
+		self.x = self.slant_x(slant)
+
+	def slanted(self, slant: StrokeSlant=STANDARD_SLANT)-> f_i_tpl:
+		return self.slant_x(slant), self.y
+
+	def scale_offset(self, slant: StrokeSlant=StrokeSlant.SLANT00, scale: int=1, offset: tuple[int, int]=(0, 0))-> i_i_tpl:
+		'''also slant'''
+		slanted_x = self.slant_x(slant)
+		return round(scale / (1 + slant.value) * slanted_x) + offset[0], scale * self.y + offset[1]
+
+class Sp0(Sp):
+	def __init__(self, x: int):
+		super().__init__(x=x, y=0)
+
+class Sp1(Sp):
+	def __init__(self, x: int):
+		super().__init__(x=x, y=1)
+
+class Sp2(Sp):
+	def __init__(self, x: int):
+		super().__init__(x=x, y=2)
 
 abcdef_seg = (
 	(0, 0),
@@ -54,21 +76,51 @@ abcdef_seg = (
 	(0, 0),
 	)
 
+class SpPair(Enum):
+	_0 = Sp(0, 0)
+	_1 = Sp(1, 0)
+	_2 = Sp(1, 1)
+	_3 = Sp(1, 2)
+	_4 = Sp(0, 2)
+	_5 = Sp(0, 1)
+	_6 = Sp(2, 2) # comma / period / dot
 
-SEG_POINTS = (
-	Sp0(0),
-	Sp0(1),
-	Sp1(1),
-	Sp2(1),
-	Sp2(0),
-	Sp1(0),
+	A = _0, _1
+	B = _1, _2
+	C = _2, _3
+	D = _3, _4
+	E = _4, _5
+	F = _5, _0
+	G = _5, _2 # minus / hyphen
+	H = _1, _4 # per / slash
+	I = _6, _6 # dot
+
+	@classmethod
+	def get(cls, c: str)-> 'SpPair':
+		index = 'ABCDEFGHI'.index(c)
+		return [cls.A, cls.B, cls.C, cls.D, cls.E, cls.F, cls.G, cls.H, cls.I][index]
+	@classmethod
+	def extract(cls, c: str)-> list[tuple[int, int]]:
+		return [sp.xy for sp in cls.get(c).value]
+
+
+class Seg7Path(Enum):
+	a = SpPair._0, SpPair._1
+
+SEG_POINT_ARRAY = (
+	Sp(0, 0),
+	Sp(1, 0),
+	Sp(1, 1),
+	Sp(1, 2),
+	Sp(0, 2),
+	Sp(0, 1),
 	)
 
 from functools import lru_cache
 SEGPATH_SLANT = 0.2
 class SegPath:
-	def __init__(self, *spsp: Sequence[Sp0], max_cache=2): # f_sp: Sp0, t_sp: Sp0):
-		self.path: Sequence[Sp0] = spsp # self.f = f_sp self.t = t_sp
+	def __init__(self, *spsp: Sequence[Sp], max_cache=2): # f_sp: Sp0, t_sp: Sp0):
+		self.path: Sequence[Sp] = spsp # self.f = f_sp self.t = t_sp
 		self.slanted = lru_cache(maxsize=max_cache)(self._slanted)
 
 	def get_path(self):
@@ -79,26 +131,25 @@ class SegPath:
 
 
 class SegElem(Enum):
-	A = SegPath(SEG_POINTS[0], SEG_POINTS[1])
-	B = SegPath(SEG_POINTS[1], SEG_POINTS[2])
-	C = SegPath(SEG_POINTS[2], SEG_POINTS[3])
-	D = SegPath(SEG_POINTS[3], SEG_POINTS[4])
-	E = SegPath(SEG_POINTS[4], SEG_POINTS[5])
-	F = SegPath(SEG_POINTS[5], SEG_POINTS[0])
-	G = SegPath(SEG_POINTS[5], SEG_POINTS[2])
-	H = SegPath(SEG_POINTS[1], SEG_POINTS[4]) # comma
-
+	A = SegPath(SEG_POINT_ARRAY[0], SEG_POINT_ARRAY[1])
+	B = SegPath(SEG_POINT_ARRAY[1], SEG_POINT_ARRAY[2])
+	C = SegPath(SEG_POINT_ARRAY[2], SEG_POINT_ARRAY[3])
+	D = SegPath(SEG_POINT_ARRAY[3], SEG_POINT_ARRAY[4])
+	E = SegPath(SEG_POINT_ARRAY[4], SEG_POINT_ARRAY[5])
+	F = SegPath(SEG_POINT_ARRAY[5], SEG_POINT_ARRAY[0])
+	G = SegPath(SEG_POINT_ARRAY[5], SEG_POINT_ARRAY[2])
+	H = SegPath(SEG_POINT_ARRAY[1], SEG_POINT_ARRAY[4]) # comma
 
 
 SEGELEMS = (
-        SegElem.A,
-        SegElem.B,
-        SegElem.C,
-        SegElem.D,
-        SegElem.E,
-        SegElem.F,
-        SegElem.G,
-        SegElem.H,
+		SegElem.A,
+		SegElem.B,
+		SegElem.C,
+		SegElem.D,
+		SegElem.E,
+		SegElem.F,
+		SegElem.G,
+		SegElem.H,
 			)
 def get_segelem_dict(segelem_dict={e.name.lower(): e.value for e in SEGELEMS}):
 	return segelem_dict
@@ -194,6 +245,11 @@ def save_np_strk_dict():
 	np_strk_dict = {k: np.array(v, int) for (k, v) in strk_dic.items() }
 	with open(NP_STRK_DICT_PKL, 'wb') as wf:
 		pickle.dump(np_strk_dict, wf)
+
+def print_seg_point_enum():
+	print("class SegPoints(Enum):")
+	for n, points in abcdef_seg:
+		print(f"\t_{n} = {str(points)}")
 
 if __name__ == '__main__':
 	import sys
