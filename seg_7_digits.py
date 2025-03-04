@@ -1,5 +1,6 @@
 from typing import Sequence, Callable
-from enum import Flag
+from enum import Flag, Enum
+from strok7 import SegPoint
 
 seg_7_digits: Sequence[int] = (
 	# abcdefgh
@@ -33,13 +34,13 @@ class Seg7(Flag):
 	G = 1 << 1
 
 def c_to_seg_7(c: str, C_TO_SEG7 = {
-        'a': Seg7.A,
-        'b': Seg7.B,
-        'c': Seg7.C,
-        'd': Seg7.D,
-        'e': Seg7.E,
-        'f': Seg7.F,
-        'g': Seg7.G,
+		'a': Seg7.A,
+		'b': Seg7.B,
+		'c': Seg7.C,
+		'd': Seg7.D,
+		'e': Seg7.E,
+		'f': Seg7.F,
+		'g': Seg7.G,
 })-> Callable[[str], Seg7]:
 	return C_TO_SEG7[c]
 
@@ -63,46 +64,66 @@ SEG7_ARRAY = (
 	(Seg7.G,),
 )
 
+SEG_POINT_DIGIT_ARRAY = (
+	(SegPoint.A, SegPoint.B, SegPoint.C, SegPoint.D, SegPoint.E, SegPoint.F),
+	(SegPoint.B, SegPoint.C),
+	(SegPoint.A, SegPoint.B, SegPoint.D, SegPoint.E, SegPoint.G),
+	(SegPoint.A, SegPoint.B, SegPoint.C, SegPoint.D, SegPoint.G),
+	(SegPoint.B, SegPoint.C, SegPoint.F, SegPoint.G),
+	(SegPoint.A, SegPoint.C, SegPoint.D, SegPoint.F, SegPoint.G),
+	(SegPoint.A, SegPoint.C, SegPoint.D, SegPoint.E, SegPoint.F, SegPoint.G),
+	(SegPoint.A, SegPoint.B, SegPoint.C),
+	(SegPoint.A, SegPoint.B, SegPoint.C, SegPoint.D, SegPoint.E, SegPoint.F, SegPoint.G),
+	(SegPoint.A, SegPoint.B, SegPoint.C, SegPoint.F, SegPoint.G),
+	(SegPoint.A, SegPoint.B, SegPoint.C, SegPoint.E, SegPoint.F, SegPoint.G),
+	(SegPoint.C, SegPoint.D, SegPoint.E, SegPoint.F, SegPoint.G),
+	(SegPoint.D, SegPoint.E, SegPoint.G),
+	(SegPoint.B, SegPoint.C, SegPoint.D, SegPoint.E, SegPoint.G),
+	(SegPoint.A, SegPoint.D, SegPoint.E, SegPoint.F, SegPoint.G),
+	(SegPoint.A, SegPoint.E, SegPoint.F, SegPoint.G),
+	(SegPoint.G,)
+)
+
 seg_7_array: Sequence[Sequence[str]] = (
-        ('a', 'b', 'c', 'd', 'e', 'f'),
-        ('b', 'c'),
-        ('a', 'b', 'd', 'e', 'g'),
-        ('a', 'b', 'c', 'd', 'g'),
-        ('b', 'c', 'f', 'g'),
-        ('a', 'c', 'd', 'f', 'g'),
-        ('a', 'c', 'd', 'e', 'f', 'g'),
-        ('a', 'b', 'c'),
-        ('a', 'b', 'c', 'd', 'e', 'f', 'g'),
-        ('a', 'b', 'c', 'f', 'g'),
-        ('a', 'b', 'c', 'e', 'f', 'g'),
-        ('c', 'd', 'e', 'f', 'g'),
-        ('d', 'e', 'g'),
-        ('b', 'c', 'd', 'e', 'g'),
-        ('a', 'd', 'e', 'f', 'g'),
-        ('a', 'e', 'f', 'g'),
-        ('g',),
+		('a', 'b', 'c', 'd', 'e', 'f'),
+		('b', 'c'),
+		('a', 'b', 'd', 'e', 'g'),
+		('a', 'b', 'c', 'd', 'g'),
+		('b', 'c', 'f', 'g'),
+		('a', 'c', 'd', 'f', 'g'),
+		('a', 'c', 'd', 'e', 'f', 'g'),
+		('a', 'b', 'c'),
+		('a', 'b', 'c', 'd', 'e', 'f', 'g'),
+		('a', 'b', 'c', 'f', 'g'),
+		('a', 'b', 'c', 'e', 'f', 'g'),
+		('c', 'd', 'e', 'f', 'g'),
+		('d', 'e', 'g'),
+		('b', 'c', 'd', 'e', 'g'),
+		('a', 'd', 'e', 'f', 'g'),
+		('a', 'e', 'f', 'g'),
+		('g',),
 )
 
 type seg_7_tuple = tuple[str,str,str,str,str,str,str]
 
 homo_seg_7_array: Sequence[seg_7_tuple] = (
-        ('a', 'b', 'c', 'd', 'e', 'f', ''), # 0
-        ('', 'b', 'c', '', '', '', ''), # 1
-        ('a', 'b', '', 'd', 'e', '', 'g'), # 2
-        ('a', 'b', 'c', 'd', '', '', 'g'), # 3
-        ('', 'b', 'c', '', '', 'f', 'g'), # 4
-        ('a', '', 'c', 'd', '', 'f', 'g'), # 5
-        ('a', '', 'c', 'd', 'e', 'f', 'g'), # 6
-        ('a', 'b', 'c', '', '', '', ''), # 7
-        ('a', 'b', 'c', 'd', 'e', 'f', 'g'), # 8
-        ('a', 'b', 'c', '', '', 'f', 'g'), # 9
-        ('a', 'b', 'c', '', 'e', 'f', 'g'), # A
-        ('', '', 'c', 'd', 'e', 'f', 'g'), # B
-        ('', '', '', 'd', 'e', '', 'g'), # C
-        ('', 'b', 'c', 'd', 'e', '', 'g'), # D
-        ('a', '', '', 'd', 'e', 'f', 'g'), # E
-        ('a', '', '', '', 'e', 'f', 'g'), # F
-        ('', '', '', '', '', '', 'g'), # 10
+		('a', 'b', 'c', 'd', 'e', 'f', ''), # 0
+		('', 'b', 'c', '', '', '', ''), # 1
+		('a', 'b', '', 'd', 'e', '', 'g'), # 2
+		('a', 'b', 'c', 'd', '', '', 'g'), # 3
+		('', 'b', 'c', '', '', 'f', 'g'), # 4
+		('a', '', 'c', 'd', '', 'f', 'g'), # 5
+		('a', '', 'c', 'd', 'e', 'f', 'g'), # 6
+		('a', 'b', 'c', '', '', '', ''), # 7
+		('a', 'b', 'c', 'd', 'e', 'f', 'g'), # 8
+		('a', 'b', 'c', '', '', 'f', 'g'), # 9
+		('a', 'b', 'c', '', 'e', 'f', 'g'), # A
+		('', '', 'c', 'd', 'e', 'f', 'g'), # B
+		('', '', '', 'd', 'e', '', 'g'), # C
+		('', 'b', 'c', 'd', 'e', '', 'g'), # D
+		('a', '', '', 'd', 'e', 'f', 'g'), # E
+		('a', '', '', '', 'e', 'f', 'g'), # F
+		('', '', '', '', '', '', 'g'), # 10
 )
 def get_seg_7_set(set_list=[], digits_list=seg_7_digits)-> list[set[str]]:
 	if len(set_list) == 0:
