@@ -2,18 +2,18 @@ from typing import Callable, Sequence
 from types import MappingProxyType
 from functools import lru_cache
 from numpy.typing import NDArray
-from strok7 import SEG_POINTS, SEGPATH_SLANT, get_segpath_for_c, Sp, StrokeSlant, i_i_tpl, SegPoint
+from strok7 import SEG_POINT_ARRAY, SEGPATH_SLANT, get_segpath_for_c, Sp, StrokeSlant, i_i_tpl, SpPair
 from seg_7_digits import Seg7, SEG7_ARRAY, seg_7_array, homo_seg_7_array
 from seven_seg import SEVEN_SEG_SIZE
 
 SEG7_TO_POINTS: dict[Seg7, tuple[Sp, Sp]] = MappingProxyType({
-	Seg7.A: (SEG_POINTS[0], SEG_POINTS[1]),
-	Seg7.B: (SEG_POINTS[1], SEG_POINTS[2]),
-	Seg7.C: (SEG_POINTS[2], SEG_POINTS[3]),
-	Seg7.D: (SEG_POINTS[3], SEG_POINTS[4]),
-	Seg7.E: (SEG_POINTS[4], SEG_POINTS[5]),
-	Seg7.F: (SEG_POINTS[5], SEG_POINTS[0]),
-	Seg7.G: (SEG_POINTS[5], SEG_POINTS[2]),
+	Seg7.A: (SEG_POINT_ARRAY[0], SEG_POINT_ARRAY[1]),
+	Seg7.B: (SEG_POINT_ARRAY[1], SEG_POINT_ARRAY[2]),
+	Seg7.C: (SEG_POINT_ARRAY[2], SEG_POINT_ARRAY[3]),
+	Seg7.D: (SEG_POINT_ARRAY[3], SEG_POINT_ARRAY[4]),
+	Seg7.E: (SEG_POINT_ARRAY[4], SEG_POINT_ARRAY[5]),
+	Seg7.F: (SEG_POINT_ARRAY[5], SEG_POINT_ARRAY[0]),
+	Seg7.G: (SEG_POINT_ARRAY[5], SEG_POINT_ARRAY[2]),
 })
 
 NUMSTROKE_SLANT = SEGPATH_SLANT
@@ -60,17 +60,24 @@ def get_segpath_list(segpath_list = [None] * len(seg_7_array))-> Sequence[Sequen
 		segpath_list[i] = spth_list
 	return segpath_list	
 
-from seg_7_digits import SEG_POINT_DIGIT_ARRAY
+from seg_7_digits import SEG_POINT_PAIR_DIGIT_ARRAY
 class BasicDigitStrokes:
 	f'''strokes[{SEVEN_SEG_SIZE}]: slanted strokes]'''
 
-	def __init__(self):#, _stroke_list = [None] * get_all_segpoints_len()):
-		pass
-		#set_all_segpoints(_stroke_list) self._stroke_list = _stroke_list
+	def __init__(self, slant: StrokeSlant=StrokeSlant.SLANT00, scale: int=1, offset: tuple[int, int]=(0, 0)):
+		self.slant = slant
+		self.scale = scale
+		self.offset = offset
+		self.get: Callable[[int], Sequence[tuple[int, int]]]= lru_cache(maxsize=len(SEG_POINT_PAIR_DIGIT_ARRAY))(self._scale_offset)
 
 	@classmethod
-	def strokes(cls, n: int)-> Sequence[tuple[i_i_tpl, i_i_tpl]]:
-		return [sp.value for sp in SEG_POINT_DIGIT_ARRAY[n]]
+	def get_sp_pairs(cls, n: int)-> Sequence[SpPair]:
+		return SEG_POINT_PAIR_DIGIT_ARRAY[n]
+	
+	def _scale_offset(self, n: int)-> Sequence[tuple[int, int]]:
+		sp_pairs = self.get_sp_pairs(n)
+		return [(spsp.value[0].scale_offset(scale=self.scale, offset=self.offset, slant=self.slant), spsp.value[1].scale_offset(scale=self.scale, offset=self.offset, slant=self.slant)) for spsp in sp_pairs]
+
 
 class DigitStrokes:
 	f'''strokes[{SEVEN_SEG_SIZE}]: slanted strokes]'''
@@ -101,20 +108,9 @@ class NumStrokes(DigitStrokes):
 
 if __name__ == '__main__':
 	from pprint import pp
-	offset=(7,3)
-	scale=2
-	all_strokes_list = get_all_segpoints()
-	num_strokes = DigitStrokes()
-	segpoints_range = get_segpoints_max()
-	strokes_list = [
-	num_strokes.strokes(n) for n in range(segpoints_range)
-	]
-	pp(strokes_list)
-	strokes_0 = num_strokes.strokes(0)
-	pp(strokes_0)
-	fcall = f"num_strokes.strokes(0, scale={scale}, offset={offset})"
-	cProfile.run(fcall)
-	print('2nd:')
-	cProfile.run(fcall)
-
-
+	digit_stroke_1 = BasicDigitStrokes(scale=8, offset=(1, 1))
+	stroke_1_0 = digit_stroke_1.get(0)
+	pp(stroke_1_0)
+	digit_stroke_2 = BasicDigitStrokes(scale=16, offset=(2, 2))
+	stroke_2_0 = digit_stroke_2.get(0)
+	pp(stroke_2_0)
