@@ -62,8 +62,8 @@ class DigitImage:
 import digit_strokes
 class BasicDigitImage:
 
-	SCALE = 12
-	PADDING = (1, 1)
+	SCALE = 8
+	PADDING = (2, 2)
 	LINE_WIDTH = 2
 
 	def __init__(self, slant: StrokeSlant=StrokeSlant.SLANT00, scale: int=SCALE, padding: tuple[int, int]=PADDING, line_width=LINE_WIDTH, bgcolor=ImageFill.WHITE):
@@ -73,12 +73,12 @@ class BasicDigitImage:
 		self.line_width = line_width
 		self.bgcolor = bgcolor
 		self.get: Callable[[int], Image.Image] = lru_cache(maxsize=self.stroke_feeder.get_max())(self._get)
-		self.img_size = [sz + 2 * stroke_offset[i] + line_width // 2 or 1 for i, sz in enumerate(self.stroke_feeder.size)]
+		self.size = [sz + 2 * stroke_offset[i] + line_width // 2 or 1 for i, sz in enumerate(self.stroke_feeder.size)]
 
 	def _get(self, n: int)-> Image.Image:
 		# img_w = self.scale # stroke_feeder.scale + 2 * self.stroke_feeder.offset[0] + self.line_width
 		# img_h = 2 * self.scale # stroke_feeder.scale + 2 * self.stroke_feeder.offset[1] + self.line_width
-		img = Image.new('L', self.img_size, color=self.bgcolor.value)
+		img = Image.new('L', self.size, color=self.bgcolor.value)
 		drw = ImageDraw.Draw(img)
 		strokes = self.stroke_feeder.get(n)
 		for stroke in strokes:
@@ -92,7 +92,15 @@ if __name__ == '__main__':
 	from num_strokes import SEGPOINTS_MAX
 	# digit_strokes_S = BasicDigitStrokes(scale=10, offset=(4, 4))
 	digit_image_S = BasicDigitImage() #scale=BasicDigitImage.SCALE, padding=(2, 2), line_width=6) # digit_strokes_S,line_width=2)
-	digit_image_S_0 = digit_image_S.get(0)
+	multi_image_numbers = [0, 2]
+	multi_number_image_size = (len(multi_image_numbers) * digit_image_S.size[0], digit_image_S.size[1])
+	multi_number_image = Image.new('L', multi_number_image_size, (0,))
+	x_offset = digit_image_S.size[0]
+	offset = (0, 0)
+	for n in multi_image_numbers:
+		digit_image = digit_image_S.get(n)
+		multi_number_image.paste(digit_image, offset)
+		offset = offset[0] + x_offset, 0
 	# digit_strokes_L = BasicDigitStrokes(scale=20, offset=(8, 8))
 	digit_image_L = BasicDigitImage(scale=20, line_width=8, padding=(4, 4)) # digit_strokes_L,line_width=4)
 	digit_image_L_0 = digit_image_L.get(0)
