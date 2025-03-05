@@ -59,17 +59,26 @@ class DigitImage:
 		_scale = scale - 2 * padding #  int(scale * (1 - slant.value))
 		return int(_scale * (1 - slant.value)) + padding or 4 + padding, padding
 
+import digit_strokes
 class BasicDigitImage:
-	def __init__(self, stroke_feeder:BasicDigitStrokes, line_width=2, bgcolor=ImageFill.WHITE):
-		self.stroke_feeder = stroke_feeder
+
+	SCALE = 12
+	PADDING = (1, 1)
+	LINE_WIDTH = 2
+
+	def __init__(self, slant: StrokeSlant=StrokeSlant.SLANT00, scale: int=SCALE, padding: tuple[int, int]=PADDING, line_width=LINE_WIDTH, bgcolor=ImageFill.WHITE):
+		stroke_scale = scale # - padding[0] * 2 - line_width
+		stroke_offset = [(pad + line_width // 2 or 1 ) for pad in padding]
+		self.stroke_feeder = digit_strokes.DigitStrokes(slant=slant, scale=stroke_scale, offset=stroke_offset)
 		self.line_width = line_width
 		self.bgcolor = bgcolor
-		self.get: Callable[[int], Sequence[tuple[i_i_tpl, i_i_tpl]]] = lru_cache(maxsize=SEGPOINTS_MAX)(self._get)
+		self.get: Callable[[int], Image.Image] = lru_cache(maxsize=self.stroke_feeder.get_max())(self._get)
+		self.img_size = [sz + 2 * stroke_offset[i] + line_width // 2 or 1 for i, sz in enumerate(self.stroke_feeder.size)]
 
 	def _get(self, n: int)-> Image.Image:
-		img_w = self.stroke_feeder.scale + 2 * self.stroke_feeder.offset[0]
-		img_h = 2 * self.stroke_feeder.scale + 2 * self.stroke_feeder.offset[1]
-		img = Image.new('L', (img_w, img_h), color=self.bgcolor.value)
+		# img_w = self.scale # stroke_feeder.scale + 2 * self.stroke_feeder.offset[0] + self.line_width
+		# img_h = 2 * self.scale # stroke_feeder.scale + 2 * self.stroke_feeder.offset[1] + self.line_width
+		img = Image.new('L', self.img_size, color=self.bgcolor.value)
 		drw = ImageDraw.Draw(img)
 		strokes = self.stroke_feeder.get(n)
 		for stroke in strokes:
@@ -81,14 +90,14 @@ if __name__ == '__main__':
 	import sys
 	from pprint import pp
 	from num_strokes import SEGPOINTS_MAX
-	digit_strokes_S = BasicDigitStrokes(scale=10, offset=(4, 4))
-	digit_image_S = BasicDigitImage(digit_strokes_S,line_width=2)
+	# digit_strokes_S = BasicDigitStrokes(scale=10, offset=(4, 4))
+	digit_image_S = BasicDigitImage() #scale=BasicDigitImage.SCALE, padding=(2, 2), line_width=6) # digit_strokes_S,line_width=2)
 	digit_image_S_0 = digit_image_S.get(0)
-	digit_image_S_0.show() 
-	digit_strokes_L = BasicDigitStrokes(scale=20, offset=(8, 8))
-	digit_image_L = BasicDigitImage(digit_strokes_L,line_width=4)
+	# digit_strokes_L = BasicDigitStrokes(scale=20, offset=(8, 8))
+	digit_image_L = BasicDigitImage(scale=20, line_width=8, padding=(4, 4)) # digit_strokes_L,line_width=4)
 	digit_image_L_0 = digit_image_L.get(0)
 	digit_image_L_0.show()
+	digit_image_S_0.show() 
 	scale = 16
 	digit_image_calc_result = DigitImage.calc_font_scale(scale=scale, line_width_ratio=0.25, padding_ratio=0.25)
 	pp(digit_image_calc_result)
