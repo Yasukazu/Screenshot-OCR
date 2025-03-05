@@ -96,9 +96,21 @@ class ImageFill(Enum): # single element tuple for ImageDraw color
 		return ImageFill.BLACK
 from collections import namedtuple
 Size = namedtuple('Size', ['w', 'h'])
+from format_num import formatnums_to_bytearray
+def get_basic_number_image(nn: Sequence[int | FormatNum] | bytearray, digit_image_feeder=BasicDigitImage())-> tuple[Image.Image, Size]:
+	b_array = nn if isinstance(nn, bytearray) else formatnums_to_bytearray(nn)
+	number_image_size = len(b_array) * digit_image_feeder.size[0], digit_image_feeder.size[1]
+	number_image = Image.new('L', number_image_size, (0,))
+	offset = (0, 0)
+	x_offset = digit_image_feeder.size[0]
+	for n in b_array:
+		digit_image = digit_image_feeder.get(n)
+		number_image.paste(digit_image, offset)
+		offset = offset[0] + x_offset, 0
+	return number_image
+
 def get_number_image(size: Size, nn: Sequence[int | FormatNum] | bytearray, bgcolor=ImageFill.WHITE, padding=0.4)-> tuple[Image.Image, Size]: #, slant=0.25, padding=0.2):
 	'''returns Image, margins'''
-	from format_num import formatnums_to_bytearray
 	b_array = nn if isinstance(nn, bytearray) else formatnums_to_bytearray(nn)
 
 	def scale_margins()-> tuple[int, Size]:
@@ -166,12 +178,32 @@ from functools import wraps
 import numpy as np
 from path_feeder import PathFeeder
 from enum import IntEnum
-class AddPos(IntEnum):
+class PutPos(IntEnum):
 	L = -1
 	C = 0
 	R = 1
 
-def add_number(size: tuple[int, int]=(100, 50), pos: AddPos=AddPos.C, bgcolor=ImageFill.WHITE, stroke_feeder=None): # tuple[int, int]=(0, 0)):
+from digit_image import BasicDigitImage
+
+def put_number(pos: PutPos=PutPos.L, digit_image_feeder=BasicDigitImage()):
+	from format_num import HexFormatNum
+	def _embed_number(func):
+		@wraps(func)
+		def wrapper(*ag, **kw):
+			item_img: Image.Image = func(*ag, **kw)
+			if item_img and kw['number_str']:
+				name_num_array = HexFormatNum.str_to_bin(kw['number_str'])
+				num_img = get_basic_number_image(name_num_array, digit_image_feeder=digit_image_feeder)
+				x_offset = 0
+				match pos:
+					case PutPos.R:
+						x_offset = item_img.width - num_img.width
+				item_img.paste(num_img, (x_offset, 0))
+				return item_img
+		return wrapper
+	return _embed_number
+
+def add_number(size: tuple[int, int]=(100, 50), pos: PutPos=PutPos.C, bgcolor=ImageFill.WHITE, stroke_feeder=None): # tuple[int, int]=(0, 0)):
 	from format_num import HexFormatNum
 	def _embed_number(func):
 		@wraps(func)
@@ -182,9 +214,9 @@ def add_number(size: tuple[int, int]=(100, 50), pos: AddPos=AddPos.C, bgcolor=Im
 				num_img, margins = get_number_image(size, name_num_array, bgcolor=bgcolor)
 				margin_list = list(margins)
 				match pos:
-					case AddPos.L:
+					case PutPos.L:
 						margin_list[0] = 0
-					case AddPos.R:
+					case PutPos.R:
 						margin_list[0] = item_img.width - num_img.width
 				item_img.paste(num_img, [int(v) for v in margin_list] )
 				return item_img

@@ -60,6 +60,14 @@ class DigitImage:
 		return int(_scale * (1 - slant.value)) + padding or 4 + padding, padding
 
 import digit_strokes
+from collections import namedtuple
+
+BasicDigitImageParam = namedtuple('BasicDigitImageParam', ['scale', 'padding', 'line_width'])
+
+BASIC_DIGIT_IMAGE_PARAM_LIST = [
+	BasicDigitImageParam(scale=8, padding=(2, 2), line_width=2),
+	BasicDigitImageParam(scale=16, padding=(4, 4), line_width=4),
+]
 class BasicDigitImage:
 
 	SCALE = 8
@@ -105,7 +113,6 @@ if __name__ == '__main__':
 	digit_image_L = BasicDigitImage(scale=20, line_width=8, padding=(4, 4)) # digit_strokes_L,line_width=4)
 	digit_image_L_0 = digit_image_L.get(0)
 	digit_image_L_0.show()
-	digit_image_S_0.show() 
 	scale = 16
 	digit_image_calc_result = DigitImage.calc_font_scale(scale=scale, line_width_ratio=0.25, padding_ratio=0.25)
 	pp(digit_image_calc_result)

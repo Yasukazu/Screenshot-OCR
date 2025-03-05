@@ -8,7 +8,7 @@ from pathlib import Path
 home_dir = Path(os.path.expanduser('~'))
 import path_feeder
 from path_feeder import PathFeeder, get_last_month #, YearMonth
-from num_to_strokes import add_number, AddPos, ImageFill
+from num_to_strokes import add_number, PutPos, ImageFill, put_number
 last_month_date = get_last_month()
 year = last_month_date.year
 month = last_month_date.month
@@ -68,8 +68,12 @@ def get_png_file_names()-> Generator[tuple[Path, str, int], None, None]:
 def get_quad_png_file_names()-> Generator[tuple[Path, str, int], None, None]:
 	for path, stem, m in path_feeder(input_type=FileExt.QPNG):
 		yield path, stem, m
+
 DAY_NOMBRE_H = 50
 TXT_OFST = 0 # width-direction / horizontal
+
+from digit_image import BASIC_DIGIT_IMAGE_PARAM_LIST, BasicDigitImage
+
 def draw_onto_pages(div=64, th=H_PAD // 2,
 	path_feeder: PathFeeder=PathFeeder(),
 	v_pad=16, h_pad=8, mode='L', dst_bg=ImageFill.BLACK)-> Iterator[Image.Image]:
@@ -114,7 +118,8 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		for i, block in enumerate(name_blocks):
 			yield concat_8_pages(block, number_str=f"{path_feeder.month:02}{(-0xa - i):x}")
 
-	@add_number(size=(DAY_NOMBRE_H * 4, DAY_NOMBRE_H * 2), pos=AddPos.R, bgcolor=ImageFill.BLACK)
+	digit_image_param_L = BASIC_DIGIT_IMAGE_PARAM_LIST[1]
+	@put_number(pos=PutPos.R, digit_image_feeder=BasicDigitImage(scale=digit_image_param_L.scale, padding=digit_image_param_L.padding, line_width=digit_image_param_L.line_width))
 	def concat_8_pages(names: Iterator[str], number_str: str)-> Image:
 
 		names_1 = list(names[:4])
@@ -147,7 +152,8 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		dst.paste(im2, (0, im1.height + pad))
 		return dst
 
-	@add_number(size=(first_img_size[0], DAY_NOMBRE_H), pos=AddPos.L, bgcolor=ImageFill.WHITE) # (feeder=path_feeder) # .feed(padding=True))
+	digit_image_param_S = BASIC_DIGIT_IMAGE_PARAM_LIST[0]
+	@put_number(pos=PutPos.R, digit_image_feeder=BasicDigitImage(scale=digit_image_param_S.scale, padding=digit_image_param_S.padding, line_width=digit_image_param_S.line_width))
 	def get_numbered_img(fn: str, number_str: str)-> Image.Image | None:
 		fullpath = path_feeder.dir / (fn + path_feeder.ext)
 		if fullpath.exists():
