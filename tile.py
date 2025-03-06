@@ -158,8 +158,9 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		dst.paste(im2, (0, im1.height + pad))
 		return dst
 
+	digit_image_feeder = BasicDigitImage(scale=24, line_width=6, padding=(4, 4))
 	digit_image_param_S = BASIC_DIGIT_IMAGE_PARAM_LIST[0]
-	@put_number(pos=PutPos.R, digit_image_feeder=BasicDigitImage(scale=digit_image_param_S.scale, padding=digit_image_param_S.padding, line_width=digit_image_param_S.line_width))
+	@put_number(pos=PutPos.R, digit_image_feeder=digit_image_feeder, line_width=digit_image_param_S.line_width))
 	def get_numbered_img(fn: str, number_str: str)-> Image.Image | None:
 		fullpath = path_feeder.dir / (fn + path_feeder.ext)
 		if fullpath.exists():

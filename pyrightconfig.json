@@ -1,0 +1,3 @@
+{
+    "exclude":["2025", "202411", "202412", "digi", "__pycache__", "venv", ".git", ".idea", "ipynb_chackpoints", ".spyproject", ".venv", ".vscode"]
+}
