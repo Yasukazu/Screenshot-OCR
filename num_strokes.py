@@ -74,7 +74,7 @@ class BasicDigitStrokes:
 	def get_sp_pairs(cls, n: int)-> Sequence[SpPair]:
 		return SEG_POINT_PAIR_DIGIT_ARRAY[n]
 	
-	def _scale_offset(self, n: int)-> list[tuple[int, int]]:
+	def _scale_offset(self, n: int)-> Sequence[tuple[int, int]]:
 		sp_pairs = self.get_sp_pairs(n)
 		return [(spsp.value[0].scale_offset(scale=self.scale, offset=self.offset, slant=self.slant), spsp.value[1].scale_offset(scale=self.scale, offset=self.offset, slant=self.slant)) for spsp in sp_pairs]
 

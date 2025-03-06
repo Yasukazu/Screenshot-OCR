@@ -25,21 +25,26 @@ def detect_edge(img_fullpath: Path):
 			break
 	print(top_edge) # 249
 
-def detect_tm_edge(img_fullpath: Path)-> int:
-	assert str(img_fullpath).endswith('.png') and img_fullpath.exists()
-	im = Image.open(img_fullpath).convert('L')
+def detect_tim_top_left_edge(im: Image.Image, show=False)-> int:
 	corner_img = im.crop((0, 0, 1, im.height // 8))
 	corner_array = np.array(corner_img)
 	line_array = corner_array.transpose()[0]
-	edge = list(line_array).index(255)
-	draw = ImageDraw.Draw(im)
-	draw.line((0, 0, 0, edge), fill=0, width=1)
-	im.show()
+	start_color = line_array[0]
+	for i in range(line_array.size):
+		if line_array[0][i] != start_color[0]:
+			break
+	edge = i # list(line_array).index(255)
+	if show:
+		draw = ImageDraw.Draw(im)
+		draw.line((1, 0, 1, edge), fill=~start_color, width=2)
+		im.show()
 	return edge
 
 
 if __name__ == '__main__':
 	# img_name = "2025-01-4p8.pdf"
 	img_fullpath = get_last_month_path() / 'png' / '01.png'
-	edge = detect_tm_edge(img_fullpath) # 77
+	assert str(img_fullpath).endswith('.png') and img_fullpath.exists()
+	im = Image.open(img_fullpath).convert('L')
+	edge = detect_tim_top_left_edge(im) # 77
 	print(edge)

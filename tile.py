@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Sequence, Iterator, Generator
 import numpy as np
 from PIL import Image, ImageDraw
@@ -8,7 +9,8 @@ from pathlib import Path
 home_dir = Path(os.path.expanduser('~'))
 import path_feeder
 from path_feeder import PathFeeder, get_last_month #, YearMonth
-from num_to_strokes import add_number, PutPos, ImageFill, put_number
+from image_fill import ImageFill
+from num_to_strokes import add_number, PutPos, put_number
 last_month_date = get_last_month()
 year = last_month_date.year
 month = last_month_date.month
@@ -42,23 +44,27 @@ def convert_to_pdf(names=paged_png_feeder(),
 		f.write(img2pdf.convert(layout_fun=layout_fun, *names, rotation=img2pdf.Rotation.ifvalid))
 
 from path_feeder import PathFeeder
-def save_pages_as_pdf(fullpath=PathFeeder().first_fullpath):
+def save_pages_as_pdf(): #fullpath=PathFeeder().first_fullpath):
 	fullpath = img_dir / f"{year_month_name}.pdf"
 	imges = list(draw_onto_pages())
-	imges[0].save(fullpath, "PDF" ,resolution=100.0, save_all=True, append_imges=imges[1:])
+	imges[0].save(fullpath, "PDF" ,resolution=200, save_all=True, append_imges=imges[1:])
 
 from path_feeder import ext_to_dir, FileExt, ExtDir
-def save_pages(ext_dir=FileExt.QPNG, arc=False):
-	if arc:
-		imgs: list[Image.Image] = list(draw_onto_pages())
-		save_dir = img_dir / ext_dir.value.dir
-		fullpath = img_dir / f"{year}-{month:02}-img32.tif"
-		imgs[0].save(fullpath, compression="tiff_deflate", save_all=True, append_images=imgs[1:])
-		return
+def save_qpng_pages(ext_dir=FileExt.QPNG):
 	save_dir = img_dir / ext_dir.value.dir
 	for pg, img in enumerate(draw_onto_pages()):
 		fullpath = save_dir / f"8-img-{pg + 1}{ext_dir.value.ext}"
 		img.save(fullpath) #, 'PNG')
+
+class ArcFileExt(Enum):
+	TIFF = ('.tif', {'compression':"tiff_deflate"})
+	PDF = ('.pdf', {})
+
+def save_arc_pages(ext: ArcFileExt=ArcFileExt.TIFF):
+		imgs: list[Image.Image] = list(draw_onto_pages())
+		fullpath = img_dir / f"{year}-{month:02}-8x4{ext.value[0]}"
+		imgs[0].save(fullpath, save_all=True, append_images=imgs[1:], **ext.value[1])
+
 from typing import Generator
 from path_feeder import path_feeder, FileExt
 def get_png_file_names()-> Generator[tuple[Path, str, int], None, None]:
@@ -256,4 +262,4 @@ def get_concat_v(imim_len: int, img_size: tuple[int, int], imim: Sequence[Image.
 if __name__ == '__main__':
 	#save_pages()
 	#convert_to_pdf()
-	save_pages(arc=True)
+	save_arc_pages()

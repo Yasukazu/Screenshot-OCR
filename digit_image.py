@@ -13,7 +13,7 @@ from pandas import DataFrame
 from strok7 import STRK_DICT_STEM, StrokeSlant, i_i_tpl
 from format_num import FormatNum, HexFormatNum, conv_num_to_bin
 from num_strokes import SEGPOINTS_MAX, DigitStrokes, BasicDigitStrokes
-from num_to_strokes import ImageFill
+from image_fill import ImageFill
 
 OfstIWIH = namedtuple('OfstIWIH', ['ofst', 'img_w', 'img_h'])
 DigitImageCalcResult = namedtuple('DigitImageCalcResult', ['scale', 'font_scale', 'padding', 'line_width'])
