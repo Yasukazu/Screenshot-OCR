@@ -10,6 +10,7 @@ from numpy.typing import NDArray
 from pandas import DataFrame
 from strok7 import STRK_DICT_STEM
 from format_num import FormatNum, HexFormatNum, conv_num_to_bin
+from digit_image import ImageFill
 
 def conv(i: str)-> bool:
 	return False if i == '' else bool(int(i))
@@ -86,18 +87,11 @@ def get_num_strokes(n: int, slant=NUMSTROKE_SLANT, segpath_list: list[list[segpa
 	segpath: list[segpath_dict] = segpath_list[n]
 	return [path.slanted(slant) for path in segpath]
 
-class ImageFill(Enum): # single element tuple for ImageDraw color
-	BLACK = (0,)
-	WHITE = (0xff,)
-	@classmethod
-	def invert(cls, fill):
-		if fill == ImageFill.BLACK:
-			return ImageFill.WHITE
-		return ImageFill.BLACK
 from collections import namedtuple
 Size = namedtuple('Size', ['w', 'h'])
 from format_num import formatnums_to_bytearray
-def get_basic_number_image(nn: Sequence[int | FormatNum] | bytearray, digit_image_feeder=BasicDigitImage())-> tuple[Image.Image, Size]:
+from digit_image import BasicDigitImage
+def get_basic_number_image(nn: Sequence[int | FormatNum] | bytearray, digit_image_feeder=BasicDigitImage())-> Image.Image:
 	b_array = nn if isinstance(nn, bytearray) else formatnums_to_bytearray(nn)
 	number_image_size = len(b_array) * digit_image_feeder.size[0], digit_image_feeder.size[1]
 	number_image = Image.new('L', number_image_size, (0,))
@@ -184,6 +178,7 @@ class PutPos(IntEnum):
 	R = 1
 
 from digit_image import BasicDigitImage
+from format_num import HexFormatNum
 
 def put_number(pos: PutPos=PutPos.L, digit_image_feeder=BasicDigitImage()):
 	from format_num import HexFormatNum
@@ -234,6 +229,18 @@ def embed_number(func):
 	return wrapper
 
 if __name__ == '__main__':
+	from get_image_outline import detect_tim_top_left_edge
+	digit_image = BasicDigitImage(scale=24, line_width=6, padding=(4, 4))
+	number_image = get_basic_number_image([0, 2], digit_image_feeder=digit_image)
+	from path_feeder import PathFeeder
+	feeder = PathFeeder()
+	for fe in feeder.feed():
+		fullpath = feeder.dir / (fe + feeder.ext)
+		image = Image.open(fullpath)
+		edge = detect_tim_top_left_edge(image)
+		image.paste(number_image, (0, 0))
+		breakpoint()
+	sys.exit(0)
 	image_size = (80, 40)
 	stroke_feeder = DigitStrokes()
 	stroke_dict = {}

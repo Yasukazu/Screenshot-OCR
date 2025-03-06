@@ -9,7 +9,7 @@ from pathlib import Path
 home_dir = Path(os.path.expanduser('~'))
 import path_feeder
 from path_feeder import PathFeeder, get_last_month #, YearMonth
-from image_fill import ImageFill
+from digit_image import ImageFill
 from num_to_strokes import add_number, PutPos, put_number
 last_month_date = get_last_month()
 year = last_month_date.year
@@ -118,15 +118,16 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 
 	def get_image_blocks():
 		names = list(path_feeder.feed(padding=True))
-		name_blocks = [names[:8], names[8:16], names[16:24], names[24:]]
+		name_blocks: Sequence[list[str]] = [names[:8], names[8:16], names[16:24], names[24:]]
 		pad_size = 8 - len(name_blocks[-1])
 		name_blocks[-1] += [''] * pad_size
 		for i, block in enumerate(name_blocks):
 			yield concat_8_pages(block, number_str=f"{path_feeder.month:02}{(-0xa - i):x}")
 
-	digit_image_param_L = BASIC_DIGIT_IMAGE_PARAM_LIST[1]
-	@put_number(pos=PutPos.R, digit_image_feeder=BasicDigitImage(scale=digit_image_param_L.scale, padding=digit_image_param_L.padding, line_width=digit_image_param_L.line_width))
-	def concat_8_pages(names: Iterator[str], number_str: str)-> Image:
+	digit_image_feeder_L = BasicDigitImage(scale=36, line_width=8, padding=(6, 6), bgcolor=ImageFill.BLACK)
+	# digit_image_param_L = BASIC_DIGIT_IMAGE_PARAM_LIST[1]
+	@put_number(pos=PutPos.R, digit_image_feeder=digit_image_feeder_L)
+	def concat_8_pages(names: list[str], number_str: str)-> Image.Image:
 
 		names_1 = list(names[:4])
 		names_2 = list(names[4:])
@@ -135,8 +136,8 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		himg2 = concat_h(names_2)
 		return concat_v(himg1, himg2)
 
-	img_size = Image.open(path_feeder.first_fullpath).size
-	def concat_h(names: list[str], pad=h_pad)-> Image:
+	img_size = Image.open(str(path_feeder.first_fullpath)).size
+	def concat_h(names: list[str], pad=h_pad)-> Image.Image:
 		imim_len = len(names)
 		imim = [get_numbered_img(n, number_str=n) for n in names]
 		max_height = img_size[1]
@@ -158,9 +159,9 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		dst.paste(im2, (0, im1.height + pad))
 		return dst
 
-	digit_image_feeder = BasicDigitImage(scale=24, line_width=6, padding=(4, 4))
-	digit_image_param_S = BASIC_DIGIT_IMAGE_PARAM_LIST[0]
-	@put_number(pos=PutPos.R, digit_image_feeder=digit_image_feeder, line_width=digit_image_param_S.line_width))
+	digit_image_feeder_S = BasicDigitImage(scale=24, line_width=6, padding=(4, 4))
+	# digit_image_param_S = BASIC_DIGIT_IMAGE_PARAM_LIST[0]
+	@put_number(pos=PutPos.L, digit_image_feeder=digit_image_feeder_S) #, line_width=digit_image_param_S.line_width))
 	def get_numbered_img(fn: str, number_str: str)-> Image.Image | None:
 		fullpath = path_feeder.dir / (fn + path_feeder.ext)
 		if fullpath.exists():

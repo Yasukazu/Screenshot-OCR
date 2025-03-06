@@ -1,19 +1,21 @@
+from enum import Enum
 from collections import namedtuple
-from math import floor
 from functools import lru_cache
 from collections.abc import Callable
-from functools import cached_property
 from collections.abc import Sequence
-from enum import Enum
-import pickle
-import numpy as np
 from PIL import ImageDraw, Image
-from numpy.typing import NDArray
-from pandas import DataFrame
 from strok7 import STRK_DICT_STEM, StrokeSlant, i_i_tpl
 from format_num import FormatNum, HexFormatNum, conv_num_to_bin
 from num_strokes import SEGPOINTS_MAX, DigitStrokes, BasicDigitStrokes
-from image_fill import ImageFill
+
+class ImageFill(Enum): # single element tuple for ImageDraw color
+	BLACK = (0,)
+	WHITE = (0xff,)
+	@classmethod
+	def invert(cls, fill):
+		if fill == ImageFill.BLACK:
+			return ImageFill.WHITE
+		return ImageFill.BLACK
 
 OfstIWIH = namedtuple('OfstIWIH', ['ofst', 'img_w', 'img_h'])
 DigitImageCalcResult = namedtuple('DigitImageCalcResult', ['scale', 'font_scale', 'padding', 'line_width'])
@@ -32,7 +34,7 @@ class DigitImage:
 		self.offset = offset
 		self.line_width = line_width
 		self.bgcolor = bgcolor
-		self.get: Callable[[int], Sequence[tuple[i_i_tpl, i_i_tpl]]] = lru_cache(maxsize=SEGPOINTS_MAX)(self._get)
+		self.get: Callable[[int], Image.Image] = lru_cache(maxsize=SEGPOINTS_MAX)(self._get)
 
 	@classmethod
 	def calc_font_scale(cls, scale: int=MIN_SCALE, line_width_ratio: float=STANDARD_LINE_WIDTH_RATIO, padding_ratio: float=STANDARD_PADDING_RATIO)-> DigitImageCalcResult:
