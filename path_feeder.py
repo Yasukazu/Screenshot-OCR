@@ -24,6 +24,8 @@ class FileExt(Enum):
 	TXT = ExtDir('.txt', 'txt')
 	PNG = ExtDir('.png', 'png')
 	QPNG = ExtDir('.png', 'qpng')
+	TIFF = ExtDir('.tif', 'tiff')
+	BTM_TXT = ExtDir('.btm.txt', 'png')
 
 def ext_to_dir(ext: str)-> str:
 	assert ext[0] == '.'

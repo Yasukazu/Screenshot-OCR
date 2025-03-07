@@ -1,3 +1,4 @@
+from pathlib import Path
 import subprocess
 
 cmd = 'tesseract' # -l jpn+eng 
@@ -65,28 +66,8 @@ def crop_bottom_text_image(input_path: Path)-> Image.Image:
 	draw.line((line_from, line_to), (0,))
 	img.show()
 
-
-import os
-from pathlib import Path
-
-def path_feeder(from_=1, to=31, input_ext='.png', output_ext='.tact'): #rng=range(0, 31)):
-	home_dir = os.path.expanduser('~')
-	home_path = Path(home_dir)
-	input_dir = home_path / 'Documents' / 'screen' / '202501'
-	assert input_dir.exists()
-	for day in range(from_, to + 1):
-		input_filename = f'2025-01-{day:02}{input_ext}'
-		input_fullpath = input_dir / input_filename
-		if not input_fullpath.exists():
-			continue
-		input_path_noext, _ext = os.path.splitext(input_fullpath)
-		output_path = Path(input_path_noext + output_ext)
-		assert not output_path.exists()
-		yield input_fullpath, output_path
-
-if __name__ == '__main__':
-	import os, sys
-	from path_feeder import PathFeeder
+from path_feeder import PathFeeder, FileExt
+def gen_btm_txt():
 	feeder = PathFeeder()
 	#for input_path, output_path in path_feeder(3, 31):
 	for stem in feeder.feed(padding=False):
@@ -99,3 +80,23 @@ if __name__ == '__main__':
 		output_btm_path = feeder.dir / (stem + '.btm')
 		if not (feeder.dir / (stem + '.btm' + '.txt')).exists():
 			run_cmd(output_png_path, output_btm_path)
+
+
+if __name__ == '__main__':
+	# gen_btm_txt()
+	feeder = PathFeeder(input_type=FileExt.BTM_TXT)
+	output_path = feeder.dir / "btm.csv"
+	import csv
+	with output_path.open('w', encoding='utf8') as wcsv:
+		writer = csv.writer(wcsv)
+		for stem in feeder.feed(padding=False):
+			input_path = feeder.dir / (stem + feeder.ext)
+			text = input_path.open(encoding='utf8').read()
+			ndnd = text.split(' ')
+			assert ndnd[0] == '差引支給額'
+			nd = ''.join(ndnd[1:])
+			nums = ''.join([c for c in nd if c.isnumeric()])
+			n = int(nums)
+			row = [stem, n]
+			writer.writerow(row)
+
