@@ -31,6 +31,9 @@ def get_np_img(input_path: Path)-> np.ndarray:
 	return np.array(img)
 CHECK_IMAGE = True
 def crop_top_text_image(img: Image.Image)-> Image.Image:
+	''' to crop the top-text(title) area: 
+	    top-text area is between full-width lines.
+		 To reduce a noise line, uses max_pitch() '''
 	draw = ImageDraw.Draw(img)
 	im = np.array(img)
 	def get_white(ofst=0):
@@ -61,7 +64,7 @@ def crop_top_text_image(img: Image.Image)-> Image.Image:
 	next_non_white = get_non_white(next_white + 1) 
 	rr += [draw_line(next_non_white)]
 	
-	def max_pitch():
+	def max_pitch(rr: Sequence[int]):
 		mx = 0
 		max_pitch_r = 0
 		last_r = 0
@@ -72,7 +75,7 @@ def crop_top_text_image(img: Image.Image)-> Image.Image:
 				max_pitch_r = i
 			last_r = r
 		return max_pitch_r - 1
-	max_pitch_pos = max_pitch()
+	max_pitch_pos = max_pitch(rr)
 	return img.crop((0, rr[max_pitch_pos], img.width, rr[max_pitch_pos + 1]))
 
 

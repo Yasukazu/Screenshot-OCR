@@ -26,22 +26,65 @@ file_over = False
 
 year_month_name = f"{year}-{month:02}"
 
-a4inpt = (img2pdf.mm_to_pt(210),img2pdf.mm_to_pt(297))
-a3inpt = (img2pdf.mm_to_pt(297),img2pdf.mm_to_pt(420))
+class PdfLayout(Enum):
+	a4pt = (img2pdf.mm_to_pt(210),img2pdf.mm_to_pt(297))
+	a3lp = (img2pdf.mm_to_pt(420),img2pdf.mm_to_pt(297))
 
+def convert_tiff_to_png_files():
+	cmd = 'convert 2025-02-8x4.tif -format png -scene 1 2025-02-%d.png'
+from path_feeder import FileExt
+def paged_png_feeder(layout=PdfLayout.a4pt):
+	feeder=PathFeeder(input_type=FileExt.QPNG)
+	img_dir = feeder.dir
+	year = feeder.year
+	month = feeder.month
+	names = []
+	match layout:
+		case PdfLayout.a4pt:
+			for p in range(4):
+				fullpath = img_dir / f"{year}-{month:02}-{p + 1}.png"
+				if not fullpath.exists():
+					ValueError(f"{fullpath} does not exist!")
+				names.append(fullpath)
+			return names
+		case PdfLayout.a3lp:
+			for p in range(2):
+				fullpath_l = img_dir / f"{year}-{month:02}-{2 * p + 1}.png"
+				fullpath_r = img_dir / f"{year}-{month:02}-{2 * p + 2}.png"
+				for fullpath in (fullpath_l, fullpath_r):
+					if not fullpath.exists():
+						ValueError(f"{fullpath} does not exist!")
+				sub_ext_list = ('L', 'R')
+				outpath = img_dir / f"{year}-{month:02}-{sub_ext_list[p]}.png"
+				l_image = Image.open(fullpath_l)
+				padding = 100
+				margin = 200
+				image = Image.new('L', (l_image.width * 2 + padding + 2 * margin, l_image.height))
+				margin_img = Image.new('L', (margin, l_image.height), (0xff,))
+				pos = 0
+				image.paste(margin_img, (0, 0))
+				pos += margin_img.width
+				image.paste(l_image, (pos, 0))
+				pos += l_image.width + padding
+				l_image = Image.open(fullpath_r)
+				image.paste(l_image, (pos, 0))
+				pos += l_image.width
+				image.paste(margin_img, (pos, 0))
+				save_path = (outpath)
+				image.save(save_path)
+				names.append(save_path)
+			return names
 
-def paged_png_feeder():
-	for p in range(4):
-		yield img_dir / f"{year}-{month:02}-{p + 1}.png"
-
-def convert_to_pdf(names=paged_png_feeder(),
-	fullpath = img_dir / f"{year_month_name}.pdf", layout=a4inpt):
-	layout_fun = img2pdf.get_layout_fun(layout)
+def convert_to_pdf(layout=PdfLayout.a4pt):
+	names = paged_png_feeder(layout=layout)
+	parent_dir = names[0].parent
+	fullpath = parent_dir / f"{year}-{month:02}.pdf"
+	layout_fun = img2pdf.get_layout_fun(layout.value)
 	with open(fullpath,"wb") as f:
-		#(img, name) in get_pages()]
 		for name in names:
-			assert Path(name).exists()
-		f.write(img2pdf.convert(layout_fun=layout_fun, *names, rotation=img2pdf.Rotation.ifvalid))
+			assert name.exists()
+		name_list = [str(n) for n in names]
+		f.write(img2pdf.convert(layout_fun=layout_fun, *name_list, rotation=img2pdf.Rotation.ifvalid))
 
 from path_feeder import PathFeeder
 def save_pages_as_pdf(): #fullpath=PathFeeder().first_fullpath):
@@ -263,5 +306,5 @@ def get_concat_v(imim_len: int, img_size: tuple[int, int], imim: Sequence[Image.
 
 if __name__ == '__main__':
 	#save_pages()
-	#convert_to_pdf()
-	save_arc_pages()
+	convert_to_pdf(layout=PdfLayout.a3lp)
+	#save_arc_pages()
