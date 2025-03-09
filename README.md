@@ -11,7 +11,10 @@
 ## Necessary files:
  - `7-seg.pkl`
 
-## get_number_image in `num_to_strokes.py`
+## get_number_image
+ - ### `DigitImage` class in `digit_image.py`:
+   - #### classmethod `calc_font_scale` returns `font_scale` ignores font line width.
+ - ### `num_to_strokes.py`
 ![test image](digi/get_number_image-test.PNG)
 
 ## Nombre(page numbering) decorator:
