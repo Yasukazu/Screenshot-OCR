@@ -1,6 +1,9 @@
 import csv
 import pandas as pd
 
+from seg_7_digits import SEG_POINT_PAIR_DIGIT_ARRAY
+SEVEN_SEG_SIZE = len(SEG_POINT_PAIR_DIGIT_ARRAY)
+
 SEVEN_SEG_STEM = '7-seg'
 SEVEN_SEG_MAX = 15
 CSV_EXT = '.csv'
