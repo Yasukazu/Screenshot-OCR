@@ -40,19 +40,19 @@ class Sp:
 		self.x *= n
 		self.y *= n
 
-	def slant_x(self, slant: StrokeSlant=STANDARD_SLANT)-> float:
+	def slant_x(self, slant: StrokeSlant=NO_SLANT)-> float:
 		return self.x + slant.value * self._slr
 
-	def slant(self, slant: StrokeSlant=STANDARD_SLANT)-> f_i_tpl:
+	def slant(self, slant: StrokeSlant=NO_SLANT)-> f_i_tpl:
 		self.x = self.slant_x(slant)
 
-	def slanted(self, slant: StrokeSlant=STANDARD_SLANT)-> f_i_tpl:
+	def slanted(self, slant: StrokeSlant=NO_SLANT)-> f_i_tpl:
 		return self.slant_x(slant), self.y
 
 	def scale_offset(self, slant: StrokeSlant=StrokeSlant.SLANT00, scale: int=1, offset: tuple[int, int]=(0, 0))-> i_i_tpl:
 		'''also slant'''
-		slanted_x = self.slant_x(slant)
-		return round(scale / (1 + slant.value) * slanted_x) + offset[0], scale * self.y + offset[1]
+		slanted_x = self.slant_x(slant) # / (1 + slant.value)
+		return round(scale * slanted_x) + offset[0], scale * self.y + offset[1]
 
 class Sp0(Sp):
 	def __init__(self, x: int):

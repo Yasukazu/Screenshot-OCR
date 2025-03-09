@@ -1,6 +1,6 @@
 from typing import Sequence, Callable
 from enum import Flag, Enum
-from strok7 import SegPoint
+from strok7 import SpPair
 
 seg_7_digits: Sequence[int] = (
 	# abcdefgh
@@ -64,24 +64,24 @@ SEG7_ARRAY = (
 	(Seg7.G,),
 )
 
-SEG_POINT_DIGIT_ARRAY = (
-	(SegPoint.A, SegPoint.B, SegPoint.C, SegPoint.D, SegPoint.E, SegPoint.F),
-	(SegPoint.B, SegPoint.C),
-	(SegPoint.A, SegPoint.B, SegPoint.D, SegPoint.E, SegPoint.G),
-	(SegPoint.A, SegPoint.B, SegPoint.C, SegPoint.D, SegPoint.G),
-	(SegPoint.B, SegPoint.C, SegPoint.F, SegPoint.G),
-	(SegPoint.A, SegPoint.C, SegPoint.D, SegPoint.F, SegPoint.G),
-	(SegPoint.A, SegPoint.C, SegPoint.D, SegPoint.E, SegPoint.F, SegPoint.G),
-	(SegPoint.A, SegPoint.B, SegPoint.C),
-	(SegPoint.A, SegPoint.B, SegPoint.C, SegPoint.D, SegPoint.E, SegPoint.F, SegPoint.G),
-	(SegPoint.A, SegPoint.B, SegPoint.C, SegPoint.F, SegPoint.G),
-	(SegPoint.A, SegPoint.B, SegPoint.C, SegPoint.E, SegPoint.F, SegPoint.G),
-	(SegPoint.C, SegPoint.D, SegPoint.E, SegPoint.F, SegPoint.G),
-	(SegPoint.D, SegPoint.E, SegPoint.G),
-	(SegPoint.B, SegPoint.C, SegPoint.D, SegPoint.E, SegPoint.G),
-	(SegPoint.A, SegPoint.D, SegPoint.E, SegPoint.F, SegPoint.G),
-	(SegPoint.A, SegPoint.E, SegPoint.F, SegPoint.G),
-	(SegPoint.G,)
+SEG_POINT_PAIR_DIGIT_ARRAY = (
+	(SpPair.A, SpPair.B, SpPair.C, SpPair.D, SpPair.E, SpPair.F),
+	(SpPair.B, SpPair.C),
+	(SpPair.A, SpPair.B, SpPair.D, SpPair.E, SpPair.G),
+	(SpPair.A, SpPair.B, SpPair.C, SpPair.D, SpPair.G),
+	(SpPair.B, SpPair.C, SpPair.F, SpPair.G),
+	(SpPair.A, SpPair.C, SpPair.D, SpPair.F, SpPair.G),
+	(SpPair.A, SpPair.C, SpPair.D, SpPair.E, SpPair.F, SpPair.G),
+	(SpPair.A, SpPair.B, SpPair.C),
+	(SpPair.A, SpPair.B, SpPair.C, SpPair.D, SpPair.E, SpPair.F, SpPair.G),
+	(SpPair.A, SpPair.B, SpPair.C, SpPair.F, SpPair.G),
+	(SpPair.A, SpPair.B, SpPair.C, SpPair.E, SpPair.F, SpPair.G),
+	(SpPair.C, SpPair.D, SpPair.E, SpPair.F, SpPair.G),
+	(SpPair.D, SpPair.E, SpPair.G),
+	(SpPair.B, SpPair.C, SpPair.D, SpPair.E, SpPair.G),
+	(SpPair.A, SpPair.D, SpPair.E, SpPair.F, SpPair.G),
+	(SpPair.A, SpPair.E, SpPair.F, SpPair.G),
+	(SpPair.G,)
 )
 
 seg_7_array: Sequence[Sequence[str]] = (
