@@ -1,0 +1,25 @@
+[project]
+name = "taimi-screen"
+version = "1.1.1"
+description = "generate PDF from taimi screenshots"
+authors = [{ name = "Yasukazu ", email = "yasukazu@makyno.jp" }]
+requires-python = ">=3.9"
+readme = "README.md"
+dependencies = [
+    "easyocr (>=1.7.2,<2.0.0)",
+    "img2pdf (>=0.5.1,<0.6.0)",
+    "numpy>=2.0.2",
+]
+
+[dependency-groups]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.uv]
+package = false
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
