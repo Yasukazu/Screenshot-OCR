@@ -27,11 +27,11 @@ class DigitImage:
 	STANDARD_LINE_WIDTH = 2
 	STANDARD_LINE_WIDTH_RATIO = 0.2
 
-	def __init__(self, stroke_feeder=DigitStrokes(), slant: StrokeSlant=StrokeSlant.SLANT00, scale: int=MIN_SCALE, line_width=STANDARD_LINE_WIDTH, offset=(STANDARD_PADDING, STANDARD_PADDING), bgcolor=ImageFill.WHITE):
+	def __init__(self, stroke_feeder=BasicDigitStrokes(), bgcolor=ImageFill.WHITE, line_width=STANDARD_LINE_WIDTH): # slant: StrokeSlant=StrokeSlant.SLANT00, scale: int=MIN_SCALE,  offset=(STANDARD_PADDING, STANDARD_PADDING)#
 		self.stroke_feeder = stroke_feeder
-		self.slant = slant
-		self.scale = scale
-		self.offset = offset
+		self.slant = stroke_feeder.slant
+		self.scale = stroke_feeder.scale
+		self.offset = stroke_feeder.offset
 		self.line_width = line_width
 		self.bgcolor = bgcolor
 		self.get: Callable[[int], Image.Image] = lru_cache(maxsize=SEGPOINTS_MAX)(self._get)
@@ -50,16 +50,16 @@ class DigitImage:
 		img_h = 2 * self.stroke_feeder.scale + 2 * self.stroke_feeder.offset[1]
 		img = Image.new('L', (img_w, img_h), color=self.bgcolor.value)
 		drw = ImageDraw.Draw(img)
-		strokes = self.stroke_feeder.strokes(n, slant=self.slant, scale=self.scale, offset=self.offset)
+		strokes = self.stroke_feeder.get(n)
 		for stroke in strokes:
 			drw.line(stroke, width=self.line_width, fill=ImageFill.invert(self.bgcolor).value, joint='curve')
 		return img
 
 
-	def calc_scale_padding(self, scale=MIN_SCALE, padding=STANDARD_PADDING_RATIO, slant: StrokeSlant=StrokeSlant.SLANT02)-> tuple[int, int]:
+	def calc_scale_padding(self, scale=MIN_SCALE, padding=STANDARD_PADDING_RATIO, slant: StrokeSlant=StrokeSlant.SLANT02)-> tuple[int, float]:
 		padding = scale * padding or 1
 		_scale = scale - 2 * padding #  int(scale * (1 - slant.value))
-		return int(_scale * (1 - slant.value)) + padding or 4 + padding, padding
+		return int(_scale * (1 - slant.value) * padding or 4 * padding), padding
 
 import digit_strokes
 from collections import namedtuple
@@ -78,8 +78,8 @@ class BasicDigitImage:
 
 	def __init__(self, slant: StrokeSlant=StrokeSlant.SLANT00, scale: int=SCALE, padding: tuple[int, int]=PADDING, line_width=LINE_WIDTH, bgcolor=ImageFill.WHITE):
 		stroke_scale = scale # - padding[0] * 2 - line_width
-		stroke_offset = [(pad + line_width // 2 or 1 ) for pad in padding]
-		self.stroke_feeder = digit_strokes.DigitStrokes(slant=slant, scale=stroke_scale, offset=stroke_offset)
+		stroke_offset = tuple((pad + line_width // 2 or 1 ) for pad in padding)
+		self.stroke_feeder = digit_strokes.DigitStrokes(slant=slant, scale=stroke_scale, offset=(stroke_offset[0], stroke_offset[1]))
 		self.line_width = line_width
 		self.bgcolor = bgcolor
 		self.get: Callable[[int], Image.Image] = lru_cache(maxsize=self.stroke_feeder.get_max())(self._get)

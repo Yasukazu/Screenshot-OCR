@@ -29,7 +29,7 @@ class Sp:
 		self._slr = (1, 0.5, 0)[y]
 
 	@property
-	def xy(self)-> tuple[int, int]:
+	def xy(self)-> tuple[float, int]:
 		return self.x, self.y
 
 	def offset(self, offset=(0, 0)):
@@ -76,24 +76,25 @@ abcdef_seg = (
 	(0, 0),
 	)
 
-class SpPair(Enum):
-	_0 = Sp(0, 0)
-	_1 = Sp(1, 0)
-	_2 = Sp(1, 1)
-	_3 = Sp(1, 2)
-	_4 = Sp(0, 2)
-	_5 = Sp(0, 1)
-	_6 = Sp(2, 2) # comma / period / dot
+SEG_POINT_ARRAY = SA = (
+	Sp(0, 0),
+	Sp(1, 0),
+	Sp(1, 1),
+	Sp(1, 2),
+	Sp(0, 2),
+	Sp(0, 1),
+	)
 
-	A = _0, _1
-	B = _1, _2
-	C = _2, _3
-	D = _3, _4
-	E = _4, _5
-	F = _5, _0
-	G = _5, _2 # minus / hyphen
-	H = _1, _4 # per / slash
-	I = _6, _6 # dot
+class SpPair(Enum):
+	A = SA[0], SA[1]
+	B = SA[1], SA[2]
+	C = SA[2], SA[3]
+	D = SA[3], SA[4]
+	E = SA[4], SA[5]
+	F = SA[5], SA[0]
+	G = SA[5], SA[2] # minus / hyphen
+	H = SA[1], SA[4] # per / slash
+	#I = _6, _6 # dot
 
 	@classmethod
 	def get(cls, c: str)-> 'SpPair':
@@ -107,14 +108,6 @@ class SpPair(Enum):
 class Seg7Path(Enum):
 	a = SpPair._0, SpPair._1
 
-SEG_POINT_ARRAY = (
-	Sp(0, 0),
-	Sp(1, 0),
-	Sp(1, 1),
-	Sp(1, 2),
-	Sp(0, 2),
-	Sp(0, 1),
-	)
 
 from functools import lru_cache
 SEGPATH_SLANT = 0.2
@@ -151,14 +144,17 @@ SEGELEMS = (
 		SegElem.G,
 		SegElem.H,
 			)
+
 def get_segelem_dict(segelem_dict={e.name.lower(): e.value for e in SEGELEMS}):
 	return segelem_dict
+
 def get_segpath_for_c(c: str, segelem_dict={e.name.lower(): e.value for e in SEGELEMS})-> SegPath:
 	_c = c.lower()[0]
 	seg_names = 'abcdefgh'
 	if _c not in seg_names:
 		raise ValueError(f"'{c[0]}' needs be in {seg_names}!")
 	return segelem_dict[_c]
+
 def get_segpath_dict(segelem_dict=get_segelem_dict()):
 	return {k: v.slanted() for (k,v) in segelem_dict.items()}
 class SegLine(Enum):

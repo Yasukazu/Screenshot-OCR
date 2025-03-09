@@ -21,7 +21,7 @@ import os
 CWD = os.getcwd()
 SEVEN_SEG_STEM = '7-seg'
 SEVEN_SEG_MAX = 16
-SEVEN_SEG_SIZE = 17
+# SEVEN_SEG_SIZE = 17
 CSV_EXT = '.csv'
 PKL_EXT = '.pkl'
 class Ext(Enum):
@@ -31,12 +31,12 @@ class Ext(Enum):
 # type str_int_dict = dict[str, int]
 
 def get_fullpath(stem: str, ext: Ext, parent: Path=Path(CWD)):
-	return parent / (stem + ext)
+	return parent / (stem + ext.value)
 SEVEN_SEG_NUM_STEM = '7-seg-num'
 
 def load_7_seg_num_csv_as_dict(lst=[])-> list[dict[str, int]]:
 	if len(lst) == 0:
-		fullpath = get_fullpath(stem=SEVEN_SEG_NUM_STEM, ext=Ext.CSV.value)
+		fullpath = get_fullpath(stem=SEVEN_SEG_NUM_STEM, ext=Ext.CSV)
 		with fullpath.open() as csv_file:
 			reader = csv.DictReader(csv_file)
 			for row in reader:

@@ -11,7 +11,7 @@ class DigitStrokes:
 		self.scale = scale
 		self.offset = offset
 		self.size = scale, 2 * scale
-		self.get: Callable[[int], Sequence[tuple[int, int]]]= lru_cache(maxsize=len(SEG_POINT_PAIR_DIGIT_ARRAY))(self._scale_offset)
+		self.get: Callable[[int], list[Sequence[tuple[int, int]]]]= lru_cache(maxsize=len(SEG_POINT_PAIR_DIGIT_ARRAY))(self._scale_offset)
 
 	@classmethod
 	def get_max(cls)-> int:

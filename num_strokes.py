@@ -6,7 +6,7 @@ from strok7 import SEG_POINT_ARRAY, SEGPATH_SLANT, get_segpath_for_c, Sp, Stroke
 from seg_7_digits import Seg7, SEG7_ARRAY, seg_7_array, homo_seg_7_array
 from seven_seg import SEVEN_SEG_SIZE
 
-SEG7_TO_POINTS: dict[Seg7, tuple[Sp, Sp]] = MappingProxyType({
+SEG7_TO_POINTS = MappingProxyType({
 	Seg7.A: (SEG_POINT_ARRAY[0], SEG_POINT_ARRAY[1]),
 	Seg7.B: (SEG_POINT_ARRAY[1], SEG_POINT_ARRAY[2]),
 	Seg7.C: (SEG_POINT_ARRAY[2], SEG_POINT_ARRAY[3]),
@@ -14,13 +14,13 @@ SEG7_TO_POINTS: dict[Seg7, tuple[Sp, Sp]] = MappingProxyType({
 	Seg7.E: (SEG_POINT_ARRAY[4], SEG_POINT_ARRAY[5]),
 	Seg7.F: (SEG_POINT_ARRAY[5], SEG_POINT_ARRAY[0]),
 	Seg7.G: (SEG_POINT_ARRAY[5], SEG_POINT_ARRAY[2]),
-})
+}) # : dict[Seg7, tuple[Sp, Sp]]
 
 NUMSTROKE_SLANT = SEGPATH_SLANT
 
 def get_segpoints_for_n(n: int)-> Sequence[tuple[Sp, Sp]]:
 	seg7s: Sequence[Seg7] = SEG7_ARRAY[n]
-	return (SEG7_TO_POINTS[sp] for sp in seg7s)
+	return [SEG7_TO_POINTS[sp] for sp in seg7s]
 
 SEGPOINTS_MAX = len(SEG7_ARRAY)
 
@@ -39,23 +39,23 @@ def get_all_segpoints()-> list[Sequence[tuple[Sp, Sp]]]:
 def set_all_segpoints(lst: list[Sequence[tuple[Sp, Sp]]]):
 	for n in range(len(SEG7_ARRAY)):
 		lst[n] = get_segpoints_for_n(n)
-
-def get_segpath_for_n(n: int, segpath_list = [None] * len(seg_7_array))-> Sequence[tuple[Sp, Sp]]:
+from strok7 import SegPath
+def get_segpath_for_n(n: int, segpath_list = [None] * len(seg_7_array))-> Sequence[SegPath]:
 	for segs in seg_7_array[n]:
 		spth_list = []
 		for c in segs:
 			if c:
-				path_pair: tuple[Sp,Sp] = get_segpath_for_c(c).path
+				path_pair = get_segpath_for_c(c).path
 				spth_list.append(path_pair)
 		segpath_list[n] = spth_list
 	return segpath_list	
 
-def get_segpath_list(segpath_list = [None] * len(seg_7_array))-> Sequence[Sequence[tuple[Sp, Sp]]]:
+def get_segpath_list(segpath_list = [None] * len(seg_7_array))-> Sequence[Sequence[SegPath]]:
 	for i, segs in enumerate(seg_7_array):
 		spth_list = []
 		for c in segs:
 			if c:
-				path_pair: tuple[Sp,Sp] = get_segpath_for_c(c).path
+				path_pair = get_segpath_for_c(c).path
 				spth_list.append(path_pair)
 		segpath_list[i] = spth_list
 	return segpath_list	
@@ -68,13 +68,13 @@ class BasicDigitStrokes:
 		self.slant = slant
 		self.scale = scale
 		self.offset = offset
-		self.get: Callable[[int], Sequence[tuple[int, int]]]= lru_cache(maxsize=len(SEG_POINT_PAIR_DIGIT_ARRAY))(self._scale_offset)
+		self.get: Callable[[int], list[Sequence[i_i_tpl]]]= lru_cache(maxsize=len(SEG_POINT_PAIR_DIGIT_ARRAY))(self._scale_offset)
 
 	@classmethod
 	def get_sp_pairs(cls, n: int)-> Sequence[SpPair]:
 		return SEG_POINT_PAIR_DIGIT_ARRAY[n]
 	
-	def _scale_offset(self, n: int)-> Sequence[tuple[int, int]]:
+	def _scale_offset(self, n: int)-> list[Sequence[i_i_tpl]]:
 		sp_pairs = self.get_sp_pairs(n)
 		return [(spsp.value[0].scale_offset(scale=self.scale, offset=self.offset, slant=self.slant), spsp.value[1].scale_offset(scale=self.scale, offset=self.offset, slant=self.slant)) for spsp in sp_pairs]
 
