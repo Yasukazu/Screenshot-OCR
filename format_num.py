@@ -1,6 +1,9 @@
-def conv_num_to_bin(num: int, format="%d"):
-	n_str = format % num
+from typing import Sequence
+
+def conv_num_to_bin(num: int, fmt="%d")-> bytearray:
+	n_str = fmt % num
 	bb = bytearray(len(n_str))
+	i = 0
 	for i, c in enumerate(n_str):
 		if c == '-':
 			bb[i] = 16
@@ -10,10 +13,11 @@ def conv_num_to_bin(num: int, format="%d"):
 
 class FormatNum:
 	FORMAT = "%d"
+
 	def __init__(self, num: int):
 		self.num = num
 	def conv_to_bin(self):
-		return conv_num_to_bin(self.num, format=self.FORMAT)
+		return conv_num_to_bin(self.num, fmt=self.FORMAT)
 
 class HexFormatNum(FormatNum):
 	FORMAT = "%x"
@@ -25,9 +29,25 @@ class HexFormatNum(FormatNum):
 			bb[i] = self.INDEX.index(c)
 		return bb
 
+def formatnums_to_bytearray(nn: Sequence[FormatNum | int])-> bytearray:
+	bb = bytearray() #len(nn))
+	for c in nn:
+		match c:
+			case FormatNum():
+				bb += c.conv_to_bin()
+			case int():
+				bb += c.to_bytes()
+			case _:
+				raise TypeError("Needs to be int or FormatNum!")
+	return bb
+
+
+
 if __name__ == '__main__':
 	from typing import Sequence
 	from pprint import pp
+	from enum import Enum
+
 	class HexNum(Enum):
 		A  = 10
 		B  = 11
