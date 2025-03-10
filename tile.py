@@ -10,7 +10,7 @@ home_dir = Path(os.path.expanduser('~'))
 import path_feeder
 from path_feeder import PathFeeder, get_last_month #, YearMonth
 from digit_image import ImageFill
-from num_to_strokes import add_number, PutPos, put_number
+from put_number import PutPos, put_number
 last_month_date = get_last_month()
 year = last_month_date.year
 month = last_month_date.month
@@ -169,6 +169,8 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 
 	digit_image_feeder_L = BasicDigitImage(scale=36, line_width=8, padding=(6, 6), bgcolor=ImageFill.BLACK)
 	# digit_image_param_L = BASIC_DIGIT_IMAGE_PARAM_LIST[1]
+	from put_number import put_number
+	
 	@put_number(pos=PutPos.R, digit_image_feeder=digit_image_feeder_L)
 	def concat_8_pages(names: list[str], number_str: str)-> Image.Image:
 

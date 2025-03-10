@@ -43,7 +43,7 @@ class Sp:
 	def slant_x(self, slant: StrokeSlant=NO_SLANT)-> float:
 		return self.x + slant.value * self._slr
 
-	def slant(self, slant: StrokeSlant=NO_SLANT)-> f_i_tpl:
+	def slant(self, slant: StrokeSlant=NO_SLANT)-> None:
 		self.x = self.slant_x(slant)
 
 	def slanted(self, slant: StrokeSlant=NO_SLANT)-> f_i_tpl:
@@ -99,28 +99,27 @@ class SpPair(Enum):
 	@classmethod
 	def get(cls, c: str)-> 'SpPair':
 		index = 'ABCDEFGHI'.index(c)
-		return [cls.A, cls.B, cls.C, cls.D, cls.E, cls.F, cls.G, cls.H, cls.I][index]
+		return [cls.A, cls.B, cls.C, cls.D, cls.E, cls.F, cls.G, cls.H][index]
+
 	@classmethod
-	def extract(cls, c: str)-> list[tuple[int, int]]:
+	def extract(cls, c: str)-> list[tuple[float, int]]:
 		return [sp.xy for sp in cls.get(c).value]
 
 
-class Seg7Path(Enum):
-	a = SpPair._0, SpPair._1
-
-
 from functools import lru_cache
-SEGPATH_SLANT = 0.2
+from strok7 import StrokeSlant
+SEGPATH_SLANT = StrokeSlant.SLANT02
+
 class SegPath:
-	def __init__(self, *spsp: Sequence[Sp], max_cache=2): # f_sp: Sp0, t_sp: Sp0):
-		self.path: Sequence[Sp] = spsp # self.f = f_sp self.t = t_sp
+	def __init__(self, *spsp: Sp, max_cache=2): # f_sp: Sp0, t_sp: Sp0):
+		self.path = spsp #[sp for sp in spsp] # self.f = f_sp self.t = t_sp
 		self.slanted = lru_cache(maxsize=max_cache)(self._slanted)
 
 	def get_path(self):
 		return list(self.path)
 
-	def _slanted(self, s=SEGPATH_SLANT, scale=1.0, offset=(0,0)):
-		return [pt.slant(s=s, scale=scale, offset=offset) for pt in self.path]
+	def _slanted(self, s=SEGPATH_SLANT, scale=1, offset=(0, 0)):
+		return [pt.scale_offset(slant=s, scale=scale, offset=offset) for pt in self.path]
 
 
 class SegElem(Enum):
@@ -167,7 +166,7 @@ class SegLine(Enum):
 	g = ((0, 1), (1, 1))
 	
 	@classmethod
-	def get(cls, c: str):
+	def get(cls, c: str)-> 'SegLine':
 		abcdefg = [cls.a, cls.b, cls.c, cls.d, cls.e, cls.f, cls.g]
 		return abcdefg["abcdefg".index(c)]
 
@@ -210,7 +209,7 @@ for i, j in enumerate('abcdef'):
 
 strk_dic['g'] = ((0, 1), (1, 1))
 
-def get_seg7_dict()-> dict[str, i_i_tpl_tpl]:
+def get_seg7_dict()-> dict[str, Sequence[tuple[int, int]]]:
 	return {c: SegLine.get(c).value for c in 'abcdefg'}
 
 def get_strk_dict()-> i_i_tpl_tpl:

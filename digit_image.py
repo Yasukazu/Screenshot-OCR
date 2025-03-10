@@ -5,7 +5,7 @@ from collections.abc import Callable
 from collections.abc import Sequence
 from PIL import ImageDraw, Image
 from strok7 import STRK_DICT_STEM, StrokeSlant, i_i_tpl
-from format_num import FormatNum, HexFormatNum, conv_num_to_bin
+from format_num import FormatNum, HexFormatNum, conv_num_to_bin, formatnums_to_bytearray
 from num_strokes import SEGPOINTS_MAX, DigitStrokes, BasicDigitStrokes
 
 class ImageFill(Enum): # single element tuple for ImageDraw color
@@ -95,6 +95,17 @@ class BasicDigitImage:
 			drw.line(stroke, width=self.line_width, fill=ImageFill.invert(self.bgcolor).value, joint='curve')
 		return img
 
+def get_basic_number_image(nn: Sequence[int | FormatNum] | bytearray, digit_image_feeder=BasicDigitImage())-> Image.Image:
+	b_array = nn if isinstance(nn, bytearray) else formatnums_to_bytearray(nn)
+	number_image_size = len(b_array) * digit_image_feeder.size[0], digit_image_feeder.size[1]
+	number_image = Image.new('L', number_image_size, (0,))
+	offset = (0, 0)
+	x_offset = digit_image_feeder.size[0]
+	for n in b_array:
+		digit_image = digit_image_feeder.get(n)
+		number_image.paste(digit_image, offset)
+		offset = offset[0] + x_offset, 0
+	return number_image
 
 if __name__ == '__main__':
 	import sys

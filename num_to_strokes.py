@@ -29,9 +29,9 @@ SEVEN_SEG_STEM = '7-seg'
 PICKLE_EXT = '.pkl'
 
 from strok7 import SegPath, get_segelem_dict, get_segpath_for_c
-_segelem_array: list[tuple[Seg7]] = [set()] * 16
+# _segelem_array: list[tuple[Seg7]] = [set()] * 16
 
-from seven_seg import SEVEN_SEG_SIZE, load_7_seg_num_pkl # load_7_seg_num_csv_as_df
+from seven_seg import SEVEN_SEG_SIZE #, load_7_seg_num_pkl # load_7_seg_num_csv_as_df
 type segpath_dict = dict[str, SegPath]
 def load_segpath_array(segelem_dict=get_segelem_dict(), _segpath_array = [None] * SEVEN_SEG_SIZE, df: DataFrame=load_7_seg_num_pkl())-> list[list[segpath_dict]]:
 	'''call "slanted" for each element'''
@@ -91,17 +91,6 @@ from collections import namedtuple
 Size = namedtuple('Size', ['w', 'h'])
 from format_num import formatnums_to_bytearray
 from digit_image import BasicDigitImage
-def get_basic_number_image(nn: Sequence[int | FormatNum] | bytearray, digit_image_feeder=BasicDigitImage())-> Image.Image:
-	b_array = nn if isinstance(nn, bytearray) else formatnums_to_bytearray(nn)
-	number_image_size = len(b_array) * digit_image_feeder.size[0], digit_image_feeder.size[1]
-	number_image = Image.new('L', number_image_size, (0,))
-	offset = (0, 0)
-	x_offset = digit_image_feeder.size[0]
-	for n in b_array:
-		digit_image = digit_image_feeder.get(n)
-		number_image.paste(digit_image, offset)
-		offset = offset[0] + x_offset, 0
-	return number_image
 
 def get_number_image(size: Size, nn: Sequence[int | FormatNum] | bytearray, bgcolor=ImageFill.WHITE, padding=0.4)-> tuple[Image.Image, Size]: #, slant=0.25, padding=0.2):
 	'''returns Image, margins'''
@@ -168,35 +157,11 @@ def get_digit_strokes(n: int, offset: np.ndarray | tuple[int, int]=(0,0), scale=
 		strokes = stroke_feeder.pure_strokes(n)
 		return [my_round2(st * scale + offset) for st in [stroke for stroke in strokes]]
 
-from functools import wraps
 import numpy as np
 from path_feeder import PathFeeder
 from enum import IntEnum
-class PutPos(IntEnum):
-	L = -1
-	C = 0
-	R = 1
-
-from digit_image import BasicDigitImage
 from format_num import HexFormatNum
 
-def put_number(pos: PutPos=PutPos.L, digit_image_feeder=BasicDigitImage()):
-	from format_num import HexFormatNum
-	def _embed_number(func):
-		@wraps(func)
-		def wrapper(*ag, **kw):
-			item_img: Image.Image = func(*ag, **kw)
-			if item_img and kw['number_str']:
-				name_num_array = HexFormatNum.str_to_bin(kw['number_str'])
-				num_img = get_basic_number_image(name_num_array, digit_image_feeder=digit_image_feeder)
-				x_offset = 0
-				match pos:
-					case PutPos.R:
-						x_offset = item_img.width - num_img.width
-				item_img.paste(num_img, (x_offset, 0))
-				return item_img
-		return wrapper
-	return _embed_number
 
 def add_number(size: tuple[int, int]=(100, 50), pos: PutPos=PutPos.C, bgcolor=ImageFill.WHITE, stroke_feeder=None): # tuple[int, int]=(0, 0)):
 	from format_num import HexFormatNum

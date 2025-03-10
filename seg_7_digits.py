@@ -1,5 +1,5 @@
 from typing import Sequence, Callable
-from enum import Flag, Enum
+from enum import Flag, IntEnum
 from strok7 import SpPair
 
 seg_7_digits: Sequence[int] = (
