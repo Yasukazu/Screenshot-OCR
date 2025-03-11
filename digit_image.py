@@ -76,14 +76,25 @@ class BasicDigitImage:
 	PADDING = (2, 2)
 	LINE_WIDTH = 2
 
+	@classmethod
+	def solve_digit_image_scale(cls, size: int, padding: int, line_width: int)-> float:
+		offset = padding + line_width / 2
+		scale = size - 2 * offset
+		return scale
+
+	@classmethod
+	def calc_digit_image_size(cls, scale: int=SCALE, padding: tuple[int, int]=PADDING, line_width=LINE_WIDTH)-> list[float]:
+		stroke_offset = [(pad + line_width // 2 or 1 ) for pad in padding]
+		size = scale, scale * 2
+		return [sz + 2 * stroke_offset[i] for i, sz in enumerate(size)]
+
 	def __init__(self, slant: StrokeSlant=StrokeSlant.SLANT00, scale: int=SCALE, padding: tuple[int, int]=PADDING, line_width=LINE_WIDTH, bgcolor=ImageFill.WHITE):
 		stroke_scale = scale # - padding[0] * 2 - line_width
-		stroke_offset = tuple((pad + line_width // 2 or 1 ) for pad in padding)
+		stroke_offset = [pad + line_width // 2 or 1 for pad in padding]
 		self.stroke_feeder = digit_strokes.DigitStrokes(slant=slant, scale=stroke_scale, offset=(stroke_offset[0], stroke_offset[1]))
 		self.line_width = line_width
 		self.bgcolor = bgcolor
 		self.get: Callable[[int], Image.Image] = lru_cache(maxsize=self.stroke_feeder.get_max())(self._get)
-		self.size = [sz + 2 * stroke_offset[i] + line_width // 2 or 1 for i, sz in enumerate(self.stroke_feeder.size)]
 
 	def _get(self, n: int)-> Image.Image:
 		# img_w = self.scale # stroke_feeder.scale + 2 * self.stroke_feeder.offset[0] + self.line_width
