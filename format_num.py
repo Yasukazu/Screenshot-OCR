@@ -16,6 +16,7 @@ class FormatNum:
 
 	def __init__(self, num: int):
 		self.num = num
+
 	def conv_to_bin(self):
 		return conv_num_to_bin(self.num, fmt=self.FORMAT)
 
@@ -55,7 +56,7 @@ if __name__ == '__main__':
 		D  = 13
 		E  = 14
 		F  = 15
-	def get_number_image(width: int, *nn: Sequence[FormatNum]): #, slant=0.25, padding=0.2):
+	def get_number_image(width: int, *nn: FormatNum): #, slant=0.25, padding=0.2):
 		b_str = []
 		for n in nn:
 			b_s = n.conv_to_bin()
