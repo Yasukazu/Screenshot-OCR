@@ -1,7 +1,7 @@
 from enum import IntEnum
 from functools import wraps
 from PIL import Image
-from digit_image import BasicDigitImage, get_basic_number_image
+from digit_image import BasicDigitImage, get_basic_number_image, BasicDigitImageParam
 from format_num import HexFormatNum
 
 class PutPos(IntEnum):
@@ -9,7 +9,7 @@ class PutPos(IntEnum):
 	C = 0
 	R = 1
 
-def put_number(pos: PutPos=PutPos.L, digit_image_feeder=BasicDigitImage()):
+def put_number(pos: PutPos=PutPos.L, digit_image_feeder=BasicDigitImage(BasicDigitImage.calc_scale_from_height())):
 	def _embed_number(func):
 		@wraps(func)
 		def wrapper(*ag, **kw):

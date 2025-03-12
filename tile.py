@@ -121,7 +121,7 @@ def get_quad_png_file_names()-> Generator[tuple[Path, str, int], None, None]:
 DAY_NOMBRE_H = 50
 TXT_OFST = 0 # width-direction / horizontal
 
-from digit_image import BASIC_DIGIT_IMAGE_PARAM_LIST, BasicDigitImage
+from digit_image import BasicDigitImage
 
 def draw_onto_pages(div=64, th=H_PAD // 2,
 	path_feeder: PathFeeder=PathFeeder(),
@@ -167,7 +167,8 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		for i, block in enumerate(name_blocks):
 			yield concat_8_pages(block, number_str=f"{path_feeder.month:02}{(-0xa - i):x}")
 
-	digit_image_feeder_L = BasicDigitImage(scale=36, line_width=8, padding=(6, 6), bgcolor=ImageFill.BLACK)
+	digit_image_param_L = BasicDigitImage.calc_scale_from_height(80)
+	digit_image_feeder_L = BasicDigitImage(digit_image_param_L, bgcolor=ImageFill.BLACK)
 	# digit_image_param_L = BASIC_DIGIT_IMAGE_PARAM_LIST[1]
 	from put_number import put_number
 	
@@ -204,8 +205,8 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		dst.paste(im2, (0, im1.height + pad))
 		return dst
 
-	digit_image_feeder_S = BasicDigitImage(scale=24, line_width=6, padding=(4, 4))
-	# digit_image_param_S = BASIC_DIGIT_IMAGE_PARAM_LIST[0]
+	digit_image_param_S = BasicDigitImage.calc_scale_from_height(50)
+	digit_image_feeder_S = BasicDigitImage(digit_image_param_S) # scale=24, line_width=6, padding=(4, 4))
 	@put_number(pos=PutPos.L, digit_image_feeder=digit_image_feeder_S) #, line_width=digit_image_param_S.line_width))
 	def get_numbered_img(fn: str, number_str: str)-> Image.Image | None:
 		fullpath = path_feeder.dir / (fn + path_feeder.ext)
