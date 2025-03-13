@@ -66,10 +66,11 @@ from collections import namedtuple
 from dataclasses import dataclass, field
 @dataclass
 class BasicDigitImageParam:
+	width: int
 	scale: int
 	padding: tuple[int, int]
 	line_width: int
-	width: int = field(init=False)
+	height: int = field(init=False)
 	def __post_init__(self):
 		if min(self.padding) < 0:
 			raise ValueError("Every padding value must be larger than 0!")
@@ -77,7 +78,7 @@ class BasicDigitImageParam:
 			raise ValueError("The value of line_width must be larger than 0!")
 		if self.scale - self.line_width <= 0:
 			raise ValueError("The value of scale must be larger than line_width!")
-		self.width = self.scale + self.padding[0] * 2 + self.line_width
+		self.height = self.width + self.scale
 
 class BasicDigitImage:
 	WIDTH = 10
@@ -97,11 +98,12 @@ class BasicDigitImage:
 		if padding < 0:
 			padding = height // 8
 		if line_width < 0:
-			line_width = height // 16 or 1
+			line_width = height // 10 or 1
 		scale = (height - 2 * padding - line_width) // 2 
 		if scale - line_width <= 0:
 			raise ValueError(f"scale({scale}) is too small to show!")
-		return BasicDigitImageParam(scale=scale, padding=(padding, padding), line_width=line_width)
+		width = scale + 2 * padding + line_width
+		return BasicDigitImageParam(width=width, scale=scale, padding=(padding, padding), line_width=line_width)
 
 	@classmethod
 	def calc_digit_image_scale_from_height(cls, height: int, padding: int, line_width: int)-> int:
@@ -123,7 +125,7 @@ class BasicDigitImage:
 		self.stroke_feeder = digit_strokes.DigitStrokes(slant=slant, scale=stroke_scale, offset=(stroke_offset[0], stroke_offset[1]))
 		self.line_width = param.line_width
 		self.bgcolor = bgcolor
-		self.size = param.width, param.width * 2
+		self.size = param.width, param.height
 		self.get: Callable[[int], Image.Image] = lru_cache(maxsize=self.stroke_feeder.get_max())(self._get)
 
 	def _get(self, n: int)-> Image.Image:
