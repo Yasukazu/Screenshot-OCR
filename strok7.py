@@ -171,18 +171,18 @@ class SegLine(Enum):
 		return abcdefg["abcdefg".index(c)]
 
 class SegFlag(Flag):
-	a = auto()
-	b = auto()
-	c = auto()
-	d = auto()
-	e = auto()
-	f = auto()
-	g = auto()
+	G = 2
+	F = auto()
+	E = auto()
+	D = auto()
+	C = auto()
+	B = auto()
+	A = auto()
 	
 	@classmethod
-	def get(cls, c: str):
-		abcdefg = [cls.a, cls.b, cls.c, cls.d, cls.e, cls.f, cls.g]
-		return abcdefg["abcdefg".index(c)]
+	def get(cls, c: str, p=0):
+		abcdefg = [cls.A, cls.B, cls.C, cls.D, cls.E, cls.F, cls.G]
+		return abcdefg["ABCDEFG".index(c[p].upper())]
 class Segment7:
 	dic = {c: (abcdef_seg[i], abcdef_seg[i + 1]) for i, c in enumerate('abcdef')}
 	dic['g'] = ((0, 1), (1, 1))
