@@ -26,6 +26,8 @@ def put_number(pos: PutPos=PutPos.L, digit_image_feeder=BasicDigitImage(BasicDig
 						x_offset = 0
 					case PutPos.R:
 						x_offset = item_img.width - num_img.width
+					case PutPos.C:
+						x_offset = (item_img.width - num_img.width) // 2
 					case _:
 						raise ValueError("Illegal PutPos value!")
 				item_img.paste(num_img, (x_offset, 0))
