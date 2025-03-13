@@ -197,7 +197,7 @@ class SegLine(Enum):
 		abcdefg = [cls.a, cls.b, cls.c, cls.d, cls.e, cls.f, cls.g]
 		return abcdefg["abcdefg".index(c)]
 
-class SegFlag(Flag):
+class SegFlag(Flag): # same as Seg7
 	G = 2
 	F = auto()
 	E = auto()

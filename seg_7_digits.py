@@ -1,6 +1,7 @@
 from typing import Sequence, Callable
+from types import MappingProxyType
 from enum import Flag, IntEnum
-from strok7 import SpPair
+from strok7 import SpPair, SegFlag
 
 seg_7_digits: Sequence[int] = (
 	# abcdefgh
@@ -32,6 +33,24 @@ class Seg7(Flag):
 	E = 1 << 3
 	F = 1 << 2
 	G = 1 << 1
+	H = 1
+
+SEG7_TO_SP_PAIR = MappingProxyType({
+	Seg7.A: SpPair.A,
+	Seg7.B: SpPair.B,
+	Seg7.C: SpPair.C,
+	Seg7.D: SpPair.D,
+	Seg7.E: SpPair.E,
+	Seg7.F: SpPair.F,
+	Seg7.G: SpPair.G,
+})
+
+def expand_to_sp_pairs(seg7: Seg7)-> list[SpPair]:
+	ex = []
+	for seg in (Seg7.A, Seg7.B, Seg7.C, Seg7.D, Seg7.E, Seg7.F, Seg7.G):
+		if seg7 & seg:
+			ex.append(SEG7_TO_SP_PAIR[seg])
+	return ex
 
 def c_to_seg_7(c: str, C_TO_SEG7 = {
 		'a': Seg7.A,
@@ -45,24 +64,30 @@ def c_to_seg_7(c: str, C_TO_SEG7 = {
 	return C_TO_SEG7[c]
 
 SEG7_ARRAY = (
-	(Seg7.A, Seg7.B, Seg7.C, Seg7.D, Seg7.E, Seg7.F),
-	(Seg7.B, Seg7.C),
-	(Seg7.A, Seg7.B, Seg7.D, Seg7.E, Seg7.G),
-	(Seg7.A, Seg7.B, Seg7.C, Seg7.D, Seg7.G),
-	(Seg7.B, Seg7.C, Seg7.F, Seg7.G),
-	(Seg7.A, Seg7.C, Seg7.D, Seg7.F, Seg7.G),
-	(Seg7.A, Seg7.C, Seg7.D, Seg7.E, Seg7.F, Seg7.G),
-	(Seg7.A, Seg7.B, Seg7.C),
-	(Seg7.A, Seg7.B, Seg7.C, Seg7.D, Seg7.E, Seg7.F, Seg7.G),
-	(Seg7.A, Seg7.B, Seg7.C, Seg7.F, Seg7.G),
-	(Seg7.A, Seg7.B, Seg7.C, Seg7.E, Seg7.F, Seg7.G),
-	(Seg7.C, Seg7.D, Seg7.E, Seg7.F, Seg7.G),
-	(Seg7.D, Seg7.E, Seg7.G),
-	(Seg7.B, Seg7.C, Seg7.D, Seg7.E, Seg7.G),
-	(Seg7.A, Seg7.D, Seg7.E, Seg7.F, Seg7.G),
-	(Seg7.A, Seg7.E, Seg7.F, Seg7.G),
-	(Seg7.G,),
+	(Seg7.A | Seg7.B | Seg7.C | Seg7.D | Seg7.E | Seg7.F),
+	(Seg7.B | Seg7.C),
+	(Seg7.A | Seg7.B | Seg7.D | Seg7.E | Seg7.G),
+	(Seg7.A | Seg7.B | Seg7.C | Seg7.D | Seg7.G),
+	(Seg7.B | Seg7.C | Seg7.F | Seg7.G),
+	(Seg7.A | Seg7.C | Seg7.D | Seg7.F | Seg7.G),
+	(Seg7.A | Seg7.C | Seg7.D | Seg7.E | Seg7.F | Seg7.G),
+	(Seg7.A | Seg7.B | Seg7.C),
+	(Seg7.A | Seg7.B | Seg7.C | Seg7.D | Seg7.E | Seg7.F | Seg7.G),
+	(Seg7.A | Seg7.B | Seg7.C | Seg7.F | Seg7.G),
+	(Seg7.A | Seg7.B | Seg7.C | Seg7.E | Seg7.F | Seg7.G),
+	(Seg7.C | Seg7.D | Seg7.E | Seg7.F | Seg7.G),
+	(Seg7.D | Seg7.E | Seg7.G),
+	(Seg7.B | Seg7.C | Seg7.D | Seg7.E | Seg7.G),
+	(Seg7.A | Seg7.D | Seg7.E | Seg7.F | Seg7.G),
+	(Seg7.A | Seg7.E | Seg7.F | Seg7.G),
+	(Seg7.G),
 )
+
+def hex_to_seg7(n: int)-> Seg7:
+	'''16 for hyphen/minus'''
+	if not (0 <= n < len(SEG7_ARRAY)):
+		raise ValueError("Out of hexadecimal range!")
+	return SEG7_ARRAY[n]
 
 SEG_POINT_PAIR_DIGIT_ARRAY = (
 	(SpPair.A, SpPair.B, SpPair.C, SpPair.D, SpPair.E, SpPair.F),
@@ -83,6 +108,11 @@ SEG_POINT_PAIR_DIGIT_ARRAY = (
 	(SpPair.A, SpPair.E, SpPair.F, SpPair.G),
 	(SpPair.G,)
 )
+
+def digit_to_sp_pair(n: int)-> Sequence[SpPair]:
+	if not (0 <= n < len(SEG_POINT_PAIR_DIGIT_ARRAY)):
+		raise ValueError("Out of digit range!")
+	return SEG_POINT_PAIR_DIGIT_ARRAY[n]
 
 seg_7_array: Sequence[Sequence[str]] = (
 		('a', 'b', 'c', 'd', 'e', 'f'),
