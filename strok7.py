@@ -32,27 +32,36 @@ class Sp:
 	def xy(self)-> tuple[float, int]:
 		return self.x, self.y
 
-	def offset(self, offset=(0, 0)):
+	def offset_self(self, offset=(0, 0)):
 		self.x += offset[0]
 		self.y += offset[1]
 
-	def scale(self, n: int=1):
+	def scale_self(self, n: int=1):
 		self.x *= n
 		self.y *= n
 
-	def slant_x(self, slant: StrokeSlant=NO_SLANT)-> float:
+	def slanted_x(self, slant: StrokeSlant=NO_SLANT)-> float:
 		return self.x + slant.value * self._slr
 
-	def slant(self, slant: StrokeSlant=NO_SLANT)-> None:
-		self.x = self.slant_x(slant)
+	#def slant_self(self, slant: StrokeSlant=NO_SLANT)-> None:		self.x = self.slant_x(slant)
 
 	def slanted(self, slant: StrokeSlant=NO_SLANT)-> f_i_tpl:
-		return self.slant_x(slant), self.y
+		return self.slanted_x(slant), self.y
 
 	def scale_offset(self, slant: StrokeSlant=StrokeSlant.SLANT00, scale: int=1, offset: tuple[int, int]=(0, 0))-> i_i_tpl:
 		'''also slant'''
-		slanted_x = self.slant_x(slant) # / (1 + slant.value)
+		slanted_x = self.slanted_x(slant) # / (1 + slant.value)
 		return round(scale * slanted_x) + offset[0], scale * self.y + offset[1]
+
+class MySp(Sp):
+	def __init__(self, x: int, y: int, slant_enum=StrokeSlant.SLANT00, scale_value=1, offset_value=(0, 0)):
+		super().__init__(x, y)
+		self.slant_enum = slant_enum
+		self.scale_value = scale_value
+		self.offset_value = offset_value
+	
+	def scale_offset(self, slant = StrokeSlant.SLANT00, scale = 1, offset = (0, 0)):
+		return super().scale_offset(slant=self.slant_enum, scale=self.scale_value, offset=self.offset_value)
 
 class Sp0(Sp):
 	def __init__(self, x: int):
@@ -76,7 +85,7 @@ abcdef_seg = (
 	(0, 0),
 	)
 
-SEG_POINT_ARRAY = SA = (
+SEG_POINT_ARRAY = _S_A = (
 	Sp(0, 0),
 	Sp(1, 0),
 	Sp(1, 1),
@@ -85,25 +94,43 @@ SEG_POINT_ARRAY = SA = (
 	Sp(0, 1),
 	)
 
+class MySegPoints:
+	'''Customized Seg Point array'''
+	def __init__(self, slant: StrokeSlant=StrokeSlant.SLANT00, scale: int=1, offset: tuple[int, int]=(0, 0)):
+		self.points = list(SEG_POINT_ARRAY)
+		self.slant = slant
+		self.scale = scale
+		self.offset = offset
+
+	def get(self, n: int):
+		if not 0 <= n < len(SEG_POINT_ARRAY):
+			raise ValueError(f"Out of range[0: {len(SEG_POINT_ARRAY)}]!")
+		sp = self.points[n]
+		if isinstance(sp, MySp):
+			return sp
+		sp = MySp(sp.x, sp.y, self.slant, self.scale, self.offset)
+		self.points[n] = sp
+		return sp
+
 class SpPair(Enum):
-	A = SA[0], SA[1]
-	B = SA[1], SA[2]
-	C = SA[2], SA[3]
-	D = SA[3], SA[4]
-	E = SA[4], SA[5]
-	F = SA[5], SA[0]
-	G = SA[5], SA[2] # minus / hyphen
-	H = SA[1], SA[4] # per / slash
+	A = _S_A[0], _S_A[1]
+	B = _S_A[1], _S_A[2]
+	C = _S_A[2], _S_A[3]
+	D = _S_A[3], _S_A[4]
+	E = _S_A[4], _S_A[5]
+	F = _S_A[5], _S_A[0]
+	G = _S_A[5], _S_A[2] # minus / hyphen
+	H = _S_A[1], _S_A[4] # per / slash
 	#I = _6, _6 # dot
 
-	@classmethod
+	"""@classmethod
 	def get(cls, c: str)-> 'SpPair':
 		index = 'ABCDEFGHI'.index(c)
 		return [cls.A, cls.B, cls.C, cls.D, cls.E, cls.F, cls.G, cls.H][index]
 
 	@classmethod
 	def extract(cls, c: str)-> list[tuple[float, int]]:
-		return [sp.xy for sp in cls.get(c).value]
+		return [sp.xy for sp in cls.get(c).value]"""
 
 
 from functools import lru_cache
@@ -183,6 +210,38 @@ class SegFlag(Flag):
 	def get(cls, c: str, p=0):
 		abcdefg = [cls.A, cls.B, cls.C, cls.D, cls.E, cls.F, cls.G]
 		return abcdefg["ABCDEFG".index(c[p].upper())]
+	
+
+def seg_flag_to_sp_pair(flag: SegFlag, seg_flag_dic={f: f.name for f in [
+	SegFlag.A,
+	SegFlag.B,
+	SegFlag.C,
+	SegFlag.D,
+	SegFlag.E,
+	SegFlag.F,
+	SegFlag.G,
+]})-> SpPair:
+	pass
+
+class Disp7Seg:
+	def __init__(self, slant: StrokeSlant=StrokeSlant.SLANT00, scale: int=1, offset: tuple[int, int]=(0, 0)):
+		self.slant = slant
+		self.scale = scale
+		self.offset = offset
+		self.size = scale, 2 * scale
+		self.get: Callable[[int], list[Sequence[tuple[int, int]]]]= lru_cache(maxsize=len(SEG_POINT_PAIR_DIGIT_ARRAY))(self._scale_offset)
+
+	@classmethod
+	def get_max(cls)-> int:
+		return len(SEG_POINT_PAIR_DIGIT_ARRAY)
+
+	@classmethod
+	def get_sp_pairs(cls, n: int)-> Sequence[SpPair]:
+		return SEG_POINT_PAIR_DIGIT_ARRAY[n]
+	
+	def _scale_offset(self, n: int)-> list[Sequence[tuple[int, int]]]:
+		sp_pairs = self.get_sp_pairs(n)
+		return [(spsp.value[0].scale_offset(scale=self.scale, offset=self.offset, slant=self.slant), spsp.value[1].scale_offset(scale=self.scale, offset=self.offset, slant=self.slant)) for spsp in sp_pairs]
 class Segment7:
 	dic = {c: (abcdef_seg[i], abcdef_seg[i + 1]) for i, c in enumerate('abcdef')}
 	dic['g'] = ((0, 1), (1, 1))
