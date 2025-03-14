@@ -29,7 +29,7 @@ class Sp:
 		self._slr = (1, 0.5, 0)[y]
 
 	@property
-	def xy(self)-> tuple[float, int]:
+	def xy(self)-> tuple[int, int]:
 		return self.x, self.y
 
 	def offset_self(self, offset=(0, 0)):
@@ -122,7 +122,9 @@ class SpPair(Enum):
 	G = _S_A[5], _S_A[2] # minus / hyphen
 	H = _S_A[1], _S_A[4] # per / slash
 	#I = _6, _6 # dot
-
+	@classmethod
+	def expand_to_xy_list(cls, spp: 'SpPair')-> list[tuple[int, int]]:
+		return [sp.xy for sp in spp.value]
 	"""@classmethod
 	def get(cls, c: str)-> 'SpPair':
 		index = 'ABCDEFGHI'.index(c)
@@ -211,7 +213,7 @@ class SegFlag(Flag): # same as Seg7
 		abcdefg = [cls.A, cls.B, cls.C, cls.D, cls.E, cls.F, cls.G]
 		return abcdefg["ABCDEFG".index(c[p].upper())]
 	
-
+'''
 def seg_flag_to_sp_pair(flag: SegFlag, seg_flag_dic={f: f.name for f in [
 	SegFlag.A,
 	SegFlag.B,
@@ -222,7 +224,7 @@ def seg_flag_to_sp_pair(flag: SegFlag, seg_flag_dic={f: f.name for f in [
 	SegFlag.G,
 ]})-> SpPair:
 	pass
-
+'''
 class Disp7Seg:
 	def __init__(self, slant: StrokeSlant=StrokeSlant.SLANT00, scale: int=1, offset: tuple[int, int]=(0, 0)):
 		self.slant = slant
