@@ -27,13 +27,13 @@ class SegmentStrokes:
 	def _scale_offset_array(self, n: int)-> np.ndarray:
 		array = self.expand_int_to_xy_array(n)
 		if not self.offset_ndarray:
-			self.offset_ndarray = np.array(self.offset, dtype=np.int16)
+			self.offset_ndarray = np.array(self.offset, dtype=np.int64)
 		return array * self.scale + self.offset_ndarray
 
 	def _scale_offset_bin(self, bn: int)-> np.ndarray:
 		array = self._expand_bin_to_xy_array(bn)
-		if not self.offset_ndarray:
-			self.offset_ndarray = np.array(self.offset, dtype=np.int16)
+		if self.offset_ndarray is None:
+			self.offset_ndarray = np.array(self.offset, dtype=np.int64)
 		return array * self.scale + self.offset_ndarray
 
 	def scale_offset(self, seg: Seg7, _dict: dict[Seg7, np.ndarray] = {})-> np.ndarray:
@@ -41,14 +41,14 @@ class SegmentStrokes:
 			return _dict[seg]
 		array = self.expand_seg7_to_xy_array(seg)
 		if not self.offset_ndarray:
-			self.offset_ndarray = np.array(self.offset, dtype=np.int16)
+			self.offset_ndarray = np.array(self.offset, dtype=np.int64)
 		value = array * self.scale + self.offset_ndarray
 		_dict[seg] = value
 		return value
 
 	@classmethod
 	def _expand_bin_to_xy_array(cls, bn: int)-> np.ndarray:
-		return np.array(expand_bin_to_xy_list_list(bn), dtype=np.int16)
+		return np.array(expand_bin_to_xy_list_list(bn), dtype=np.int64)
 
 
 	@classmethod
@@ -66,7 +66,7 @@ class SegmentStrokes:
 			return _dict[n]
 		seg7 = hex_to_seg7(n)
 		xy_list_list = expand_to_xy_list_list(seg7)
-		array = np.array(xy_list_list, dtype=np.int16)
+		array = np.array(xy_list_list, dtype=np.int64)
 		_dict[n] = array
 		return array
 
@@ -86,8 +86,10 @@ if __name__ == '__main__':
 	ss = SegmentStrokes(scale=scale, offset=offset)
 	abcd_seg = Seg7.A | Seg7.B | Seg7.C | Seg7.D
 	abcd_bin = abcd_seg.value
-	strokes = ss._scale_offset_bin(abcd_bin)
-	img_size = (np.array([scale, 2 * scale], dtype=np.int16) + 2 * np.array(offset, dtype=np.int16)).tolist()
+	seg_0 = hex_to_seg7(0)
+	seg_0_bin = seg_0.value
+	strokes = ss.get(seg_0_bin) #_scale_offset_bin
+	img_size = (np.array([scale, 2 * scale], dtype=np.int64) + 2 * np.array(offset, dtype=np.int64)).tolist()
 	from PIL import Image, ImageDraw
 	image = Image.new('L', img_size, 0x1f)
 	draw = ImageDraw.Draw(image)

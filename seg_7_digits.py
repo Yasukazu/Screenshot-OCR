@@ -52,6 +52,7 @@ BIT_TO_SP_PAIR = {
 	Seg7.D.value: SpPair.D,
 	Seg7.E.value: SpPair.E,
 	Seg7.F.value: SpPair.F,
+	Seg7.G.value: SpPair.G,
 }
 
 def expand_bin_to_sp_pairs(bn: int)-> Sequence[SpPair]:

@@ -8,7 +8,7 @@ def conv_num_to_bin(num: int, fmt="%d")-> bytearray:
 		if c == '-':
 			bb[i] = 16
 		else:
-			bb[i] = int(c)
+			bb[i] = int(c, 16)
 	return bb
 
 class FormatNum:
