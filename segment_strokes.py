@@ -37,11 +37,11 @@ class SegmentStrokes:
 			self.offset_ndarray = np.array(self.offset, dtype=np.int64)
 		return array * self.scale + self.offset_ndarray
 	
-	def draw(self, drw: ImageDraw.ImageDraw, bn: int):
+	def draw(self, drw: ImageDraw.ImageDraw, bn: int, line_width=1, fill=0):
 		seg_elems = expand_bin_to_seg_elems(bn)
 		for seg_elem in seg_elems:
 			seg_path = seg_elem.value
-			seg_path.draw(drw=drw, scale=self.scale, offset=self.offset)
+			seg_path.draw(drw=drw, scale=self.scale, offset=self.offset, line_width=line_width, fill=fill)
 
 	def scale_offset(self, seg: Seg7, _dict: dict[Seg7, np.ndarray] = {})-> np.ndarray:
 		if seg in _dict:
@@ -88,15 +88,15 @@ class SegmentStrokes:
 if __name__ == '__main__':
 	from pprint import pp
 	scale = 80
-	offset = (3, 5)
+	offset = (10, 20)
 	ss = SegmentStrokes(scale=scale, offset=offset)
-	a_seg = Seg7.A
-	a_bin = a_seg.value
+	seg = Seg7.H
+	a_bin = seg.value
 	img_size = (np.array([scale, 2 * scale], dtype=np.int64) + 2 * np.array(offset, dtype=np.int64)).tolist()
 	from PIL import Image, ImageDraw
 	image = Image.new('L', img_size, 0xff)
 	draw = ImageDraw.Draw(image)
-	ss.draw(drw=draw, bn=a_bin)
+	ss.draw(drw=draw, bn=a_bin, line_width=4)
 	image.show()
 	'''
 	abcd_bin = abcd_seg.value

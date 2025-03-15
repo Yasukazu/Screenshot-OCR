@@ -1,7 +1,7 @@
 from typing import Sequence, Callable
 from types import MappingProxyType
 from enum import Flag, IntEnum
-from strok7 import SpPair, SegFlag
+from strok7 import SpPair, SegElem
 
 seg_7_digits: Sequence[int] = (
 	# abcdefgh
@@ -54,6 +54,20 @@ BIT_TO_SP_PAIR = {
 	Seg7.F.value: SpPair.F,
 	Seg7.G.value: SpPair.G,
 }
+
+BIT_TO_SEG_ELEM = {
+	Seg7.A.value: SegElem.A,
+	Seg7.B.value: SegElem.B,
+	Seg7.C.value: SegElem.C,
+	Seg7.D.value: SegElem.D,
+	Seg7.E.value: SegElem.E,
+	Seg7.F.value: SegElem.F,
+	Seg7.G.value: SegElem.G,
+	Seg7.H.value: SegElem.H,
+}
+
+def expand_bin_to_seg_elems(bn: int)-> Sequence[SegElem]:
+	return tuple(BIT_TO_SEG_ELEM[bit] for bit in (Seg7.A.value, Seg7.B.value, Seg7.C.value, Seg7.D.value, Seg7.E.value, Seg7.F.value, Seg7.G.value, Seg7.H.value) if bit & bn)
 
 def expand_bin_to_sp_pairs(bn: int)-> Sequence[SpPair]:
 	return tuple(BIT_TO_SP_PAIR[bit] for bit in (Seg7.A.value, Seg7.B.value, Seg7.C.value, Seg7.D.value, Seg7.E.value, Seg7.F.value, Seg7.G.value, Seg7.H.value) if bit & bn)
