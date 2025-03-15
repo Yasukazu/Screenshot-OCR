@@ -45,12 +45,25 @@ SEG7_TO_SP_PAIR = MappingProxyType({
 	Seg7.G: SpPair.G,
 })
 
-def expand_to_sp_pairs(seg7: Seg7)-> list[SpPair]:
-	ex = []
-	for seg in (Seg7.A, Seg7.B, Seg7.C, Seg7.D, Seg7.E, Seg7.F, Seg7.G):
-		if seg7 & seg:
-			ex.append(SEG7_TO_SP_PAIR[seg])
-	return ex
+BIT_TO_SP_PAIR = (
+	SpPair.H,
+	SpPair.G,
+	SpPair.F,
+	SpPair.E,
+	SpPair.D,
+	SpPair.C,
+	SpPair.B,
+	SpPair.A,
+)
+
+def expand_bin_to_sp_pairs(bn: int)-> Sequence[SpPair]:
+	return tuple(BIT_TO_SP_PAIR[bit] for bit in (Seg7.A.value, Seg7.B.value, Seg7.C.value, Seg7.D.value, Seg7.E.value, Seg7.F.value, Seg7.G.value, Seg7.H.value) if bit & bn)
+
+def expand_to_sp_pairs(seg7: Seg7)-> Sequence[SpPair]:
+	return tuple(SEG7_TO_SP_PAIR[seg] for seg in (Seg7.A, Seg7.B, Seg7.C, Seg7.D, Seg7.E, Seg7.F, Seg7.G) if seg7 & seg)
+
+def expand_to_xy_list_list(seg7: Seg7)-> list[list[tuple[int, int]]]:
+	return [SpPair.expand_to_xy_list(spp) for spp in expand_to_sp_pairs(seg7)]
 
 def c_to_seg_7(c: str, C_TO_SEG7 = {
 		'a': Seg7.A,
@@ -88,6 +101,19 @@ def hex_to_seg7(n: int)-> Seg7:
 	if not (0 <= n < len(SEG7_ARRAY)):
 		raise ValueError("Out of hexadecimal range!")
 	return SEG7_ARRAY[n]
+
+def bin_to_seg7(b: int)-> Seg7:
+	if not 0 < b < 256:
+		raise ValueError("Needs non-nul byte!")
+	seg7_list = [seg for seg in (Seg7.A, Seg7.B, Seg7.C, Seg7.D, Seg7.E, Seg7.F, Seg7.G, Seg7.H) if b & seg.value]
+	if len(seg7_list) == 1:
+		return seg7_list[0]
+	s_0 = seg7_list[0]
+	after_0 = seg7_list[1:]
+	for s in after_0:
+		s_0 |= s
+	return s_0
+
 
 SEG_POINT_PAIR_DIGIT_ARRAY = (
 	(SpPair.A, SpPair.B, SpPair.C, SpPair.D, SpPair.E, SpPair.F),
