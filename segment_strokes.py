@@ -44,12 +44,24 @@ class SegmentStrokes:
 			seg_path.draw(drw=drw, scale=self.scale, offset=self.offset, line_width=line_width, fill=fill)
 
 	def draw_all(self, drw: ImageDraw.ImageDraw, bn: int, line_width=1, fill=0):
-		from strok7 import SegElem
+		import strok7
 		seg_elems = expand_bin_to_seg_elems(bn)
-		line_elems = [seg_elem for seg_elem in seg_elems if type(seg_elem) is SegElem]
-		for seg_elem in seg_elems:
-			seg_path = seg_elem.value
-			seg_path.draw(drw=drw, scale=self.scale, offset=self.offset, line_width=line_width, fill=fill)
+		elems = [elem for elem in seg_elems if type(elem.value) is strok7.SegPath]
+		if len(elems):
+			path_array = np.array([elem.value.path for elem in elems])
+			path_array *= self.scale
+			path_array += np.array(self.offset)
+			for path in path_array:
+				line_param = path.tolist()
+				drw.line(line_param, line_width=line_width, fill=fill)
+		elems = [seg_elem for seg_elem in seg_elems if type(seg_elem.value) is strok7.CSegPath]
+		if len(elems):
+			path_array = np.array([elem.value.path for elem in elems])
+			path_array *= self.scale
+			path_array += np.array(self.offset)
+			for path in path_array:
+				c_param = path.ravel().tolist()
+				drw.circle(c_param, line_width=line_width, fill=fill)
 
 	def scale_offset(self, seg: Bit8, _dict: dict[Bit8, np.ndarray] = {})-> np.ndarray:
 		if seg in _dict:
@@ -108,7 +120,7 @@ if __name__ == '__main__':
 		n_bin = n_seg.value
 		image = Image.new('L', img_size, 0xff)
 		draw = ImageDraw.Draw(image)
-		ss.draw(drw=draw, bn=n_bin, line_width=4)
+		ss.draw_all(drw=draw, bn=n_bin, line_width=4)
 		image.show()
 #	seg = Bit8.H	a_bin = seg.value
 	'''

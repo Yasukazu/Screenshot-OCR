@@ -150,8 +150,8 @@ class SegPath:
 		self.path = np.array([sp.xy for sp in spsp]) #[sp for sp in spsp] # self.f = f_sp self.t = t_sp
 		# self.slanted = lru_cache(maxsize=max_cache)(self._slanted)
 
-	def get_path(self):
-		return list(self.path)
+	def get_path(self)-> list[int]:
+		return self.path.ravel().tolist()
 
 	def draw(self, drw: ImageDraw.ImageDraw, scale: int, offset: np.ndarray | tuple[int, int], line_width=1, fill=0):
 		if type(offset) != np.typing.NDArray:
