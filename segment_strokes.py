@@ -43,6 +43,14 @@ class SegmentStrokes:
 			seg_path = seg_elem.value
 			seg_path.draw(drw=drw, scale=self.scale, offset=self.offset, line_width=line_width, fill=fill)
 
+	def draw_all(self, drw: ImageDraw.ImageDraw, bn: int, line_width=1, fill=0):
+		from strok7 import SegElem
+		seg_elems = expand_bin_to_seg_elems(bn)
+		line_elems = [seg_elem for seg_elem in seg_elems if type(seg_elem) is SegElem]
+		for seg_elem in seg_elems:
+			seg_path = seg_elem.value
+			seg_path.draw(drw=drw, scale=self.scale, offset=self.offset, line_width=line_width, fill=fill)
+
 	def scale_offset(self, seg: Bit8, _dict: dict[Bit8, np.ndarray] = {})-> np.ndarray:
 		if seg in _dict:
 			return _dict[seg]

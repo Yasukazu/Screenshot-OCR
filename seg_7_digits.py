@@ -33,7 +33,7 @@ class Bit8(Flag):
 	E = 1 << 3
 	F = 1 << 2
 	G = 1 << 1
-	H = 1 # comma
+	H = 1 # comma / period /dot
 
 SEG7_TO_SP_PAIR = MappingProxyType({
 	Bit8.A: SpPair.A,
@@ -43,6 +43,7 @@ SEG7_TO_SP_PAIR = MappingProxyType({
 	Bit8.E: SpPair.E,
 	Bit8.F: SpPair.F,
 	Bit8.G: SpPair.G,
+	Bit8.H: SpPair.H, # dot
 })
 
 BIT_TO_SP_PAIR = {
@@ -53,6 +54,7 @@ BIT_TO_SP_PAIR = {
 	Bit8.E.value: SpPair.E,
 	Bit8.F.value: SpPair.F,
 	Bit8.G.value: SpPair.G,
+	Bit8.H.value: SpPair.H,
 }
 
 BIT_TO_SEG_ELEM = {
