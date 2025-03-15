@@ -59,6 +59,9 @@ BIT_TO_SP_PAIR = (
 def expand_bin_to_sp_pairs(bn: int)-> Sequence[SpPair]:
 	return tuple(BIT_TO_SP_PAIR[bit] for bit in (Seg7.A.value, Seg7.B.value, Seg7.C.value, Seg7.D.value, Seg7.E.value, Seg7.F.value, Seg7.G.value, Seg7.H.value) if bit & bn)
 
+def expand_bin_to_xy_list_list(bn: int)-> list[list[tuple[int, int]]]:
+	return [SpPair.expand_to_xy_list(spp) for spp in expand_bin_to_sp_pairs(bn)]
+
 def expand_to_sp_pairs(seg7: Seg7)-> Sequence[SpPair]:
 	return tuple(SEG7_TO_SP_PAIR[seg] for seg in (Seg7.A, Seg7.B, Seg7.C, Seg7.D, Seg7.E, Seg7.F, Seg7.G) if seg7 & seg)
 
