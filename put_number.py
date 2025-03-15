@@ -41,7 +41,7 @@ if __name__ == '__main__':
 	digit_image_feeder_S = BasicDigitImage(digit_image_param_S)
 	path_feeder = PathFeeder()
 
-	@put_number(pos=PutPos.L, digit_image_feeder=digit_image_feeder_S)
+	@put_number(pos=PutPos.C, digit_image_feeder=digit_image_feeder_S)
 	def get_numbered_img(fn: str, number_str: str)-> Image.Image | None:
 		fullpath = path_feeder.dir / (fn + path_feeder.ext)
 		if fullpath.exists():

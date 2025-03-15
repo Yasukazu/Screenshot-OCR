@@ -102,8 +102,8 @@ class NumStrokes(DigitStrokes):
 		self.strokes: Callable[[int], NDArray] = lru_cache(maxsize=max_cache)(self._strokes)
 
 	def _strokes(self, n: int)-> NDArray:
-		stroke_list = [(p1.slant(s=self.slant, scale=self.scale, offset=self.offset),
-		p2.slant(s=self.slant, scale=self.scale, offset=self.offset)) for (p1, p2) in get_segpoints_for_n(n)]
+		stroke_list = [(p1.slant_self(s=self.slant, scale=self.scale, offset=self.offset),
+		p2.slant_self(s=self.slant, scale=self.scale, offset=self.offset)) for (p1, p2) in get_segpoints_for_n(n)]
 		return stroke_list
 
 if __name__ == '__main__':

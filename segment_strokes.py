@@ -1,7 +1,7 @@
 from typing import Callable, Sequence
 from functools import lru_cache
 from strok7 import SpPair
-from seg_7_digits import SEG_POINT_PAIR_DIGIT_ARRAY, Seg7, expand_to_sp_pairs, hex_to_seg7, expand_to_xy_list_list, bin_to_seg7
+from seg_7_digits import SEG_POINT_PAIR_DIGIT_ARRAY, Seg7, expand_to_sp_pairs, hex_to_seg7, expand_to_xy_list_list, bin_to_seg7, expand_bin_to_xy_list_list
 
 import numpy as np
 STROKE_SIZE = 18
@@ -30,9 +30,8 @@ class SegmentStrokes:
 			self.offset_ndarray = np.array(self.offset, dtype=np.int16)
 		return array * self.scale + self.offset_ndarray
 
-	def _scale_offset_bin(self, b: int)-> np.ndarray:
-		seg7 = bin_to_seg7(b) # if raw else hex_to_seg7(b)
-		array = self.expand_seg7_to_xy_array(seg7)
+	def _scale_offset_bin(self, bn: int)-> np.ndarray:
+		array = self._expand_bin_to_xy_array(bn)
 		if not self.offset_ndarray:
 			self.offset_ndarray = np.array(self.offset, dtype=np.int16)
 		return array * self.scale + self.offset_ndarray
@@ -47,6 +46,9 @@ class SegmentStrokes:
 		_dict[seg] = value
 		return value
 
+	@classmethod
+	def _expand_bin_to_xy_array(cls, bn: int)-> np.ndarray:
+		return np.array(expand_bin_to_xy_list_list(bn), dtype=np.int16)
 
 
 	@classmethod
@@ -83,7 +85,8 @@ if __name__ == '__main__':
 	offset = (3, 5)
 	ss = SegmentStrokes(scale=scale, offset=offset)
 	abcd_seg = Seg7.A | Seg7.B | Seg7.C | Seg7.D
-	strokes = ss.scale_offset(abcd_seg)
+	abcd_bin = abcd_seg.value
+	strokes = ss._scale_offset_bin(abcd_bin)
 	img_size = (np.array([scale, 2 * scale], dtype=np.int16) + 2 * np.array(offset, dtype=np.int16)).tolist()
 	from PIL import Image, ImageDraw
 	image = Image.new('L', img_size, 0x1f)

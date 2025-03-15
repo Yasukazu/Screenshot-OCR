@@ -45,16 +45,14 @@ SEG7_TO_SP_PAIR = MappingProxyType({
 	Seg7.G: SpPair.G,
 })
 
-BIT_TO_SP_PAIR = (
-	SpPair.H,
-	SpPair.G,
-	SpPair.F,
-	SpPair.E,
-	SpPair.D,
-	SpPair.C,
-	SpPair.B,
-	SpPair.A,
-)
+BIT_TO_SP_PAIR = {
+	Seg7.A.value: SpPair.A,
+	Seg7.B.value: SpPair.B,
+	Seg7.C.value: SpPair.C,
+	Seg7.D.value: SpPair.D,
+	Seg7.E.value: SpPair.E,
+	Seg7.F.value: SpPair.F,
+}
 
 def expand_bin_to_sp_pairs(bn: int)-> Sequence[SpPair]:
 	return tuple(BIT_TO_SP_PAIR[bit] for bit in (Seg7.A.value, Seg7.B.value, Seg7.C.value, Seg7.D.value, Seg7.E.value, Seg7.F.value, Seg7.G.value, Seg7.H.value) if bit & bn)
