@@ -3,23 +3,23 @@ from types import MappingProxyType
 from functools import lru_cache
 from numpy.typing import NDArray
 from strok7 import SEG_POINT_ARRAY, SEGPATH_SLANT, get_segpath_for_c, Sp, StrokeSlant, i_i_tpl, SpPair
-from seg_7_digits import Seg7, SEG7_ARRAY, seg_7_array, homo_seg_7_array
+from seg_7_digits import Bit8, SEG7_ARRAY, seg_7_array, homo_seg_7_array
 from seven_seg import SEVEN_SEG_SIZE
 
 SEG7_TO_POINTS = MappingProxyType({
-	Seg7.A: (SEG_POINT_ARRAY[0], SEG_POINT_ARRAY[1]),
-	Seg7.B: (SEG_POINT_ARRAY[1], SEG_POINT_ARRAY[2]),
-	Seg7.C: (SEG_POINT_ARRAY[2], SEG_POINT_ARRAY[3]),
-	Seg7.D: (SEG_POINT_ARRAY[3], SEG_POINT_ARRAY[4]),
-	Seg7.E: (SEG_POINT_ARRAY[4], SEG_POINT_ARRAY[5]),
-	Seg7.F: (SEG_POINT_ARRAY[5], SEG_POINT_ARRAY[0]),
-	Seg7.G: (SEG_POINT_ARRAY[5], SEG_POINT_ARRAY[2]),
+	Bit8.A: (SEG_POINT_ARRAY[0], SEG_POINT_ARRAY[1]),
+	Bit8.B: (SEG_POINT_ARRAY[1], SEG_POINT_ARRAY[2]),
+	Bit8.C: (SEG_POINT_ARRAY[2], SEG_POINT_ARRAY[3]),
+	Bit8.D: (SEG_POINT_ARRAY[3], SEG_POINT_ARRAY[4]),
+	Bit8.E: (SEG_POINT_ARRAY[4], SEG_POINT_ARRAY[5]),
+	Bit8.F: (SEG_POINT_ARRAY[5], SEG_POINT_ARRAY[0]),
+	Bit8.G: (SEG_POINT_ARRAY[5], SEG_POINT_ARRAY[2]),
 }) # : dict[Seg7, tuple[Sp, Sp]]
 
 NUMSTROKE_SLANT = SEGPATH_SLANT
 
 def get_segpoints_for_n(n: int)-> Sequence[tuple[Sp, Sp]]:
-	seg7s: Sequence[Seg7] = SEG7_ARRAY[n]
+	seg7s: Sequence[Bit8] = SEG7_ARRAY[n]
 	return [SEG7_TO_POINTS[sp] for sp in seg7s]
 
 SEGPOINTS_MAX = len(SEG7_ARRAY)

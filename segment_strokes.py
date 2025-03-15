@@ -2,7 +2,7 @@ from typing import Callable, Sequence
 from functools import lru_cache
 from PIL import ImageDraw
 from strok7 import SpPair
-from seg_7_digits import SEG_POINT_PAIR_DIGIT_ARRAY, Seg7, expand_to_sp_pairs, hex_to_seg7, expand_to_xy_list_list, bin_to_seg7, expand_bin_to_xy_list_list, expand_bin_to_seg_elems
+from seg_7_digits import SEG_POINT_PAIR_DIGIT_ARRAY, Bit8, expand_to_sp_pairs, hex_to_seg7, expand_to_xy_list_list, bin_to_seg7, expand_bin_to_xy_list_list, expand_bin_to_seg_elems
 
 import numpy as np
 STROKE_SIZE = 18
@@ -43,7 +43,7 @@ class SegmentStrokes:
 			seg_path = seg_elem.value
 			seg_path.draw(drw=drw, scale=self.scale, offset=self.offset, line_width=line_width, fill=fill)
 
-	def scale_offset(self, seg: Seg7, _dict: dict[Seg7, np.ndarray] = {})-> np.ndarray:
+	def scale_offset(self, seg: Bit8, _dict: dict[Bit8, np.ndarray] = {})-> np.ndarray:
 		if seg in _dict:
 			return _dict[seg]
 		array = self.expand_seg7_to_xy_array(seg)
@@ -58,7 +58,7 @@ class SegmentStrokes:
 		return np.array(expand_bin_to_xy_list_list(bn), dtype=np.int64)
 
 	@classmethod
-	def expand_seg7_to_xy_array(cls, seg7: Seg7, _dict: dict[Seg7, np.ndarray] = {})-> np.ndarray:
+	def expand_seg7_to_xy_array(cls, seg7: Bit8, _dict: dict[Bit8, np.ndarray] = {})-> np.ndarray:
 		if seg7 in _dict:
 			return _dict[seg7]
 		xy_list_list = expand_to_xy_list_list(seg7)
@@ -77,27 +77,32 @@ class SegmentStrokes:
 		return array
 
 	@classmethod
-	def expand_to_segments(cls, h: int)-> Sequence[Seg7]:
+	def expand_to_segments(cls, h: int)-> Sequence[Bit8]:
 		seg7 = hex_to_seg7(h)
 		elements = []
-		for seg in [Seg7.A, Seg7.B, Seg7.C, Seg7.D, Seg7.E, Seg7.F, Seg7.G,]:
+		for seg in [Bit8.A, Bit8.B, Bit8.C, Bit8.D, Bit8.E, Bit8.F, Bit8.G,]:
 			if seg7 & seg:
 				elements.append(seg)
 		return tuple(elements)
 
 if __name__ == '__main__':
 	from pprint import pp
+	from PIL import Image, ImageDraw
+	from format_num import FloatFormatNum
 	scale = 80
 	offset = (10, 20)
 	ss = SegmentStrokes(scale=scale, offset=offset)
-	seg = Seg7.H
-	a_bin = seg.value
 	img_size = (np.array([scale, 2 * scale], dtype=np.int64) + 2 * np.array(offset, dtype=np.int64)).tolist()
-	from PIL import Image, ImageDraw
-	image = Image.new('L', img_size, 0xff)
-	draw = ImageDraw.Draw(image)
-	ss.draw(drw=draw, bn=a_bin, line_width=4)
-	image.show()
+	fmtnum = FloatFormatNum(0.1, fmt="%.1f")
+	n_bb = fmtnum.conv_to_bin()
+	for n_b in n_bb:
+		n_seg = hex_to_seg7(n_b)
+		n_bin = n_seg.value
+		image = Image.new('L', img_size, 0xff)
+		draw = ImageDraw.Draw(image)
+		ss.draw(drw=draw, bn=n_bin, line_width=4)
+		image.show()
+#	seg = Bit8.H	a_bin = seg.value
 	'''
 	abcd_bin = abcd_seg.value
 	n = 0

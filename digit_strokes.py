@@ -1,7 +1,7 @@
 from typing import Callable, Sequence, Iterator
 from functools import lru_cache
 from strok7 import StrokeSlant, i_i_tpl, SpPair
-from seg_7_digits import SEG_POINT_PAIR_DIGIT_ARRAY, Seg7, expand_to_sp_pairs, hex_to_seg7
+from seg_7_digits import SEG_POINT_PAIR_DIGIT_ARRAY, Bit8, expand_to_sp_pairs, hex_to_seg7
 
 class DigitStrokes:
 	f'''strokes[{SEG_POINT_PAIR_DIGIT_ARRAY}]: slanted strokes]'''
@@ -34,7 +34,7 @@ class DigitStrokes:
 		sp_pairs = self.get_sp_pairs(n)
 		return [(spsp.value[0].scale_offset(scale=self.scale, offset=self.offset, slant=self.slant), spsp.value[1].scale_offset(scale=self.scale, offset=self.offset, slant=self.slant)) for spsp in sp_pairs]
 	
-	def _scale_offset_segment(self, seg7: Seg7)-> list[Sequence[tuple[int, int]]]:
+	def _scale_offset_segment(self, seg7: Bit8)-> list[Sequence[tuple[int, int]]]:
 		sp_pairs = expand_to_sp_pairs(seg7)
 		return [(spsp.value[0].scale_offset(scale=self.scale, offset=self.offset, slant=self.slant), spsp.value[1].scale_offset(scale=self.scale, offset=self.offset, slant=self.slant)) for spsp in sp_pairs]
 
