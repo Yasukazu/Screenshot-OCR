@@ -1,7 +1,8 @@
 from typing import Callable, Sequence
 from functools import lru_cache
+from PIL import ImageDraw
 from strok7 import SpPair
-from seg_7_digits import SEG_POINT_PAIR_DIGIT_ARRAY, Seg7, expand_to_sp_pairs, hex_to_seg7, expand_to_xy_list_list, bin_to_seg7, expand_bin_to_xy_list_list
+from seg_7_digits import SEG_POINT_PAIR_DIGIT_ARRAY, Seg7, expand_to_sp_pairs, hex_to_seg7, expand_to_xy_list_list, bin_to_seg7, expand_bin_to_xy_list_list, expand_bin_to_seg_elems
 
 import numpy as np
 STROKE_SIZE = 18
@@ -35,6 +36,12 @@ class SegmentStrokes:
 		if self.offset_ndarray is None:
 			self.offset_ndarray = np.array(self.offset, dtype=np.int64)
 		return array * self.scale + self.offset_ndarray
+	
+	def draw(self, drw: ImageDraw.ImageDraw, bn: int):
+		seg_elems = expand_bin_to_seg_elems(bn)
+		for seg_elem in seg_elems:
+			seg_path = seg_elem.value
+			seg_path.draw(drw=drw, scale=self.scale, offset=self.offset)
 
 	def scale_offset(self, seg: Seg7, _dict: dict[Seg7, np.ndarray] = {})-> np.ndarray:
 		if seg in _dict:
@@ -49,7 +56,6 @@ class SegmentStrokes:
 	@classmethod
 	def _expand_bin_to_xy_array(cls, bn: int)-> np.ndarray:
 		return np.array(expand_bin_to_xy_list_list(bn), dtype=np.int64)
-
 
 	@classmethod
 	def expand_seg7_to_xy_array(cls, seg7: Seg7, _dict: dict[Seg7, np.ndarray] = {})-> np.ndarray:
@@ -81,28 +87,34 @@ class SegmentStrokes:
 
 if __name__ == '__main__':
 	from pprint import pp
-	scale = 8
+	scale = 80
 	offset = (3, 5)
 	ss = SegmentStrokes(scale=scale, offset=offset)
-	abcd_seg = Seg7.A | Seg7.B | Seg7.C | Seg7.D
-	abcd_bin = abcd_seg.value
-	seg_0 = hex_to_seg7(0)
-	seg_0_bin = seg_0.value
-	strokes = ss.get(seg_0_bin) #_scale_offset_bin
+	a_seg = Seg7.A
+	a_bin = a_seg.value
 	img_size = (np.array([scale, 2 * scale], dtype=np.int64) + 2 * np.array(offset, dtype=np.int64)).tolist()
 	from PIL import Image, ImageDraw
-	image = Image.new('L', img_size, 0x1f)
+	image = Image.new('L', img_size, 0xff)
 	draw = ImageDraw.Draw(image)
-	for stroke in strokes:
-		ss = stroke.tolist()
-		draw.line(ss[0] + ss[1], width=1, fill=255)
+	ss.draw(drw=draw, bn=a_bin)
 	image.show()
-	xy_array = SegmentStrokes.expand_seg7_to_xy_array(Seg7.A|Seg7.B)
-	pp(xy_array)
 	'''
 	abcd_bin = abcd_seg.value
 	n = 0
 	n_seg7 = hex_to_seg7(n)
 	n_bin = n_seg7.value
 	abcd_strokes = ss.get(n_bin)
-	pp(abcd_strokes)'''
+	pp(abcd_strokes)
+		abcd_seg = Seg7.A | Seg7.B | Seg7.C | Seg7.D
+	abcd_bin = abcd_seg.value
+		seg_0 = hex_to_seg7(0)
+	seg_0_bin = seg_0.value
+	strokes = ss.get(seg_0_bin) #_scale_offset_bin
+
+	for stroke in strokes:
+		ss = stroke.tolist()
+		draw.line(ss[0] + ss[1], width=1, fill=255)
+	image.show()
+	xy_array = SegmentStrokes.expand_seg7_to_xy_array(Seg7.A|Seg7.B)
+	pp(xy_array)
+'''

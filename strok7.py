@@ -90,7 +90,7 @@ SEG_POINT_ARRAY = _S_A = (
 	Sp(1, 0),
 	Sp(1, 1),
 	Sp(1, 2),
-	Sp(0, 2),
+	Sp(0, 2), # comma
 	Sp(0, 1),
 	)
 
@@ -120,7 +120,7 @@ class SpPair(Enum):
 	E = _S_A[4], _S_A[5]
 	F = _S_A[5], _S_A[0]
 	G = _S_A[5], _S_A[2] # minus / hyphen
-	H = _S_A[1], _S_A[4] # per / slash
+	H = _S_A[4], _S_A[4] # period / comma
 	#I = _6, _6 # dot
 	@classmethod
 	def expand_to_xy_list(cls, spp: 'SpPair')-> list[tuple[int, int]]:
@@ -136,20 +136,34 @@ class SpPair(Enum):
 
 
 from functools import lru_cache
+from PIL import ImageDraw
 from strok7 import StrokeSlant
 SEGPATH_SLANT = StrokeSlant.SLANT02
+import numpy as np
 
 class SegPath:
-	def __init__(self, *spsp: Sp, max_cache=2): # f_sp: Sp0, t_sp: Sp0):
-		self.path = spsp #[sp for sp in spsp] # self.f = f_sp self.t = t_sp
-		self.slanted = lru_cache(maxsize=max_cache)(self._slanted)
+	def __init__(self, *spsp: Sp): # f_sp: Sp0, t_sp: Sp0):, max_cache=2
+		self.path = np.array([sp.xy for sp in spsp]) #[sp for sp in spsp] # self.f = f_sp self.t = t_sp
+		# self.slanted = lru_cache(maxsize=max_cache)(self._slanted)
 
 	def get_path(self):
 		return list(self.path)
 
-	def _slanted(self, s=SEGPATH_SLANT, scale=1, offset=(0, 0)):
-		return [pt.scale_offset(slant=s, scale=scale, offset=offset) for pt in self.path]
+	def draw(self, drw: ImageDraw.ImageDraw, scale: int, offset: np.ndarray | tuple[int, int], line_width=1, fill=0):
+		if type(offset) != np.typing.NDArray:
+			offset = np.array(offset)
+		path = scale * self.path + offset
+		drw.line(path.ravel().tolist(), fill=fill, width=line_width)
 
+
+	'''def _slanted(self, s=SEGPATH_SLANT, scale=1, offset=(0, 0)):
+		return [pt.scale_offset(slant=s, scale=scale, offset=offset) for pt in self.path]'''
+class CSegPath(SegPath):
+	def draw(self, drw: ImageDraw.ImageDraw, scale=1, offset: np.ndarray | tuple[int, int]=(0, 0), line_width=1, fill=0):
+		if type(offset) != np.typing.NDArray:
+			offset = np.array(offset)
+		path = scale * self.path + offset
+		drw.circle(path.ravel().tolist(), radius=line_width * 2, fill=fill)
 
 class SegElem(Enum):
 	A = SegPath(SEG_POINT_ARRAY[0], SEG_POINT_ARRAY[1])
@@ -159,7 +173,7 @@ class SegElem(Enum):
 	E = SegPath(SEG_POINT_ARRAY[4], SEG_POINT_ARRAY[5])
 	F = SegPath(SEG_POINT_ARRAY[5], SEG_POINT_ARRAY[0])
 	G = SegPath(SEG_POINT_ARRAY[5], SEG_POINT_ARRAY[2])
-	H = SegPath(SEG_POINT_ARRAY[1], SEG_POINT_ARRAY[4]) # comma
+	H = CSegPath(SEG_POINT_ARRAY[4]) # comma
 
 
 SEGELEMS = (
@@ -309,6 +323,16 @@ def print_seg_point_enum():
 
 if __name__ == '__main__':
 	import sys
+	from PIL import Image
+	se = SegElem.H 	#se_a = SegElem.A
+	sp = se.value
+	size = (100, 200)
+	img = Image.new('L', size, 0xff)
+	drw = ImageDraw.Draw(img)
+	sp.draw(drw=drw, scale=50, offset=(20, 20), line_width=4)
+	img.show()
+	sys.exit(0)
+	
 	dic = get_segelem_dict()
 	for c in 'abcdefg':
 		a_path = dic[c].slanted()
