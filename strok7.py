@@ -163,7 +163,7 @@ class CSegPath(SegPath):
 		if type(offset) != np.typing.NDArray:
 			offset = np.array(offset)
 		path = scale * self.path + offset
-		drw.circle(path.ravel().tolist(), radius=line_width * 2, fill=fill)
+		drw.circle(path.ravel().tolist(), radius=line_width, fill=fill)
 
 class SegElem(Enum):
 	A = SegPath(SEG_POINT_ARRAY[0], SEG_POINT_ARRAY[1])

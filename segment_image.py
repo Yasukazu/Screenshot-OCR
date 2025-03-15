@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import Enum, IntEnum
 from collections import namedtuple
 from functools import lru_cache
 from collections.abc import Callable
@@ -12,9 +12,9 @@ from num_strokes import SEGPOINTS_MAX, DigitStrokes, BasicDigitStrokes
 from seg_7_digits import hex_to_seg7
 from segment_strokes import SegmentStrokes
 
-class ImageFill(Enum): # single element tuple for ImageDraw color
-	BLACK = (0,)
-	WHITE = (0xff,)
+class ImageFill(IntEnum): # single element tuple for ImageDraw color
+	BLACK = 0
+	WHITE = 0xff
 	@classmethod
 	def invert(cls, fill):
 		if fill == ImageFill.BLACK:
@@ -84,7 +84,7 @@ class BasicDigitImageParam:
 			raise ValueError("The value of scale must be larger than line_width!")
 		self.height = self.width + self.scale
 
-class Seg7Image:
+class SegmentImage:
 	WIDTH = 10
 	HEIGHT = WIDTH * 2
 	SIZE = [WIDTH, HEIGHT]
@@ -134,20 +134,18 @@ class Seg7Image:
 	def _get(self, n: int)-> Image.Image:
 		img = Image.new('L', self.size, color=self.bgcolor.value)
 		drw = ImageDraw.Draw(img)
-		strokes = self.stroke_feeder.get(n)
-		for stroke in strokes:
-			drw.line(stroke.ravel().tolist(), width=self.line_width, fill=ImageFill.invert(self.bgcolor).value, joint='curve')
+		self.stroke_feeder.draw(drw=drw, bn=n, line_width=self.line_width, fill=ImageFill.invert(self.bgcolor).value)
 		return img
 
-def get_hex_array_image(nn: Sequence[int | FormatNum] | bytearray, seg7_image_feeder=Seg7Image(param=Seg7Image.calc_scale_from_height(Seg7Image.HEIGHT)))-> Image.Image:
+def get_hex_array_image(nn: Sequence[int | FormatNum] | bytearray, segment_image_feeder=SegmentImage(param=SegmentImage.calc_scale_from_height(SegmentImage.HEIGHT)))-> Image.Image:
 	b_array = nn if isinstance(nn, bytearray) else formatnums_to_bytearray(nn)
-	number_image_size = len(b_array) * seg7_image_feeder.size[0], seg7_image_feeder.size[1]
+	number_image_size = len(b_array) * segment_image_feeder.size[0], segment_image_feeder.size[1]
 	number_image = Image.new('L', number_image_size, (0,))
 	offset = (0, 0)
-	x_offset = seg7_image_feeder.size[0]
+	x_offset = segment_image_feeder.size[0]
 	for n in b_array:
 		seg7 = hex_to_seg7(n)
-		digit_image = seg7_image_feeder.get(seg7.value)
+		digit_image = segment_image_feeder.get(seg7.value)
 		number_image.paste(digit_image, offset)
 		offset = offset[0] + x_offset, 0
 	return number_image
@@ -155,15 +153,17 @@ def get_hex_array_image(nn: Sequence[int | FormatNum] | bytearray, seg7_image_fe
 if __name__ == '__main__':
 	import sys
 	if len(sys.argv) < 2:
-		print("Needs digit/hex")
+		print("Needs float digit/hex")
 		sys.exit(1)
 	height = 40
-	s7i_prm = Seg7Image.calc_scale_from_height(height)
-	s7i = Seg7Image(s7i_prm)
-	hx = int(sys.argv[1], 16)
-	from format_num import conv_num_to_bin
-	bb = conv_num_to_bin(hx, fmt="%x")
-	hx_img = get_hex_array_image(bb)
+	s7i_prm = SegmentImage.calc_scale_from_height(height)
+	s7i = SegmentImage(s7i_prm)
+	from format_num import FloatFormatNum, formatnums_to_bytearray
+	hx = float(sys.argv[1])
+	nn = [FloatFormatNum(hx, fmt="%.1f")]
+#conv_num_to_bin
+	bb = formatnums_to_bytearray(nn) #conv_num_to_bin(hx, fmt="%x")
+	hx_img = get_hex_array_image(bb, segment_image_feeder=s7i)
 	hx_img.show()
 	sys.exit(0)
 	for b in bb:
