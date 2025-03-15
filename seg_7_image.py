@@ -163,6 +163,9 @@ if __name__ == '__main__':
 	hx = int(sys.argv[1], 16)
 	from format_num import conv_num_to_bin
 	bb = conv_num_to_bin(hx, fmt="%x")
+	hx_img = get_hex_array_image(bb)
+	hx_img.show()
+	sys.exit(0)
 	for b in bb:
 		s7 = hex_to_seg7(b)
 		hx_img = s7i.get(s7.value)
