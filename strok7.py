@@ -1,5 +1,5 @@
 from enum import Enum, StrEnum, Flag, auto
-from typing import Sequence
+from typing import Sequence, Callable
 import csv
 
 type ii_ii = tuple[tuple[int, int], tuple[int, int]]
@@ -22,7 +22,7 @@ class Sp:
 	p4 p3
 	'''
 	def __init__(self, x: int, y: int):
-		assert x in (0, 1, 2) # 2 for comma
+		assert x in (0, 1)
 		assert y in (0, 1, 2)
 		self.x = x
 		self.y = y
@@ -239,25 +239,6 @@ def seg_flag_to_sp_pair(flag: SegFlag, seg_flag_dic={f: f.name for f in [
 ]})-> SpPair:
 	pass
 '''
-class Disp7Seg:
-	def __init__(self, slant: StrokeSlant=StrokeSlant.SLANT00, scale: int=1, offset: tuple[int, int]=(0, 0)):
-		self.slant = slant
-		self.scale = scale
-		self.offset = offset
-		self.size = scale, 2 * scale
-		self.get: Callable[[int], list[Sequence[tuple[int, int]]]]= lru_cache(maxsize=len(SEG_POINT_PAIR_DIGIT_ARRAY))(self._scale_offset)
-
-	@classmethod
-	def get_max(cls)-> int:
-		return len(SEG_POINT_PAIR_DIGIT_ARRAY)
-
-	@classmethod
-	def get_sp_pairs(cls, n: int)-> Sequence[SpPair]:
-		return SEG_POINT_PAIR_DIGIT_ARRAY[n]
-	
-	def _scale_offset(self, n: int)-> list[Sequence[tuple[int, int]]]:
-		sp_pairs = self.get_sp_pairs(n)
-		return [(spsp.value[0].scale_offset(scale=self.scale, offset=self.offset, slant=self.slant), spsp.value[1].scale_offset(scale=self.scale, offset=self.offset, slant=self.slant)) for spsp in sp_pairs]
 class Segment7:
 	dic = {c: (abcdef_seg[i], abcdef_seg[i + 1]) for i, c in enumerate('abcdef')}
 	dic['g'] = ((0, 1), (1, 1))
