@@ -10,6 +10,7 @@ class PutPos(IntEnum):
 	R = 1
 from typing import Any
 def put_number(pos: PutPos=PutPos.L, digit_image_feeder=BasicDigitImage(BasicDigitImage.calc_scale_from_height())):
+	'''prefix "0x" for hexadecimal'''
 	def _embed_number(func):
 		@wraps(func)
 		def wrapper(*ag, **kw: dict[str, Any]):
@@ -18,7 +19,7 @@ def put_number(pos: PutPos=PutPos.L, digit_image_feeder=BasicDigitImage(BasicDig
 				number_str_list = str(kw['number_str']).split()
 				name_num_array = bytearray()
 				for number_str in number_str_list:
-					d = int(number_str, 16)
+					d = int(number_str, 0)
 					name_num_array += HexFormatNum(d).conv_to_bin()
 				num_img = get_basic_number_image(name_num_array, digit_image_feeder=digit_image_feeder)
 				match pos:
