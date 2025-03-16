@@ -1,8 +1,8 @@
 from typing import Callable, Sequence
 from functools import lru_cache
 from PIL import ImageDraw
-from strok7 import SpPair, SegElem
-from seg_7_digits import SEG_POINT_PAIR_DIGIT_ARRAY, Bit8, expand_to_sp_pairs, hex_to_seg7, expand_to_xy_list_list, bin_to_seg7, expand_bin_to_xy_list_list, expand_bin_to_seg_elems, bin2_to_seg7
+from strok7 import SpPair, SegElem, SegPath
+from seg_7_digits import SEG_POINT_PAIR_DIGIT_ARRAY, Bit8, expand_to_sp_pairs, hex_to_bit8, expand_to_xy_list_list, bin_to_bit8, expand_bin_to_xy_list_list, expand_bin_to_seg_elems, bin2_to_bit8
 
 import numpy as np
 STROKE_SIZE = 18
@@ -44,8 +44,8 @@ class SegmentStrokes:
 			seg_path.draw(drw=drw, scale=self.scale, offset=self.offset, line_width=line_width, fill=fill)
 
 	def draw_all(self, drw: ImageDraw.ImageDraw, bn: int | Sequence[SegElem], line_width=1, fill=0):
-		seg_elems = bn if isinstance(bn, SegElem) else expand_bin_to_seg_elems(bn)
-		elems = [elem for elem in seg_elems if type(elem.value) is strok7.SegPath]
+		seg_elems = expand_bin_to_seg_elems(bn) if type(bn) is int else bn
+		elems = [elem for elem in seg_elems if type(elem.value) is SegPath]
 		if len(elems):
 			path_array = np.array([elem.value.path for elem in elems])
 			path_array *= self.scale
@@ -93,7 +93,7 @@ class SegmentStrokes:
 	def expand_int_to_xy_array(cls, n: int, _dict: dict[int, np.ndarray] = {})-> np.ndarray:
 		if n in _dict:
 			return _dict[n]
-		seg7 = hex_to_seg7(n)
+		seg7 = hex_to_bit8(n)
 		xy_list_list = expand_to_xy_list_list(seg7)
 		array = np.array(xy_list_list, dtype=np.int64)
 		_dict[n] = array
@@ -101,7 +101,7 @@ class SegmentStrokes:
 
 	@classmethod
 	def expand_to_segments(cls, h: int)-> Sequence[Bit8]:
-		seg7 = hex_to_seg7(h)
+		seg7 = hex_to_bit8(h)
 		elements = []
 		for seg in [Bit8.A, Bit8.B, Bit8.C, Bit8.D, Bit8.E, Bit8.F, Bit8.G,]:
 			if seg7 & seg:
@@ -131,7 +131,7 @@ if __name__ == '__main__':
 		# n_bb = fmtnum.conv_to_bin()
 		n2bb = fmtnum.conv_to_bin2()
 		for n_b in n2bb:
-			n_seg = bin2_to_seg7(n_b)
+			n_seg = bin2_to_bit8(n_b)
 			n_bin = n_seg.value
 			image = Image.new('L', img_size, 0xff)
 			draw = ImageDraw.Draw(image)

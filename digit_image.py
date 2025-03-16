@@ -8,7 +8,7 @@ import numpy as np
 from strok7 import STRK_DICT_STEM, StrokeSlant, i_i_tpl
 from format_num import FormatNum, HexFormatNum, conv_num_to_bin, formatnums_to_bytearray
 from num_strokes import SEGPOINTS_MAX, DigitStrokes, BasicDigitStrokes
-from segment_strokes import hex_to_seg7, SegmentStrokes
+from segment_strokes import hex_to_bit8, SegmentStrokes
 class ImageFill(Enum): # single element tuple for ImageDraw color
 	BLACK = (0,)
 	WHITE = (0xff,)

@@ -6,7 +6,7 @@ from PIL import ImageDraw, Image
 import numpy as np
 from format_num import FormatNum, conv_num_to_bin, formatnums_to_bytearray
 from num_strokes import SEGPOINTS_MAX, BasicDigitStrokes
-from seg_7_digits import hex_to_seg7, bin2_to_seg7, str_to_seg_elems
+from seg_7_digits import hex_to_bit8, bin2_to_bit8, str_to_seg_elems
 from segment_strokes import SegmentStrokes
 from image_fill import ImageFill
 from digit_image import BasicDigitImageParam
@@ -71,7 +71,7 @@ def get_hex_array_image(nn: Sequence[int | FormatNum] | bytearray, image_feeder=
 	offset = (0, 0)
 	x_offset = image_feeder.size[0]
 	for n in b_array:
-		seg7 = bin2_to_seg7(n) if bin2_input else hex_to_seg7(n)
+		seg7 = bin2_to_bit8(n) if bin2_input else hex_to_bit8(n)
 		digit_image = image_feeder.get(seg7.value)
 		number_image.paste(digit_image, offset)
 		offset = offset[0] + x_offset, 0
@@ -98,6 +98,6 @@ if __name__ == '__main__':
 	hx_img.show()
 	sys.exit(0)
 	for b in bb:
-		s7 = hex_to_seg7(b)
+		s7 = hex_to_bit8(b)
 		hx_img = s7i.get(s7.value)
 		hx_img.show()

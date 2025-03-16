@@ -68,6 +68,17 @@ BIT_TO_SEG_ELEM = {
 	Bit8.H.value: SegElem.H,
 }
 
+BIT8_TO_SEG_ELEM = {
+	Bit8.A: SegElem.A,
+	Bit8.B: SegElem.B,
+	Bit8.C: SegElem.C,
+	Bit8.D: SegElem.D,
+	Bit8.E: SegElem.E,
+	Bit8.F: SegElem.F,
+	Bit8.G: SegElem.G,
+	Bit8.H: SegElem.H,
+}
+
 def str_to_seg_elems(n_s: str)-> list[Sequence[SegElem]]:
 	INDEX = '0123456789abcdef-'
 	n_str = n_s + '\0'
@@ -78,17 +89,21 @@ def str_to_seg_elems(n_s: str)-> list[Sequence[SegElem]]:
 		if n_str[i + 1] == '.':
 			b += 1
 			i += 1
-		bb += [expand_bin2_to_seg_elems(b)]
+		b8 = bin2_to_bit8(b)
+		bb += [expand_bit8_to_seg_elems(b8)]
 		i += 1
 	return bb
 
 def expand_bin_to_seg_elems(bn: int)-> Sequence[SegElem]:
 	return tuple(BIT_TO_SEG_ELEM[bit] for bit in (Bit8.A.value, Bit8.B.value, Bit8.C.value, Bit8.D.value, Bit8.E.value, Bit8.F.value, Bit8.G.value, Bit8.H.value) if bit & bn)
 
+def expand_bit8_to_seg_elems(bits: Bit8)-> Sequence[SegElem]:
+	# bits = bin2_to_bit8(bn)
+	return tuple(BIT8_TO_SEG_ELEM[bit] for bit in (Bit8.A, Bit8.B, Bit8.C, Bit8.D, Bit8.E, Bit8.F, Bit8.G, Bit8.H) if bit & bits)
+
 def expand_bin2_to_seg_elems(bn: int)-> Sequence[SegElem]:
-	dot = bn & 1
-	bn >>= 1
-	return tuple(BIT_TO_SEG_ELEM[bit] for bit in (Bit8.A.value, Bit8.B.value, Bit8.C.value, Bit8.D.value, Bit8.E.value, Bit8.F.value, Bit8.G.value, Bit8.H.value) if bit & bn)
+	bits = bin2_to_bit8(bn)
+	return tuple(BIT_TO_SEG_ELEM[bit] for bit in (Bit8.A, Bit8.B, Bit8.C, Bit8.D, Bit8.E, Bit8.F, Bit8.G, Bit8.H) if bit & bits)
 
 def expand_bin_to_sp_pairs(bn: int)-> Sequence[SpPair]:
 	return tuple(BIT_TO_SP_PAIR[bit] for bit in (Bit8.A.value, Bit8.B.value, Bit8.C.value, Bit8.D.value, Bit8.E.value, Bit8.F.value, Bit8.G.value, Bit8.H.value) if bit & bn)
@@ -134,13 +149,13 @@ SEG7_ARRAY = (
 	Bit8.H
 )
 
-def hex_to_seg7(n: int)-> Bit8:
+def hex_to_bit8(n: int)-> Bit8:
 	'''16 for hyphen/minus, 17 for comma/period'''
 	if not (0 <= n < len(SEG7_ARRAY)):
 		raise ValueError("Out of hexadecimal range!")
 	return SEG7_ARRAY[n]
 
-def bin2_to_seg7(n: int)-> Bit8:
+def bin2_to_bit8(n: int)-> Bit8:
 	'''LSB is for dot'''
 	dot = n & 1
 	n >>= 1
@@ -151,7 +166,7 @@ def bin2_to_seg7(n: int)-> Bit8:
 		bit8 |= Bit8.H
 	return bit8
 
-def bin_to_seg7(b: int)-> Bit8:
+def bin_to_bit8(b: int)-> Bit8:
 	if not 0 < b < 256:
 		raise ValueError("Needs non-nul byte!")
 	seg7_list = [seg for seg in (Bit8.A, Bit8.B, Bit8.C, Bit8.D, Bit8.E, Bit8.F, Bit8.G, Bit8.H) if b & seg.value]
