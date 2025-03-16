@@ -58,11 +58,14 @@ class SegmentStrokes:
 		if len(elems):
 			path_array = np.array([elem.value.path for elem in elems])
 			path_array *= self.scale
-			ofst = round(self.scale * 0.2) 
-			path_array += np.array(self.offset) + np.array([ofst, ofst]) 
+			ofst = round(self.scale * 0.2)
+			path_array += np.array(self.offset) + np.array([ofst, ofst])
 			for path in path_array:
 				c_param = path.ravel().tolist()
-				drw.circle(c_param, radius=line_width, fill=fill)
+				l_param = c_param + c_param
+				l_param[2] += line_width
+				drw.line(l_param, width=line_width, fill=fill)
+				# drw.circle(c_param, radius=line_width, fill=fill)
 
 	def scale_offset(self, seg: Bit8, _dict: dict[Bit8, np.ndarray] = {})-> np.ndarray:
 		if seg in _dict:
