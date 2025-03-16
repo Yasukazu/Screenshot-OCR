@@ -71,6 +71,11 @@ BIT_TO_SEG_ELEM = {
 def expand_bin_to_seg_elems(bn: int)-> Sequence[SegElem]:
 	return tuple(BIT_TO_SEG_ELEM[bit] for bit in (Bit8.A.value, Bit8.B.value, Bit8.C.value, Bit8.D.value, Bit8.E.value, Bit8.F.value, Bit8.G.value, Bit8.H.value) if bit & bn)
 
+def expand_bin2_to_seg_elems(bn: int)-> Sequence[SegElem]:
+	dot = bn & 1
+	bn >>= 1
+	return tuple(BIT_TO_SEG_ELEM[bit] for bit in (Bit8.A.value, Bit8.B.value, Bit8.C.value, Bit8.D.value, Bit8.E.value, Bit8.F.value, Bit8.G.value, Bit8.H.value) if bit & bn)
+
 def expand_bin_to_sp_pairs(bn: int)-> Sequence[SpPair]:
 	return tuple(BIT_TO_SP_PAIR[bit] for bit in (Bit8.A.value, Bit8.B.value, Bit8.C.value, Bit8.D.value, Bit8.E.value, Bit8.F.value, Bit8.G.value, Bit8.H.value) if bit & bn)
 
@@ -120,6 +125,17 @@ def hex_to_seg7(n: int)-> Bit8:
 	if not (0 <= n < len(SEG7_ARRAY)):
 		raise ValueError("Out of hexadecimal range!")
 	return SEG7_ARRAY[n]
+
+def bin2_to_seg7(n: int)-> Bit8:
+	'''LSB is for dot'''
+	dot = n & 1
+	n >>= 1
+	if not (0 <= n < len(SEG7_ARRAY)):
+		raise ValueError("Out of hexadecimal range!")
+	bit8 = SEG7_ARRAY[n]
+	if dot:
+		bit8 |= Bit8.H
+	return bit8
 
 def bin_to_seg7(b: int)-> Bit8:
 	if not 0 < b < 256:

@@ -21,7 +21,7 @@ class Sp:
 	slant/2 p5 p2
 	p4 p3
 	'''
-	X_MAX = 2 # 2 for dot
+	X_MAX = 1 # 2 for dot
 	Y_MAX = 2
 
 	def __init__(self, x: int, y: int):
@@ -92,10 +92,9 @@ SEG_POINT_ARRAY = _S_A = (
 	Sp(0, 0),
 	Sp(1, 0),
 	Sp(1, 1),
-	Sp(1, 2),
+	Sp(1, 2),# comma
 	Sp(0, 2),
 	Sp(0, 1),
-	Sp(2, 2), # comma
 	)
 
 class MySegPoints:
@@ -124,7 +123,7 @@ class SpPair(Enum):
 	E = _S_A[4], _S_A[5]
 	F = _S_A[5], _S_A[0]
 	G = _S_A[5], _S_A[2] # minus / hyphen
-	H = (_S_A[6],) # period / comma / dot
+	H = (_S_A[3],) # period / comma / dot
 	#I = _6, _6 # dot
 	@classmethod
 	def expand_to_xy_list(cls, spp: 'SpPair')-> list[tuple[int, int]]:
@@ -177,7 +176,7 @@ class SegElem(Enum):
 	E = SegPath(SEG_POINT_ARRAY[4], SEG_POINT_ARRAY[5])
 	F = SegPath(SEG_POINT_ARRAY[5], SEG_POINT_ARRAY[0])
 	G = SegPath(SEG_POINT_ARRAY[5], SEG_POINT_ARRAY[2])
-	H = CSegPath(SEG_POINT_ARRAY[4]) # comma / period / dot
+	H = CSegPath(SEG_POINT_ARRAY[3]) # comma / period / dot
 
 
 SEGELEMS = (

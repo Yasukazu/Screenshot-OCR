@@ -2,7 +2,7 @@ from typing import Callable, Sequence
 from functools import lru_cache
 from PIL import ImageDraw
 from strok7 import SpPair
-from seg_7_digits import SEG_POINT_PAIR_DIGIT_ARRAY, Bit8, expand_to_sp_pairs, hex_to_seg7, expand_to_xy_list_list, bin_to_seg7, expand_bin_to_xy_list_list, expand_bin_to_seg_elems
+from seg_7_digits import SEG_POINT_PAIR_DIGIT_ARRAY, Bit8, expand_to_sp_pairs, hex_to_seg7, expand_to_xy_list_list, bin_to_seg7, expand_bin_to_xy_list_list, expand_bin_to_seg_elems, bin2_to_seg7
 
 import numpy as np
 STROKE_SIZE = 18
@@ -52,16 +52,17 @@ class SegmentStrokes:
 			path_array *= self.scale
 			path_array += np.array(self.offset)
 			for path in path_array:
-				line_param = path.tolist()
-				drw.line(line_param, line_width=line_width, fill=fill)
-		elems = [seg_elem for seg_elem in seg_elems if type(seg_elem.value) is strok7.CSegPath]
+				line_param = path.ravel().tolist()
+				drw.line(line_param, width=line_width, fill=fill)
+		elems = [seg_elem for seg_elem in seg_elems i, dtype=np.int64
 		if len(elems):
 			path_array = np.array([elem.value.path for elem in elems])
 			path_array *= self.scale
-			path_array += np.array(self.offset)
+			ofst = round(self.scale * 0.2) 
+			path_array += np.array(self.offset) + np.array([ofst, ofst]) 
 			for path in path_array:
 				c_param = path.ravel().tolist()
-				drw.circle(c_param, line_width=line_width, fill=fill)
+				drw.circle(c_param, radius=line_width, fill=fill)
 
 	def scale_offset(self, seg: Bit8, _dict: dict[Bit8, np.ndarray] = {})-> np.ndarray:
 		if seg in _dict:
@@ -110,13 +111,14 @@ if __name__ == '__main__':
 	from PIL import Image, ImageDraw
 	from format_num import FloatFormatNum
 	scale = 80
-	offset = (10, 20)
+	offset = (30, 40)
 	ss = SegmentStrokes(scale=scale, offset=offset)
 	img_size = (np.array([scale, 2 * scale], dtype=np.int64) + 2 * np.array(offset, dtype=np.int64)).tolist()
 	fmtnum = FloatFormatNum(0.1, fmt="%.1f")
 	n_bb = fmtnum.conv_to_bin()
-	for n_b in n_bb:
-		n_seg = hex_to_seg7(n_b)
+	n2bb = fmtnum.conv_to_bin2()
+	for n_b in n2bb:
+		n_seg = bin2_to_seg7(n_b)
 		n_bin = n_seg.value
 		image = Image.new('L', img_size, 0xff)
 		draw = ImageDraw.Draw(image)
