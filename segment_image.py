@@ -6,7 +6,7 @@ from PIL import ImageDraw, Image
 import numpy as np
 from format_num import FormatNum, conv_num_to_bin, formatnums_to_bytearray
 from num_strokes import SEGPOINTS_MAX, BasicDigitStrokes
-from seg_7_digits import hex_to_seg7, bin2_to_seg7
+from seg_7_digits import hex_to_seg7, bin2_to_seg7, str_to_seg_elems
 from segment_strokes import SegmentStrokes
 from image_fill import ImageFill
 from digit_image import BasicDigitImageParam
@@ -86,8 +86,12 @@ if __name__ == '__main__':
 	s7i_prm = SegmentImage.calc_scale_from_height(height)
 	s7i = SegmentImage(s7i_prm)
 	from format_num import FloatFormatNum, formatnums_to_bytearray
+	seg_elems = str_to_seg_elems(sys.argv[1])
 	hx = float(sys.argv[1])
-	nn = [FloatFormatNum(hx, fmt="%.1f")]
+	nn = [FloatFormatNum(hx, fmt="%.2f")]
+	ff2 = [n.conv_to_bin2() for n in nn]
+	bb2 = bytearray(*ff2)
+
 #conv_num_to_bin
 	bb = formatnums_to_bytearray(nn, conv_to_bin2=True) #conv_num_to_bin(hx, fmt="%x")
 	hx_img = get_hex_array_image(bb, image_feeder=s7i, bin2_input=True)

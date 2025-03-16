@@ -33,6 +33,7 @@ def conv_to_bin2(num: float, fmt="%f")-> bytearray:
 		bb += bytearray([b])
 		i += 1
 	return bb
+
 class FormatNum:
 	FORMAT = "%d"
 
@@ -54,7 +55,7 @@ class HexFormatNum(FormatNum):
 	def conv_to_bin2(self):
 		return conv_to_bin2(self.num, fmt=self.FORMAT)
 class FloatFormatNum(FormatNum):
-	FORMAT = "%f"
+	FORMAT = "%.2f"
 
 	def conv_to_bin(self):
 		return conv_to_bin(self.num, fmt=self.FORMAT)

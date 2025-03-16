@@ -68,6 +68,20 @@ BIT_TO_SEG_ELEM = {
 	Bit8.H.value: SegElem.H,
 }
 
+def str_to_seg_elems(n_s: str)-> list[Sequence[SegElem]]:
+	INDEX = '0123456789abcdef-'
+	n_str = n_s + '\0'
+	bb = []
+	i = 0
+	while i < len(n_str) - 1:
+		b = INDEX.index(n_str[i]) << 1
+		if n_str[i + 1] == '.':
+			b += 1
+			i += 1
+		bb += [expand_bin2_to_seg_elems(b)]
+		i += 1
+	return bb
+
 def expand_bin_to_seg_elems(bn: int)-> Sequence[SegElem]:
 	return tuple(BIT_TO_SEG_ELEM[bit] for bit in (Bit8.A.value, Bit8.B.value, Bit8.C.value, Bit8.D.value, Bit8.E.value, Bit8.F.value, Bit8.G.value, Bit8.H.value) if bit & bn)
 

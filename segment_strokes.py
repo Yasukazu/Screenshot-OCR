@@ -1,7 +1,7 @@
 from typing import Callable, Sequence
 from functools import lru_cache
 from PIL import ImageDraw
-from strok7 import SpPair
+from strok7 import SpPair, SegElem
 from seg_7_digits import SEG_POINT_PAIR_DIGIT_ARRAY, Bit8, expand_to_sp_pairs, hex_to_seg7, expand_to_xy_list_list, bin_to_seg7, expand_bin_to_xy_list_list, expand_bin_to_seg_elems, bin2_to_seg7
 
 import numpy as np
@@ -43,9 +43,8 @@ class SegmentStrokes:
 			seg_path = seg_elem.value
 			seg_path.draw(drw=drw, scale=self.scale, offset=self.offset, line_width=line_width, fill=fill)
 
-	def draw_all(self, drw: ImageDraw.ImageDraw, bn: int, line_width=1, fill=0):
-		import strok7
-		seg_elems = expand_bin_to_seg_elems(bn)
+	def draw_all(self, drw: ImageDraw.ImageDraw, bn: int | Sequence[SegElem], line_width=1, fill=0):
+		seg_elems = bn if isinstance(bn, SegElem) else expand_bin_to_seg_elems(bn)
 		elems = [elem for elem in seg_elems if type(elem.value) is strok7.SegPath]
 		if len(elems):
 			path_array = np.array([elem.value.path for elem in elems])
@@ -113,20 +112,31 @@ if __name__ == '__main__':
 	from pprint import pp
 	from PIL import Image, ImageDraw
 	from format_num import FloatFormatNum
+	import sys
+	from seg_7_digits import str_to_seg_elems
 	scale = 80
 	offset = (30, 40)
 	ss = SegmentStrokes(scale=scale, offset=offset)
 	img_size = (np.array([scale, 2 * scale], dtype=np.int64) + 2 * np.array(offset, dtype=np.int64)).ravel().tolist()
-	fmtnum = FloatFormatNum(0.1, fmt="%.1f")
-	# n_bb = fmtnum.conv_to_bin()
-	n2bb = fmtnum.conv_to_bin2()
-	for n_b in n2bb:
-		n_seg = bin2_to_seg7(n_b)
-		n_bin = n_seg.value
-		image = Image.new('L', img_size, 0xff)
-		draw = ImageDraw.Draw(image)
-		ss.draw_all(drw=draw, bn=n_bin, line_width=4)
-		image.show()
+	if len(sys.argv) > 1:
+		num_str = sys.argv[1]
+		seg_elems_list = str_to_seg_elems(num_str)
+		for seg_elems in seg_elems_list:
+			image = Image.new('L', img_size, 0xff)
+			draw = ImageDraw.Draw(image)
+			ss.draw_all(drw=draw, bn=seg_elems, line_width=4)
+			image.show()
+	else:
+		fmtnum = FloatFormatNum(0.1, fmt="%.1f")
+		# n_bb = fmtnum.conv_to_bin()
+		n2bb = fmtnum.conv_to_bin2()
+		for n_b in n2bb:
+			n_seg = bin2_to_seg7(n_b)
+			n_bin = n_seg.value
+			image = Image.new('L', img_size, 0xff)
+			draw = ImageDraw.Draw(image)
+			ss.draw_all(drw=draw, bn=n_bin, line_width=4)
+			image.show()
 #	seg = Bit8.H	a_bin = seg.value
 	'''
 	abcd_bin = abcd_seg.value
