@@ -54,7 +54,7 @@ class SegmentStrokes:
 			for path in path_array:
 				line_param = path.ravel().tolist()
 				drw.line(line_param, width=line_width, fill=fill)
-		elems = [seg_elem for seg_elem in seg_elems i, dtype=np.int64
+		elems = [elem for elem in seg_elems if type(elem.value) is strok7.CSegPath]
 		if len(elems):
 			path_array = np.array([elem.value.path for elem in elems])
 			path_array *= self.scale
@@ -113,9 +113,9 @@ if __name__ == '__main__':
 	scale = 80
 	offset = (30, 40)
 	ss = SegmentStrokes(scale=scale, offset=offset)
-	img_size = (np.array([scale, 2 * scale], dtype=np.int64) + 2 * np.array(offset, dtype=np.int64)).tolist()
+	img_size = (np.array([scale, 2 * scale], dtype=np.int64) + 2 * np.array(offset, dtype=np.int64)).ravel().tolist()
 	fmtnum = FloatFormatNum(0.1, fmt="%.1f")
-	n_bb = fmtnum.conv_to_bin()
+	# n_bb = fmtnum.conv_to_bin()
 	n2bb = fmtnum.conv_to_bin2()
 	for n_b in n2bb:
 		n_seg = bin2_to_seg7(n_b)

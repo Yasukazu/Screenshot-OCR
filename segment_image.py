@@ -1,88 +1,15 @@
-from enum import Enum, IntEnum
-from collections import namedtuple
 from functools import lru_cache
 from collections.abc import Callable
 from collections.abc import Sequence
 import numpy as np
 from PIL import ImageDraw, Image
 import numpy as np
-from strok7 import STRK_DICT_STEM, StrokeSlant, i_i_tpl
-from format_num import FormatNum, HexFormatNum, conv_num_to_bin, formatnums_to_bytearray
-from num_strokes import SEGPOINTS_MAX, DigitStrokes, BasicDigitStrokes
+from format_num import FormatNum, conv_num_to_bin, formatnums_to_bytearray
+from num_strokes import SEGPOINTS_MAX, BasicDigitStrokes
 from seg_7_digits import hex_to_seg7
 from segment_strokes import SegmentStrokes
-
-class ImageFill(IntEnum): # single element tuple for ImageDraw color
-	BLACK = 0
-	WHITE = 0xff
-	@classmethod
-	def invert(cls, fill):
-		if fill == ImageFill.BLACK:
-			return ImageFill.WHITE
-		return ImageFill.BLACK
-
-OfstIWIH = namedtuple('OfstIWIH', ['ofst', 'img_w', 'img_h'])
-DigitImageCalcResult = namedtuple('DigitImageCalcResult', ['scale', 'font_scale', 'padding', 'line_width'])
-class DigitImage:
-
-	MIN_SCALE = 20
-	STANDARD_PADDING = 1
-	STANDARD_PADDING_RATIO = 0.25
-	STANDARD_LINE_WIDTH = 2
-	STANDARD_LINE_WIDTH_RATIO = 0.2
-
-	def __init__(self, stroke_feeder=BasicDigitStrokes(), bgcolor=ImageFill.WHITE, line_width=STANDARD_LINE_WIDTH): # slant: StrokeSlant=StrokeSlant.SLANT00, scale: int=MIN_SCALE,  offset=(STANDARD_PADDING, STANDARD_PADDING)#
-		self.stroke_feeder = stroke_feeder
-		self.slant = stroke_feeder.slant
-		self.scale = stroke_feeder.scale
-		self.offset = stroke_feeder.offset
-		self.line_width = line_width
-		self.bgcolor = bgcolor
-		self.get: Callable[[int], Image.Image] = lru_cache(maxsize=SEGPOINTS_MAX)(self._get)
-
-	@classmethod
-	def calc_font_scale(cls, scale: int=MIN_SCALE, line_width_ratio: float=STANDARD_LINE_WIDTH_RATIO, padding_ratio: float=STANDARD_PADDING_RATIO)-> DigitImageCalcResult:
-		padding = int(scale * padding_ratio)
-		f_scale = scale - 2 * padding
-		line_width = int(f_scale * line_width_ratio) or 1
-		if f_scale - line_width <= 2:
-			raise ValueError(f"Insufficient scale:{scale} for line-width-ratio{line_width_ratio}!")	
-		return DigitImageCalcResult(scale=scale, font_scale=f_scale, padding=padding, line_width=line_width)
-
-	def _get(self, n: int)-> Image.Image:
-		img_w = self.stroke_feeder.scale + 2 * self.stroke_feeder.offset[0]
-		img_h = 2 * self.stroke_feeder.scale + 2 * self.stroke_feeder.offset[1]
-		img = Image.new('L', (img_w, img_h), color=self.bgcolor.value)
-		drw = ImageDraw.Draw(img)
-		strokes = self.stroke_feeder.get(n)
-		for stroke in strokes:
-			drw.line(stroke, width=self.line_width, fill=ImageFill.invert(self.bgcolor).value, joint='curve')
-		return img
-
-
-	def calc_scale_padding(self, scale=MIN_SCALE, padding=STANDARD_PADDING_RATIO, slant: StrokeSlant=StrokeSlant.SLANT02)-> tuple[int, float]:
-		padding = scale * padding or 1
-		_scale = scale - 2 * padding #  int(scale * (1 - slant.value))
-		return int(_scale * (1 - slant.value) * padding or 4 * padding), padding
-
-import digit_strokes
-from collections import namedtuple
-from dataclasses import dataclass, field
-@dataclass
-class BasicDigitImageParam:
-	width: int
-	scale: int
-	padding: tuple[int, int]
-	line_width: int
-	height: int = field(init=False)
-	def __post_init__(self):
-		if min(self.padding) < 0:
-			raise ValueError("Every padding value must be larger than 0!")
-		if self.line_width < 0:
-			raise ValueError("The value of line_width must be larger than 0!")
-		if self.scale - self.line_width <= 0:
-			raise ValueError("The value of scale must be larger than line_width!")
-		self.height = self.width + self.scale
+from image_fill import ImageFill
+from digit_image import BasicDigitImageParam
 
 class SegmentImage:
 	WIDTH = 10
@@ -134,11 +61,11 @@ class SegmentImage:
 	def _get(self, n: int)-> Image.Image:
 		img = Image.new('L', self.size, color=self.bgcolor.value)
 		drw = ImageDraw.Draw(img)
-		self.stroke_feeder.draw(drw=drw, bn=n, line_width=self.line_width, fill=ImageFill.invert(self.bgcolor).value)
+		self.stroke_feeder.draw_all(drw=drw, bn=n, line_width=self.line_width, fill=ImageFill.invert(self.bgcolor).value)
 		return img
 
-def get_hex_array_image(nn: Sequence[int | FormatNum] | bytearray, segment_image_feeder=SegmentImage(param=SegmentImage.calc_scale_from_height(SegmentImage.HEIGHT)))-> Image.Image:
-	b_array = nn if isinstance(nn, bytearray) else formatnums_to_bytearray(nn)
+def get_hex_array_image(nn: Sequence[int | FormatNum] | bytearray, segment_image_feeder=SegmentImage(param=SegmentImage.calc_scale_from_height(SegmentImage.HEIGHT)), bin2=True)-> Image.Image:
+	b_array = nn if isinstance(nn, bytearray) else formatnums_to_bytearray(nn, conv_to_bin2=bin2)
 	number_image_size = len(b_array) * segment_image_feeder.size[0], segment_image_feeder.size[1]
 	number_image = Image.new('L', number_image_size, (0,))
 	offset = (0, 0)
@@ -162,8 +89,8 @@ if __name__ == '__main__':
 	hx = float(sys.argv[1])
 	nn = [FloatFormatNum(hx, fmt="%.1f")]
 #conv_num_to_bin
-	bb = formatnums_to_bytearray(nn) #conv_num_to_bin(hx, fmt="%x")
-	hx_img = get_hex_array_image(bb, segment_image_feeder=s7i)
+	bb = formatnums_to_bytearray(nn, conv_to_bin2=True) #conv_num_to_bin(hx, fmt="%x")
+	hx_img = get_hex_array_image(bb, segment_image_feeder=s7i, bin2=True)
 	hx_img.show()
 	sys.exit(0)
 	for b in bb:

@@ -61,7 +61,7 @@ class FloatFormatNum(FormatNum):
 	def conv_to_bin2(self):
 		return conv_to_bin2(self.num, fmt=self.FORMAT)
 
-def formatnums_to_bytearray(nn: Sequence[FormatNum | int], conv_to_bin2=False)-> bytearray: # , fmt=None
+def formatnums_to_bytearray(nn: Sequence[FormatNum | int], conv_to_bin2=True)-> bytearray: # , fmt=None
 	bb = bytearray() #len(nn))
 	for c in nn:
 		match c:
