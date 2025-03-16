@@ -64,15 +64,15 @@ class SegmentImage:
 		self.stroke_feeder.draw_all(drw=drw, bn=n, line_width=self.line_width, fill=ImageFill.invert(self.bgcolor).value)
 		return img
 
-def get_hex_array_image(nn: Sequence[int | FormatNum] | bytearray, segment_image_feeder=SegmentImage(param=SegmentImage.calc_scale_from_height(SegmentImage.HEIGHT)), bin2_input=True)-> Image.Image:
+def get_hex_array_image(nn: Sequence[int | FormatNum] | bytearray, image_feeder=SegmentImage(param=SegmentImage.calc_scale_from_height(SegmentImage.HEIGHT)), bin2_input=True)-> Image.Image:
 	b_array = nn if isinstance(nn, bytearray) else formatnums_to_bytearray(nn, conv_to_bin2=bin2_input)
-	number_image_size = len(b_array) * segment_image_feeder.size[0], segment_image_feeder.size[1]
+	number_image_size = len(b_array) * image_feeder.size[0], image_feeder.size[1]
 	number_image = Image.new('L', number_image_size, (0,))
 	offset = (0, 0)
-	x_offset = segment_image_feeder.size[0]
+	x_offset = image_feeder.size[0]
 	for n in b_array:
 		seg7 = bin2_to_seg7(n) if bin2_input else hex_to_seg7(n)
-		digit_image = segment_image_feeder.get(seg7.value)
+		digit_image = image_feeder.get(seg7.value)
 		number_image.paste(digit_image, offset)
 		offset = offset[0] + x_offset, 0
 	return number_image
@@ -90,7 +90,7 @@ if __name__ == '__main__':
 	nn = [FloatFormatNum(hx, fmt="%.1f")]
 #conv_num_to_bin
 	bb = formatnums_to_bytearray(nn, conv_to_bin2=True) #conv_num_to_bin(hx, fmt="%x")
-	hx_img = get_hex_array_image(bb, segment_image_feeder=s7i, bin2_input=True)
+	hx_img = get_hex_array_image(bb, image_feeder=s7i, bin2_input=True)
 	hx_img.show()
 	sys.exit(0)
 	for b in bb:

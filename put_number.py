@@ -1,7 +1,8 @@
 from enum import IntEnum
 from functools import wraps
 from PIL import Image
-from digit_image import BasicDigitImage, get_basic_number_image #, BasicDigitImageParam
+from digit_image import BasicDigitImage #, get_basic_number_image #, BasicDigitImageParam
+from segment_image import SegmentImage, get_hex_array_image
 from format_num import HexFormatNum
 
 class PutPos(IntEnum):
@@ -9,7 +10,7 @@ class PutPos(IntEnum):
 	C = 0
 	R = 1
 from typing import Any
-def put_number(pos: PutPos=PutPos.L, digit_image_feeder=BasicDigitImage(BasicDigitImage.calc_scale_from_height())):
+def put_number(pos: PutPos=PutPos.L, digit_image_feeder=SegmentImage(BasicDigitImage.calc_scale_from_height())):
 	'''prefix "0x" for hexadecimal'''
 	def _embed_number(func):
 		@wraps(func)
@@ -21,7 +22,7 @@ def put_number(pos: PutPos=PutPos.L, digit_image_feeder=BasicDigitImage(BasicDig
 				for number_str in number_str_list:
 					d = int(number_str, 0)
 					name_num_array += HexFormatNum(d).conv_to_bin()
-				num_img = get_basic_number_image(name_num_array, digit_image_feeder=digit_image_feeder)
+				num_img = get_hex_array_image(name_num_array, image_feeder=digit_image_feeder)
 				match pos:
 					case PutPos.L:
 						x_offset = 0
@@ -39,7 +40,7 @@ def put_number(pos: PutPos=PutPos.L, digit_image_feeder=BasicDigitImage(BasicDig
 if __name__ == '__main__':
 	from path_feeder import PathFeeder
 	digit_image_param_S = BasicDigitImage.calc_scale_from_height(50)
-	digit_image_feeder_S = BasicDigitImage(digit_image_param_S)
+	digit_image_feeder_S = SegmentImage(digit_image_param_S)
 	path_feeder = PathFeeder()
 
 	@put_number(pos=PutPos.C, digit_image_feeder=digit_image_feeder_S)
