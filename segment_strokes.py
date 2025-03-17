@@ -1,8 +1,8 @@
 from typing import Callable, Sequence
 from functools import lru_cache
 from PIL import ImageDraw
-from strok7 import SpPair, SegElem, SegPath
-from seg_7_digits import SEG_POINT_PAIR_DIGIT_ARRAY, Bit8, expand_to_sp_pairs, hex_to_bit8, expand_to_xy_list_list, bin_to_bit8, expand_bin_to_xy_list_list, expand_bin_to_seg_elems, bin2_to_bit8
+from strok7 import SpPair, SegElem, SegPath, CSegPath
+from seg_7_digits import SEG_POINT_PAIR_DIGIT_ARRAY, Bit8, expand_to_sp_pairs, hex_to_bit8, expand_to_xy_list_list, bin_to_bit8, expand_bin_to_xy_list_list, expand_bin2_to_seg_elems, bin2_to_bit8
 
 import numpy as np
 STROKE_SIZE = 18
@@ -44,7 +44,7 @@ class SegmentStrokes:
 			seg_path.draw(drw=drw, scale=self.scale, offset=self.offset, line_width=line_width, fill=fill)
 
 	def draw_all(self, drw: ImageDraw.ImageDraw, bn: int | Sequence[SegElem], line_width=1, fill=0):
-		seg_elems = expand_bin_to_seg_elems(bn) if type(bn) is int else bn
+		seg_elems = expand_bin2_to_seg_elems(bn) if type(bn) is int else bn
 		elems = [elem for elem in seg_elems if type(elem.value) is SegPath]
 		if len(elems):
 			path_array = np.array([elem.value.path for elem in elems])
@@ -53,7 +53,7 @@ class SegmentStrokes:
 			for path in path_array:
 				line_param = path.ravel().tolist()
 				drw.line(line_param, width=line_width, fill=fill)
-		elems = [elem for elem in seg_elems if type(elem.value) is strok7.CSegPath]
+		elems = [elem for elem in seg_elems if type(elem.value) is CSegPath]
 		if len(elems):
 			path_array = np.array([elem.value.path for elem in elems])
 			path_array *= self.scale
