@@ -35,6 +35,17 @@ class Bit8(Flag):
 	G = 1 << 1
 	H = 1 # comma / period /dot
 
+BIT8_ARRAY = (
+	Bit8.A,
+	Bit8.B,
+	Bit8.C,
+	Bit8.D,
+	Bit8.E,
+	Bit8.F,
+	Bit8.G,
+	Bit8.H
+)
+
 SEG7_TO_SP_PAIR = MappingProxyType({
 	Bit8.A: SpPair.A,
 	Bit8.B: SpPair.B,
