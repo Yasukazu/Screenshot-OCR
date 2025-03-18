@@ -34,6 +34,7 @@ class Bit8(Flag):
 	F = 1 << 2
 	G = 1 << 1
 	H = 1 # comma / period /dot
+	NUL = 0
 
 BIT8_ARRAY = (
 	Bit8.A,

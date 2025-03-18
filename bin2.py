@@ -18,7 +18,7 @@ class Bin2(int):
 	def of_int(self)-> int:
 		return self >> 1
 		
-	def to_bit8(self)-> Bit8 | None:
+	def to_bit8_(self)-> Bit8 | None:
 		of_int = self.of_int
 		if not of_int:
 			return Bit8.H if self.dot else None
@@ -27,6 +27,13 @@ class Bin2(int):
 		for i in range(1, len(b8s)):
 			r |= b8s[i]
 		return r | Bit8.H
+
+	def to_bit8(self)-> Bit8:
+		b8s = [b for b in BIT8_ARRAY if b.value & self.of_int]
+		r = Bit8.NUL
+		for i in b8s:
+			r |= i
+		return r
 
 if __name__ == '__main__':
 	b2 = Bin2(1)
