@@ -8,6 +8,13 @@ class Seg7yx:
 			[0, 1],
 		]):
 		self.yx = yx
+
+	def to_list(self): #-> list[list[list[float]]:
+		r = []
+		for y, xx in enumerate(self.yx):
+			r += [[x, y] for x in xx]
+		return r
+
 	@classmethod
 	def slanted(cls, slant_r: float, yx: 'Seg7yx')-> 'Seg7yx':
 		def slant_ratio_by_y(y: int)-> float:
@@ -19,3 +26,9 @@ class Seg7yx:
 		return cls([slanted_xx(slant_r, xx, y) for y, xx in enumerate(yx.yx)])
 
 
+if __name__ == '__main__':
+	from pprint import pp
+	s7yx = Seg7yx()
+	pp(s7yx.to_list())
+	s7yx2 = Seg7yx.slanted(0.2, s7yx)
+	pp(s7yx2.to_list())
