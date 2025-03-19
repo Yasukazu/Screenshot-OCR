@@ -32,6 +32,12 @@ class Seg7yx:
 	def slant_ratio_by_y(cls, y: int)-> float:
 		return 1 - y / 2
 
+from enum import Enum
+class Seg7yxSlant(Enum):
+	SLANT00 = Seg7yx().to_tuple()
+	SLANT02 = Seg7yx.slanted(0.2, Seg7yx()).to_tuple()
+
+
 
 if __name__ == '__main__':
 	from pprint import pp
