@@ -2,6 +2,7 @@ from enum import Enum, StrEnum, Flag, auto
 from typing import Sequence, Callable
 from functools import lru_cache
 import csv
+from seg7yx import Seg7yxSlant
 
 type ii_ii = tuple[tuple[int, int], tuple[int, int]]
 type i_i_tpl_tpl = dict[str, ii_ii]
@@ -56,9 +57,10 @@ class Sp:
 	def slanted(self, slant: StrokeSlant=NO_SLANT)-> f_i_tpl:
 		return self.slanted_x(slant), self.y
 
-	def scale_offset(self, slant: StrokeSlant=StrokeSlant.SLANT00, scale: int=1, offset: tuple[int, int]=(0, 0))-> i_i_tpl:
+	def scale_offset(self, slant: Seg7yxSlant=Seg7yxSlant.SLANT02, scale: int=1, offset: tuple[int, int]=(0, 0))-> i_i_tpl:
 		'''also slant'''
-		slanted_x = self.slanted_x(slant) # / (1 + slant.value)
+		slant_map = slant.value
+		slanted_x = slant_map[self.y][self.x]
 		return round(scale * slanted_x) + offset[0], scale * self.y + offset[1]
 
 class MySp(Sp):
