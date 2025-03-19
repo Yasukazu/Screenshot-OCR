@@ -1,5 +1,6 @@
 from enum import Enum, StrEnum, Flag, auto
 from typing import Sequence, Callable
+from functools import lru_cache
 import csv
 
 type ii_ii = tuple[tuple[int, int], tuple[int, int]]
@@ -29,7 +30,11 @@ class Sp:
 		assert 0 <= x <= Sp.Y_MAX
 		self.x = x
 		self.y = y
-		self._slr = (1, 0.5, 0)[y]
+		# self._slr = (1, 0.5, 0)[y]
+
+	@property
+	def _slr(self)-> float:
+		return 1 - self.y / 2 # (1, 0.5, 0)[
 
 	@property
 	def xy(self)-> tuple[int, int]:
@@ -254,7 +259,7 @@ class Segment7:
 
 
 strk7: list[Segment7] = []
-
+seg_yx
 with open('abcdef-7.csv', encoding='utf8') as csv_file:
 	csv_reader = csv.reader(csv_file)
 	for row in csv_reader:
@@ -306,7 +311,7 @@ def print_seg_point_enum():
 		print(f"\t_{n} = {str(points)}")
 
 if __name__ == '__main__':
-	import sys
+	import sys   
 	from PIL import Image
 	se = SegElem.H 	#se_a = SegElem.A
 	sp = se.value
