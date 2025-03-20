@@ -94,7 +94,7 @@ class SegNodePair:
 			rr += [xy6[r] for r in sp.pair]
 		return rr
 		# assert len(map) == 6
-class SegNodePairEnum(Enum):
+class SegNodePairElem(Enum):
 	A = SegNodePair((0, 1))
 	B = SegNodePair((1, 2))
 	C = SegNodePair((2, 3))
@@ -358,7 +358,7 @@ if __name__ == '__main__':
 	from pprint import pp
 	import seg7yx
 
-	snp_array = [SegNodePairEnum.B.value, SegNodePairEnum.C.value]
+	snp_array = [SegNodePairElem.B.value, SegNodePairElem.C.value]
 	scale = 10
 	offset = np.array([100, 200])
 	slant02 = seg7yx.Seg7yx(seg7yx.Seg7yxSlant.SLANT02.value).to_list()
