@@ -2,6 +2,7 @@ from typing import Sequence
 type f_list = list[float]
 type seg_yx = list[f_list]
 class Seg7yx:
+	'''3-row 2-column float array'''
 	def __init__(self, yx: Sequence[Sequence[float]]= (
 			(0, 1),
 			(0, 1),

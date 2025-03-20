@@ -21,7 +21,7 @@
 `@add_number(size: tuple[int, int]=(100, 50), pos: AddPos=AddPos.C, bgcolor=ImageFill.WHITE)`
 - Needs to set `number_str`:str param. when to call the decorated function .
 ## (7+1)-segment display(the 8th is comma/period):
-  class SegElem(Enum): from A to G is assigned as a SegPath, H is CSegPath(:SegPath descendant).
+  SegElem(Enum)class: from A to G is assigned as a SegPath, H is CSegPath(:SegPath descendant).
   SegPath has draw(drw: ImageDraw.ImageDraw) method, 
   class Bit8(Flag): H member is for comma
    A
