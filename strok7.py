@@ -65,44 +65,6 @@ class Sp:
 		return round(scale * slanted_x) + offset[0], scale * self.y + offset[1]
 
 
-class SegNodePair:
-	def __init__(self, xyxy: Sequence[int]):
-		assert 0 <= xyxy[0] < 6
-		if len(xyxy) > 1:
-			assert 0 <= xyxy[1] < 6
-		self.pair = (xyxy[0], xyxy[1]) if len(xyxy) > 1 else (xyxy[0],)
-
-	@classmethod
-	def map_node6(cls, node6: Sequence[Sequence[float]], *spsp: 'SegNodePair')-> list[list[float]]:
-		assert len(node6) == 6
-		rr = []
-		for sp in spsp:
-			rr += [node6[r] for r in sp.pair]
-		return rr
-
-	@classmethod
-	def slant_scale_offset(cls, slant=Seg7yxSlant.SLANT02, scale=1, offset=(0, 0), *spsp: 'SegNodePair'):
-		arr = np.array(slant.value) #seg7yx.Seg7yx(.to_list())
-		if not isinstance(offset, np.ndarray):
-			offset = np.array(offset)
-		arr *= scale
-		arr += offset
-		xy6 = arr.tolist() # 
-		assert len(xy6) == 6
-		rr = []
-		for sp in spsp:
-			rr += [xy6[r] for r in sp.pair]
-		return rr
-		# assert len(map) == 6
-class SegNodePairElem(Enum):
-	A = SegNodePair((0, 1))
-	B = SegNodePair((1, 2))
-	C = SegNodePair((2, 3))
-	D = SegNodePair((3, 4))
-	E = SegNodePair((4, 5))
-	F = SegNodePair((5, 0))
-	G = SegNodePair((5, 2))
-	H = SegNodePair((3, )) # comma / period / dot
 
 class MySp(Sp):
 	def __init__(self, x: int, y: int, slant_enum=StrokeSlant.SLANT00, scale_value=1, offset_value=(0, 0)):
@@ -356,32 +318,18 @@ def print_seg_point_enum():
 if __name__ == '__main__':
 	import sys
 	from pprint import pp
-	import seg7yx
-
-	snp_array = [SegNodePairElem.B.value, SegNodePairElem.C.value]
-	scale = 10
-	offset = np.array([100, 200])
-	slant02 = seg7yx.Seg7yx(seg7yx.Seg7yxSlant.SLANT02.value).to_list()
-	slant02_array = np.array(slant02)
-	slant_scale_offset_map = (slant02_array * scale + offset).tolist()
-	def map_func(sp: SegNodePair):
-		return [slant_scale_offset_map[r] for r in sp.pair]
-	slanted_snp_array = [m for m in map(map_func, snp_array)]
-	mapped_snp_array = SegNodePair.map_node6(slant_scale_offset_map, *snp_array)
-	scaled_array = SegNodePair.slant_scale_offset(seg7yx.Seg7yxSlant.SLANT02, 10, (1, 2), *snp_array)
-	pp(scaled_array)
-
-
-
 	from PIL import Image
-	se = SegElem.H 	#se_a = SegElem.A
-	sp = se.value
 	size = (100, 200)
 	img = Image.new('L', size, 0xff)
 	drw = ImageDraw.Draw(img)
-	sp.draw(drw=drw, scale=50, offset=(20, 20), line_width=4)
+
+
 	img.show()
 	sys.exit(0)
+
+	se = SegElem.H 	#se_a = SegElem.A
+	sp = se.value
+	sp.draw(drw=drw, scale=50, offset=(20, 20), line_width=4)
 	
 	dic = get_segelem_dict()
 	for c in 'abcdefg':

@@ -13,10 +13,10 @@ class SegNodePair:
 	@classmethod
 	def map_node6(cls, node6: Sequence[Sequence[float]], *spsp: 'SegNodePair')-> list[list[float]]:
 		assert len(node6) == 6
-		conv_tbl = [0, 1, 5, 2, 4, 3]
+		#conv_tbl = [0, 1, 5, 2, 4, 3]
 		rr = []
 		for sp in spsp:
-			rr += [node6[conv_tbl[r]] for r in sp.pair]
+			rr += [node6[r] for r in sp.pair]
 		return rr
 
 	@classmethod
@@ -49,9 +49,9 @@ if __name__ == '__main__':
 	import seg7yx
 
 	snp_array = [SegNodePairElem.B.value, SegNodePairElem.C.value]
-	scale = 10
-	offset = np.array([100, 200])
-	slant02 = seg7yx.Seg7yx(seg7yx.Seg7yxSlant.SLANT02.value).to_seg7()
+	scale = 30
+	offset = np.array([10, 20])
+	slant02 = Seg7yxSlant.SLANT02.value #seg7yx.Seg7yx(seg7yx.).to_seg7()
 	slant02_array = np.array(slant02)
 	slant_scale_offset_map = (slant02_array * scale + offset).tolist()
 	mapped_array = SegNodePair.map_node6(slant_scale_offset_map, *snp_array)
