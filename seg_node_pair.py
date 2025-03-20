@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Sequence
 import numpy as np
 from seg7yx import Seg7yxSlant
-
+from seg_7_digits import Bit8, SEG7_ARRAY, BIT8_ARRAY
 class SegNodePair:
 	def __init__(self, xyxy: Sequence[int]):
 		assert 0 <= xyxy[0] < 6
@@ -43,12 +43,28 @@ class SegNodePairElem(Enum):
 	G = SegNodePair((5, 2))
 	H = SegNodePair((3, )) # comma / period / dot
 
+BIT8_TO_SEG_NODE_PAIR_ELEM = {
+	Bit8.A: SegNodePairElem.A,
+	Bit8.B: SegNodePairElem.B,
+	Bit8.C: SegNodePairElem.C,
+	Bit8.D: SegNodePairElem.D,
+	Bit8.E: SegNodePairElem.E,
+	Bit8.F: SegNodePairElem.F,
+	Bit8.G: SegNodePairElem.G,
+	Bit8.H: SegNodePairElem.H,
+}
+
 if __name__ == '__main__':
 	import sys
 	from pprint import pp
 	import seg7yx
-
-	snp_array = [SegNodePairElem.B.value, SegNodePairElem.C.value]
+	num = int(sys.argv[1])
+	b8s = SEG7_ARRAY[num]
+	smsm = []
+	for b8 in BIT8_ARRAY:
+		if b8 & b8s:
+			smsm.append(BIT8_TO_SEG_NODE_PAIR_ELEM[b8].value)
+	snp_array = smsm # [SegNodePairElem.B.value, SegNodePairElem.C.value]
 	scale = 30
 	offset = np.array([10, 20])
 	slant02 = Seg7yxSlant.SLANT02.value #seg7yx.Seg7yx(seg7yx.).to_seg7()
