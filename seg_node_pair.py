@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Sequence, Iterator
 import numpy as np
-from seg7yx import Seg7yxSlant
+from seg7yx import Seg7yxSlant, Seg7Node6
 from seg_7_digits import Bit8, SEG7_ARRAY, BIT8_ARRAY
 class SegNodePair:
 	def __init__(self, xyxy: Sequence[int]):
@@ -80,18 +80,24 @@ if __name__ == '__main__':
 			smsm.append(BIT8_TO_SEG_NODE_PAIR_ELEM[b8].value)
 	snp_array = smsm # [SegNodePairElem.B.value, SegNodePairElem.C.value]
 	scale = 30
-	offset = np.array([10, 20])
-	slant02 = Seg7yxSlant.SLANT02.value #seg7yx.Seg7yx(seg7yx.).to_seg7()
-	slant02_array = np.array(slant02)
-	slant_scale_offset_map = (slant02_array * scale + offset).tolist()
-	from PIL import Image, ImageDraw
+	offset = [10, 20]
+	#slant02 = Seg7yxSlant.SLANT02.value #seg7yx.Seg7yx(seg7yx.).to_seg7()
+	# slant02_array = np.array(slant02)
+	slant_scale_offset_map = Seg7Node6(slant=0.2).scale_offset(scale=scale, offset=offset) #(slant02_array * scale + offset).tolist()
 	max_x = max(*[x for (x, y) in slant_scale_offset_map])
 	max_y = max(*[y for (x, y) in slant_scale_offset_map])
 	size = (round(max_x * 1.2), round(max_y * 1.2))
-	img = Image.new('L', size, 0xff)
-	drw = ImageDraw.Draw(img)
+	from ipycanvas import Canvas
+	canvas = Canvas(width=200, height=200)
+	canvas.stroke_style = "blue"
 	for xy_list in SegNodePair.map_node6_each(slant_scale_offset_map, *snp_array):
 		pp(xy_list)
+		canvas.stroke_line(*xy_list)
+	canvas
+	sys.exit(0)
+	from PIL import Image, ImageDraw
+	img = Image.new('L', size, 0xff)
+	drw = ImageDraw.Draw(img)
 	pair = []
 	for i, xy in enumerate(mapped_array):
 		if i & 1:
