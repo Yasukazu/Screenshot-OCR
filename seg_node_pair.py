@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Sequence
+from typing import Sequence, Iterator
 import numpy as np
 from seg7yx import Seg7yxSlant
 from seg_7_digits import Bit8, SEG7_ARRAY, BIT8_ARRAY
@@ -18,6 +18,20 @@ class SegNodePair:
 		for sp in spsp:
 			rr += [node6[r] for r in sp.pair]
 		return rr
+
+	@classmethod
+	def map_node6_each(cls, node6: Sequence[Sequence[float]], *spsp: 'SegNodePair')-> Iterator[list[Sequence[float]]]:
+		assert len(node6) == 6
+		for j, sp in enumerate(spsp):
+			xy_list = [node6[r] for r in sp.pair]
+			rr = []
+			for i, xy in enumerate(xy_list):
+				if i & 1:
+					yield rr + xy
+					rr = []
+				else:
+					rr += xy
+			assert len(rr) == 0
 
 	@classmethod
 	def slant_scale_offset(cls, slant=Seg7yxSlant.SLANT02, scale=1, offset=(0, 0), *spsp: 'SegNodePair'):
@@ -70,13 +84,14 @@ if __name__ == '__main__':
 	slant02 = Seg7yxSlant.SLANT02.value #seg7yx.Seg7yx(seg7yx.).to_seg7()
 	slant02_array = np.array(slant02)
 	slant_scale_offset_map = (slant02_array * scale + offset).tolist()
-	mapped_array = SegNodePair.map_node6(slant_scale_offset_map, *snp_array)
 	from PIL import Image, ImageDraw
-	max_x = max(*[x for (x, y) in mapped_array])
-	max_y = max(*[y for (x, y) in mapped_array])
+	max_x = max(*[x for (x, y) in slant_scale_offset_map])
+	max_y = max(*[y for (x, y) in slant_scale_offset_map])
 	size = (round(max_x * 1.2), round(max_y * 1.2))
 	img = Image.new('L', size, 0xff)
 	drw = ImageDraw.Draw(img)
+	for xy_list in SegNodePair.map_node6_each(slant_scale_offset_map, *snp_array):
+		pp(xy_list)
 	pair = []
 	for i, xy in enumerate(mapped_array):
 		if i & 1:
@@ -84,7 +99,12 @@ if __name__ == '__main__':
 		else:
 			pair = xy
 	img.show()
-	'''def map_func(sp: SegNodePair):
+	'''
+		def map_array(n):
+		return slant_scale_offset_map[n]
+			mapped_array = SegNodePair.map_node6(slant_scale_offset_map, *snp_array)
+	mapped_array_ = [m for m in map(map_array, snp_array)]
+	def map_func(sp: SegNodePair):
 		return [slant_scale_offset_map[r] for r in sp.pair]
 	slanted_snp_array = [m for m in map(map_func, snp_array)]'''
 
