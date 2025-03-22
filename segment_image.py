@@ -74,7 +74,7 @@ def get_segments_image(nn: Sequence[int | FormatNum] | bytearray, image_feeder=S
 	offset = (0, 0)
 	x_offset = image_feeder.size[0]
 	for n in b_array:
-		seg7 = bin2_to_bit8(n) if bin2_input else hex_to_bit8(n)
+		seg7 = bin2_to_bit8(Bin2(n)) if bin2_input else hex_to_bit8(n)
 		digit_image = image_feeder.get(seg7.value)
 		number_image.paste(digit_image, offset)
 		offset = offset[0] + x_offset, 0

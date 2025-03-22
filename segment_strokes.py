@@ -1,8 +1,10 @@
 from typing import Callable, Sequence
 from functools import lru_cache
 from PIL import ImageDraw
-from strok7 import SpPair, SegElem, SegPath, CSegPath
-from seg_7_digits import SEG_POINT_PAIR_DIGIT_ARRAY, Bit8, expand_to_sp_pairs, hex_to_bit8, expand_to_xy_list_list, bin_to_bit8, expand_bin_to_xy_list_list, expand_bin2_to_seg_elems, bin2_to_bit8
+from strok7 import SpPair, SegElem, SegPath, CSegPath, SegNodePairElem
+from seg_7_digits import SEG_POINT_PAIR_DIGIT_ARRAY, Seg7Bit8, expand_to_sp_pairs, hex_to_bit8, expand_to_xy_list_list, bin_to_bit8, expand_bin_to_xy_list_list, expand_bin2_to_seg_elems, bin2_to_bit8
+from seg7yx import Seg7Node6
+from seg_node_pair import Seg7Node6Pair, Seg7Elem
 
 import numpy as np
 STROKE_SIZE = 18
@@ -66,7 +68,7 @@ class SegmentStrokes:
 				drw.line(l_param, width=line_width, fill=fill)
 				# drw.circle(c_param, radius=line_width, fill=fill)
 
-	def scale_offset(self, seg: Bit8, _dict: dict[Bit8, np.ndarray] = {})-> np.ndarray:
+	def scale_offset(self, seg: Seg7Bit8, _dict: dict[Seg7Bit8, np.ndarray] = {})-> np.ndarray:
 		if seg in _dict:
 			return _dict[seg]
 		array = self.expand_seg7_to_xy_array(seg)
@@ -81,7 +83,7 @@ class SegmentStrokes:
 		return np.array(expand_bin_to_xy_list_list(bn), dtype=np.int64)
 
 	@classmethod
-	def expand_seg7_to_xy_array(cls, seg7: Bit8, _dict: dict[Bit8, np.ndarray] = {})-> np.ndarray:
+	def expand_seg7_to_xy_array(cls, seg7: Seg7Bit8, _dict: dict[Seg7Bit8, np.ndarray] = {})-> np.ndarray:
 		if seg7 in _dict:
 			return _dict[seg7]
 		xy_list_list = expand_to_xy_list_list(seg7)
@@ -100,10 +102,10 @@ class SegmentStrokes:
 		return array
 
 	@classmethod
-	def expand_to_segments(cls, h: int)-> Sequence[Bit8]:
+	def expand_to_segments(cls, h: int)-> Sequence[Seg7Bit8]:
 		seg7 = hex_to_bit8(h)
 		elements = []
-		for seg in [Bit8.A, Bit8.B, Bit8.C, Bit8.D, Bit8.E, Bit8.F, Bit8.G,]:
+		for seg in [Seg7Bit8.A, Seg7Bit8.B, Seg7Bit8.C, Seg7Bit8.D, Seg7Bit8.E, Seg7Bit8.F, Seg7Bit8.G,]:
 			if seg7 & seg:
 				elements.append(seg)
 		return tuple(elements)
@@ -114,6 +116,7 @@ if __name__ == '__main__':
 	from format_num import FloatFormatNum
 	import sys
 	from seg_7_digits import str_to_seg_elems
+	from bin2 import Bin2
 	scale = 80
 	offset = (30, 40)
 	ss = SegmentStrokes(scale=scale, offset=offset)
@@ -131,7 +134,7 @@ if __name__ == '__main__':
 		# n_bb = fmtnum.conv_to_bin()
 		n2bb = fmtnum.conv_to_bin2()
 		for n_b in n2bb:
-			n_seg = bin2_to_bit8(n_b)
+			n_seg = bin2_to_bit8(Bin2(n_b))
 			n_bin = n_seg.value
 			image = Image.new('L', img_size, 0xff)
 			draw = ImageDraw.Draw(image)

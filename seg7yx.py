@@ -1,11 +1,11 @@
-from typing import Sequence
+from typing import Sequence, Iterator
 from enum import Enum
 from dataclasses import dataclass
-type _xy_ = tuple[float, float]
-type xy6 = tuple[_xy_, _xy_, _xy_, _xy_, _xy_, _xy_]
+type _f_f_ = tuple[float, float]
+type node6 = tuple[_f_f_, _f_f_, _f_f_, _f_f_, _f_f_, _f_f_]
 @dataclass
 class Node6:
-	xy6: xy6
+	xy6: node6
 class Seg7yx:
 	'''3-row 2-column float array'''
 	node_dict = {
@@ -24,13 +24,13 @@ class Seg7yx:
 		# self.node_list = [scale * Seg7yx.node_dict[x] for x in range(6)]
 		# self.scale = scale
 
-	def to_list(self)-> xy6: #list[list[float]]:
+	def to_list(self)-> node6: #list[list[float]]:
 		r = []
 		for y, xx in enumerate(self.yx):
 			r += tuple([(x, y) for x in xx])
 		return tuple(r)
 	
-	def to_node6(self)-> xy6:
+	def to_node6(self)-> node6:
 		'''dst[2] = src[3]
 		dst[3] = src[5]
 		dst[5] = src[2]'''
@@ -74,15 +74,16 @@ class Seg7Node6:
 	def __init__(self, slant=0.0): # node6: Sequence[Sequence[float]]):
 		self.node6 = Seg7yx(slant=slant).to_node6()
 	#def scale_offset(self, scale: int, offset: Sequence[int]):		return self._offset(offset, self._scale(scale, self))
+
 	@classmethod
 	def scale_offset(cls, scale: int, offset: Sequence[int], node6: 'Seg7Node6'):
-		return cls._offset(offset, cls._scale(scale, node6))
+		return tuple(cls._offset(offset, cls._scale(scale, node6)))
 	@classmethod
-	def _offset(cls, offset: Sequence[int], node6: Sequence[Sequence[float]]):
-		return [[x + offset[0], y + offset[1]] for (x, y) in node6]
+	def _offset(cls, offset: Sequence[int], nodes: Sequence[tuple[float, float]]):
+		return (tuple([x + offset[0], y + offset[1]]) for (x, y) in nodes)
 	@classmethod
-	def _scale(cls, scale: int, node6: 'Seg7Node6'):
-		return [[xx[0] * scale, xx[1] * scale] for xx in node6.node6]
+	def _scale(cls, scale: int, seg7: 'Seg7Node6'):
+		return (tuple([xx[0] * scale, xx[1] * scale]) for xx in seg7.node6)
 
 class Seg7yxSlant(Enum):
 	SLANT00 = Seg7yx().to_node6() # [[0, 0], [1, 0], [1, 1], [1, 2], [0, 2], [0, 1]]
