@@ -121,7 +121,7 @@ def c_to_seg_7(c: str, C_TO_SEG7 = {
 })-> Callable[[str], Seg7Bit8]:
 	return C_TO_SEG7[c]
 
-SEG7_ARRAY = (
+SEG7_DIGIT_ARRAY = (
 	(Seg7Bit8.A | Seg7Bit8.B | Seg7Bit8.C | Seg7Bit8.D | Seg7Bit8.E | Seg7Bit8.F),
 	(Seg7Bit8.B | Seg7Bit8.C),
 	(Seg7Bit8.A | Seg7Bit8.B | Seg7Bit8.D | Seg7Bit8.E | Seg7Bit8.G),
@@ -144,9 +144,9 @@ SEG7_ARRAY = (
 
 def hex_to_bit8(n: int)-> Seg7Bit8:
 	'''16 for hyphen/minus, 17 for comma/period'''
-	if not (0 <= n < len(SEG7_ARRAY)):
+	if not (0 <= n < len(SEG7_DIGIT_ARRAY)):
 		raise ValueError("Out of hexadecimal range!")
-	return SEG7_ARRAY[n]
+	return SEG7_DIGIT_ARRAY[n]
 
 
 def bin_to_bit8(b: int)-> Seg7Bit8:

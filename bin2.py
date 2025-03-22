@@ -17,7 +17,7 @@ class Bin2(int):
 		of_int = self.of_int
 		if not of_int:
 			return Seg7Bit8.H if self.dot else None
-		b8s = [b for b in SEG7BIT8_ARRAY if b.value & self.of_int]
+		b8s = [b for b in SEG7BIT8_ARRAY if b.value & of_int]
 		r = Seg7Bit8.NUL
 		for i in b8s:
 			r |= i

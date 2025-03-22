@@ -2,15 +2,20 @@ from enum import Enum
 from typing import Sequence, Iterator
 from types import MappingProxyType
 import numpy as np
-from seg7yx import Seg7yxSlant, Seg7Node6, node6
-from seg_7_digits import Seg7Bit8, SEG7_ARRAY
+from seg7yx import Seg7yx, Seg7yxSlant, Seg7Node6, node6
+from seg_7_digits import Seg7Bit8, SEG7_DIGIT_ARRAY
 from seg7bit8 import SEG7BIT8_ARRAY
+NODE6_ARRAY = (
+	(0, 0), (1, 0),
+	(0, 1), (1, 1),
+	(0, 2), (1, 2)
+)
 class Seg7Node6Pair:
-	def __init__(self, xyxy: Sequence[int]):
-		assert 0 <= xyxy[0] < 6
-		if len(xyxy) > 1:
-			assert 0 <= xyxy[1] < 6
-		self.pair = (xyxy[0], xyxy[1]) if len(xyxy) > 1 else (xyxy[0],)
+
+	def __init__(self, pair: tuple[int, int]|tuple[int]):
+		for x in pair:
+			assert 0 <= pair[0] < 6
+		self.pair = pair # (pair[0], pair[1]) if len(pair) > 1 else (pair[0],)
 	def node6_map(self, nodes: node6):
 		return (nodes[r] for r in self.pair)
 	@classmethod
@@ -53,13 +58,13 @@ class Seg7Node6Pair:
 
 class Seg7Elem(Enum):
 	A = Seg7Node6Pair((0, 1))
-	B = Seg7Node6Pair((1, 2))
-	C = Seg7Node6Pair((2, 3))
-	D = Seg7Node6Pair((3, 4))
-	E = Seg7Node6Pair((4, 5))
-	F = Seg7Node6Pair((5, 0))
-	G = Seg7Node6Pair((5, 2))
-	H = Seg7Node6Pair((3, )) # comma / period / dot
+	B = Seg7Node6Pair((1, 3))
+	C = Seg7Node6Pair((3, 5))
+	D = Seg7Node6Pair((5, 4))
+	E = Seg7Node6Pair((4, 2))
+	F = Seg7Node6Pair((2, 0))
+	G = Seg7Node6Pair((2, 3))
+	H = Seg7Node6Pair((5, )) # comma / period / dot
 
 SEG7BIT8_TO_SEG7ELEM = MappingProxyType({
 	Seg7Bit8.A: Seg7Elem.A,
@@ -93,14 +98,19 @@ def str_to_seg7elems_y(n_s: str)-> Iterator[Sequence[Seg7Elem]]:
 	bb = []
 	i = 0
 	while i < len(n_str) - 1:
-		b = INDEX.index(n_str[i]) << 1
+		ix = INDEX.index(n_str[i]) # << 1
+		digital_bits: Seg7Bit8 = SEG7_DIGIT_ARRAY[ix]
 		if n_str[i + 1] == '.':
+			digital_bits |= Seg7Bit8.H
+			i += 1
+
+		seg7elems = expand_seg7bit8_to_seg7elems(digital_bits)
+		yield seg7elems
+		i += 1
+'''		if n_str[i + 1] == '.':
 			b += 1
 			i += 1
-		b8 = Bin2(b).to_bit8()
-		yield expand_seg7bit8_to_seg7elems(b8)
-		i += 1
-
+		b8 = Bin2(b).to_bit8()'''
 if __name__ == '__main__':
 	import sys
 	from pprint import pp
@@ -108,41 +118,51 @@ if __name__ == '__main__':
 	import seg7yx
 	num = 3.12
 	num_str = "%.2f" % num
+
 	seg7elems = str_to_seg7elems_y(num_str)
-	scale = 30
-	offset = [10, 20]
-	seg7node6 = Seg7Node6(slant=0.2)
-	slant_scale_offset_map = Seg7Node6.scale_offset(scale=scale, offset=offset, node6=seg7node6)
+	scale = 20
+	offset = [3, 5]
+	seg7node6 = Seg7Node6(slant=0.2)#.to_list()
+	slant_scale_offset_map = Seg7Node6.scale_offset(scale=scale, offset=offset, seg7node6=seg7node6)
 	max_x = max(*[x for (x, y) in slant_scale_offset_map])
 	max_y = max(*[y for (x, y) in slant_scale_offset_map])
 	size = (round(max_x * 1.2), round(max_y * 1.2))
-	canvas = Canvas(width=200, height=200)
+	from PIL import Image, ImageDraw
+
+	for elems in seg7elems:
+		img = Image.new('L', size, 0xff)
+		drw = ImageDraw.Draw(img)
+		for n, elem in enumerate(elems):
+			seg7node6pair = elem.value
+			stroke = []
+			for i, xy in enumerate(seg7node6pair.node6_map(slant_scale_offset_map)):
+				if i & 1:
+					drw.line(stroke + [xy], fill=0, width=n + 1)
+					stroke = []					
+				else:
+					stroke = [xy] #[x for x in xy]
+			if len(stroke):
+				ofst = np.array([5, 5])
+				strk0 = np.array(stroke[0]) + ofst
+				dot_strk = np.array([0, 5])
+				strk = np.array([strk0, strk0 + dot_strk])
+				stroke_list = strk.ravel().tolist()
+				drw.line(stroke_list, fill=0, width=n + 1)					
+		img.show()
+	sys.exit(0)
+	#canvas
+'''	canvas = Canvas(width=200, height=200)
 	canvas.stroke_style = "red"
 	canvas.stroke_rect(round(offset[0] - scale * 0.2), round(offset[1]-scale * 0.2), round(scale * 1.6), round(scale * 2 * 1.4))
 	canvas.stroke_style = "blue"
 	canvas.line_width = 8
-	for elems in seg7elems:
-		for elem in elems:
-			seg7node6pair = elem.value
-			stroke = []
-			for xy in seg7node6pair.node6_map(slant_scale_offset_map):
-				stroke += [x for x in xy]
-			pp(stroke)
-			canvas.stroke_line(*stroke)
-			break
-	canvas
-	sys.exit(0)
-	from PIL import Image, ImageDraw
-	img = Image.new('L', size, 0xff)
-	drw = ImageDraw.Draw(img)
+			#canvas.stroke_line(*stroke)
 	pair = []
 	for i, xy in enumerate(mapped_array):
 		if i & 1:
 			drw.line(pair + xy, 0)
 		else:
 			pair = xy
-	img.show()
-	'''
 		def map_array(n):
 		return slant_scale_offset_map[n]
 			mapped_array = SegNodePair.map_node6(slant_scale_offset_map, *snp_array)
