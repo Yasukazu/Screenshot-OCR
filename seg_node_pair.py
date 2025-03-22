@@ -12,7 +12,7 @@ class Seg7Node6Pair:
 			assert 0 <= xyxy[1] < 6
 		self.pair = (xyxy[0], xyxy[1]) if len(xyxy) > 1 else (xyxy[0],)
 	def node6_map(self, nodes: node6):
-		return [nodes[r] for r in self.pair]
+		return (nodes[r] for r in self.pair)
 	@classmethod
 	def map_nodes(cls, nodes: node6, *spsp: 'Seg7Node6Pair')-> list[list[float]]:
 		# assert len(node6) == 6
@@ -86,7 +86,7 @@ SEG7BIT8_TO_SEG7NODE6PAIR = MappingProxyType({
 def expand_seg7bit8_to_seg7elems(s7: Seg7Bit8)-> Sequence[Seg7Elem]:
 	return tuple(SEG7BIT8_TO_SEG7ELEM[b8] for b8 in SEG7BIT8_ARRAY if s7 & b8)
 
-def str_to_seg7elems(n_s: str)-> list[Sequence[Seg7Elem]]:
+def str_to_seg7elems_y(n_s: str)-> Iterator[Sequence[Seg7Elem]]:
 	from bin2 import Bin2
 	INDEX = '0123456789abcdef-'
 	n_str = n_s + '\0'
@@ -98,41 +98,38 @@ def str_to_seg7elems(n_s: str)-> list[Sequence[Seg7Elem]]:
 			b += 1
 			i += 1
 		b8 = Bin2(b).to_bit8()
-		bb += [expand_seg7bit8_to_seg7elems(b8)]
+		yield expand_seg7bit8_to_seg7elems(b8)
 		i += 1
-	return bb
+
 if __name__ == '__main__':
 	import sys
 	from pprint import pp
+	from ipycanvas import Canvas
 	import seg7yx
-	num = 3.12 # int(sys.argv[1])
+	num = 3.12
 	num_str = "%.2f" % num
-	seg7elems = str_to_seg7elems(num_str)
-	b8s = SEG7_ARRAY[num]
-	smsm = []
-	for b8 in SEG7BIT8_ARRAY:
-		if b8 & b8s:
-			smsm.append(SEG7BIT8_TO_SEG7ELEM[b8].value)
-	snp_array_list = [[s.value for s in sm] for sm in seg7elems] # [SegNodePairElem.B.value, SegNodePairElem.C.value]
+	seg7elems = str_to_seg7elems_y(num_str)
 	scale = 30
 	offset = [10, 20]
-	#slant02 = Seg7yxSlant.SLANT02.value #seg7yx.Seg7yx(seg7yx.).to_seg7()
-	# slant02_array = np.array(slant02)
 	seg7node6 = Seg7Node6(slant=0.2)
-	slant_scale_offset_map = Seg7Node6.scale_offset(scale=scale, offset=offset, node6=seg7node6) #(slant02_array * scale + offset).tolist()
+	slant_scale_offset_map = Seg7Node6.scale_offset(scale=scale, offset=offset, node6=seg7node6)
 	max_x = max(*[x for (x, y) in slant_scale_offset_map])
 	max_y = max(*[y for (x, y) in slant_scale_offset_map])
 	size = (round(max_x * 1.2), round(max_y * 1.2))
-	from ipycanvas import Canvas
 	canvas = Canvas(width=200, height=200)
-	canvas.stroke_style = "blue"
+	canvas.stroke_style = "red"
 	canvas.stroke_rect(round(offset[0] - scale * 0.2), round(offset[1]-scale * 0.2), round(scale * 1.6), round(scale * 2 * 1.4))
 	canvas.stroke_style = "blue"
 	canvas.line_width = 8
-	canvas.line_join = 'bevel'
-	for xy_list in Seg7Node6Pair.map_node6_each(slant_scale_offset_map, *snp_array):
-		pp(xy_list)
-		canvas.stroke_line(*xy_list)
+	for elems in seg7elems:
+		for elem in elems:
+			seg7node6pair = elem.value
+			stroke = []
+			for xy in seg7node6pair.node6_map(slant_scale_offset_map):
+				stroke += [x for x in xy]
+			pp(stroke)
+			canvas.stroke_line(*stroke)
+			break
 	canvas
 	sys.exit(0)
 	from PIL import Image, ImageDraw
