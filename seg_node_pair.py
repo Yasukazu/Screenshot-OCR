@@ -83,13 +83,18 @@ if __name__ == '__main__':
 	offset = [10, 20]
 	#slant02 = Seg7yxSlant.SLANT02.value #seg7yx.Seg7yx(seg7yx.).to_seg7()
 	# slant02_array = np.array(slant02)
-	slant_scale_offset_map = Seg7Node6(slant=0.2).scale_offset(scale=scale, offset=offset) #(slant02_array * scale + offset).tolist()
+	seg7node6 = Seg7Node6(slant=0.2)
+	slant_scale_offset_map = Seg7Node6.scale_offset(scale=scale, offset=offset, node6=seg7node6) #(slant02_array * scale + offset).tolist()
 	max_x = max(*[x for (x, y) in slant_scale_offset_map])
 	max_y = max(*[y for (x, y) in slant_scale_offset_map])
 	size = (round(max_x * 1.2), round(max_y * 1.2))
 	from ipycanvas import Canvas
 	canvas = Canvas(width=200, height=200)
 	canvas.stroke_style = "blue"
+	canvas.stroke_rect(round(offset[0] - scale * 0.2), round(offset[1]-scale * 0.2), round(scale * 1.6), round(scale * 2 * 1.4))
+	canvas.stroke_style = "blue"
+	canvas.line_width = 8
+	canvas.line_join = 'bevel'
 	for xy_list in SegNodePair.map_node6_each(slant_scale_offset_map, *snp_array):
 		pp(xy_list)
 		canvas.stroke_line(*xy_list)
