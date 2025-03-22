@@ -88,10 +88,23 @@ SEG7BIT8_TO_SEG7NODE6PAIR = MappingProxyType({
 	Seg7Bit8.H: Seg7Elem.H.value,
 })
 
-def expand_seg7bit8_to_seg7elems(s7: Seg7Bit8)-> Sequence[Seg7Elem]:
-	return tuple(SEG7BIT8_TO_SEG7ELEM[b8] for b8 in SEG7BIT8_ARRAY if s7 & b8)
+def expand_seg7bit8_to_seg7elems(s7: Seg7Bit8)-> list[Seg7Elem]:
+	return [SEG7BIT8_TO_SEG7ELEM[b8] for b8 in SEG7BIT8_ARRAY if s7 & b8]
 
-def str_to_seg7elems_y(n_s: str)-> Iterator[Sequence[Seg7Elem]]:
+def encode_str_to_seg7bit8(n_s: str)-> Iterator[Seg7Bit8]:
+	INDEX = '0123456789abcdef-'
+	n_str = n_s + '\0'
+	i = 0
+	while i < len(n_str) - 1:
+		ix = INDEX.index(n_str[i]) # << 1
+		digital_bits: Seg7Bit8 = SEG7_DIGIT_ARRAY[ix]
+		if n_str[i + 1] == '.':
+			digital_bits |= Seg7Bit8.H
+			i += 1
+		yield digital_bits
+		i += 1
+
+def convert_str_to_seg7elems(n_s: str)-> Iterator[Sequence[Seg7Elem]]:
 	from bin2 import Bin2
 	INDEX = '0123456789abcdef-'
 	n_str = n_s + '\0'
@@ -103,14 +116,37 @@ def str_to_seg7elems_y(n_s: str)-> Iterator[Sequence[Seg7Elem]]:
 		if n_str[i + 1] == '.':
 			digital_bits |= Seg7Bit8.H
 			i += 1
-
 		seg7elems = expand_seg7bit8_to_seg7elems(digital_bits)
 		yield seg7elems
 		i += 1
-'''		if n_str[i + 1] == '.':
-			b += 1
-			i += 1
-		b8 = Bin2(b).to_bit8()'''
+
+class SegmentStrokeFeeder:
+	'''Feeds strokes from Seg7Bit8'''
+	def __init__(self, scale: int=1, offset: tuple[int, int]=(0, 0), slant=0.2):
+		self.scale = scale
+		self.offset = offset
+		seg7node6 = Seg7Node6(slant=slant)
+		self.slant_scale_offset_map = Seg7Node6.scale_offset(scale=scale, offset=offset, seg7node6=seg7node6)
+		max_x = max(*[x for (x, y) in slant_scale_offset_map])
+		max_y = max(*[y for (x, y) in slant_scale_offset_map])
+		self.size = (round(max_x * 1.2), round(max_y * 1.2))
+	def convert_seg7bit8_to_strokes_each(self, seg7bit8: Seg7Bit8):
+		for n, elem in enumerate(expand_seg7bit8_to_seg7elems(seg7bit8)):
+			seg7node6pair = elem.value
+			stroke = []
+			for i, xy in enumerate(seg7node6pair.node6_map(self.slant_scale_offset_map)):
+				if i & 1:
+					yield stroke + [xy]
+					stroke = []
+				else:
+					stroke = [xy]
+			if len(stroke) > 0:
+				ofst = np.array(self.size) * 0.1
+				strk0 = np.array(stroke[0]) + ofst
+				dot_strk = np.array([0, ofst[0]]) / 2
+				strk = np.array([strk0, strk0 + dot_strk])
+				yield strk.ravel().tolist()
+
 if __name__ == '__main__':
 	import sys
 	from pprint import pp
@@ -119,7 +155,7 @@ if __name__ == '__main__':
 	num = 3.12
 	num_str = "%.2f" % num
 
-	seg7elems = str_to_seg7elems_y(num_str)
+	seg7elems = convert_str_to_seg7elems(num_str)
 	scale = 20
 	offset = [3, 5]
 	seg7node6 = Seg7Node6(slant=0.2)#.to_list()
