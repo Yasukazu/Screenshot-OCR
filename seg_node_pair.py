@@ -136,17 +136,19 @@ class SegmentStrokeFeeder:
 			seg7node6pair = elem.value
 			stroke: list[int] = []
 			for i, xy in enumerate(seg7node6pair.node6_map(self.slant_scale_offset_map)):
+				stroke.append([round(r) for r in xy])
 				if i & 1:
-					stroke.append(xy)
-					yield np.array(stroke) # + tuple(xy)
+					# stroke.append(xy)
+					yield stroke # + tuple(xy)
 					stroke = []
-				else:
-					stroke.append(xy) # = [round(x), round(y) for (x, y) in xy]
+				'''else:
+					stroke.append([round(x), round(y) for (x, y) in xy])'''
 			if len(stroke) > 0:
 				ofst = np.array(self.size) * 0.1
 				strk0 = np.array(stroke[0]) + ofst
 				dot_strk = np.array([0, ofst[0]]) / 2
-				yield np.array([strk0, strk0 + dot_strk])
+				dot_line_strk = np.array([strk0, strk0 + dot_strk])
+				yield dot_line_strk.tolist()
 				#yield [round(r) for r in strk.ravel().tolist()]
 
 if __name__ == '__main__':
@@ -169,7 +171,7 @@ if __name__ == '__main__':
 	for n, digit in enumerate(digits):
 		for i, strokes in enumerate(stroke_feeder.feeding(digit)):
 			pp(strokes)
-			shifted_strokes = strokes + n * x_shift
+			shifted_strokes = np.array(strokes) + n * x_shift
 			_strokes = [round(s) for s in shifted_strokes.ravel().tolist()]
 			drw.line(_strokes, width=i + 1)
 	img.show()
