@@ -49,27 +49,6 @@ SEG7BIT8_VALUE_TO_SP_PAIR = {
 	Seg7Bit8.H.value: SpPair.H,
 }
 
-SEG7BIT8_VALUE_TO_SEG_ELEM = {
-	Seg7Bit8.A.value: SegElem.A,
-	Seg7Bit8.B.value: SegElem.B,
-	Seg7Bit8.C.value: SegElem.C,
-	Seg7Bit8.D.value: SegElem.D,
-	Seg7Bit8.E.value: SegElem.E,
-	Seg7Bit8.F.value: SegElem.F,
-	Seg7Bit8.G.value: SegElem.G,
-	Seg7Bit8.H.value: SegElem.H,
-}
-
-SEG7BIT8_TO_SEG_ELEM = {
-	Seg7Bit8.A: SegElem.A,
-	Seg7Bit8.B: SegElem.B,
-	Seg7Bit8.C: SegElem.C,
-	Seg7Bit8.D: SegElem.D,
-	Seg7Bit8.E: SegElem.E,
-	Seg7Bit8.F: SegElem.F,
-	Seg7Bit8.G: SegElem.G,
-	Seg7Bit8.H: SegElem.H,
-}
 
 def str_to_seg_elems(n_s: str)-> list[Sequence[SegElem]]:
 	from bin2 import Bin2

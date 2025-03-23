@@ -1,8 +1,8 @@
 from typing import Callable, Sequence
 from functools import lru_cache
 from PIL import ImageDraw
-from strok7 import SpPair, SegElem, SegPath, CSegPath, SegNodePairElem
-from seg_7_digits import SEG_POINT_PAIR_DIGIT_ARRAY, Seg7Bit8, expand_to_sp_pairs, hex_to_bit8, expand_to_xy_list_list, bin_to_bit8, expand_bin_to_xy_list_list, expand_bin2_to_seg_elems, bin2_to_bit8
+from strok7 import SpPair, SegElem, SegPath, CSegPath #, SegNodePairElem
+from seg_7_digits import SEG_POINT_PAIR_DIGIT_ARRAY, Seg7Bit8, expand_to_sp_pairs, hex_to_bit8, expand_to_xy_list_list,  expand_bin_to_xy_list_list, expand_bin2_to_seg_elems #, bin2_to_bit8 # bin_to_bit8,
 from seg7yx import Seg7Node6
 from seg_node_pair import Seg7Node6Pair, Seg7Elem
 

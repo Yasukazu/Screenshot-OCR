@@ -89,6 +89,7 @@ SEG7BIT8_TO_SEG7NODE6PAIR = MappingProxyType({
 	Seg7Bit8.H: Seg7Elem.H.value,
 })
 
+
 def expand_seg7bit8_to_seg7elems(s7: Seg7Bit8)-> list[Seg7Elem]:
 	return [SEG7BIT8_TO_SEG7ELEM[b8] for b8 in SEG7BIT8_ARRAY if s7 & b8]
 
@@ -123,7 +124,7 @@ def convert_str_to_seg7elems(n_s: str)-> Iterator[Sequence[Seg7Elem]]:
 
 class DigitStrokeFeeder:
 	'''Feeds strokes from Seg7Bit8'''
-
+	max_size = 20
 	def __init__(self, scale: int=1, offset: Sequence[int]=(0, 0), slant=0.2, padding=(0.2, 0.2)):
 		self.scale = scale
 		self.offset = offset
@@ -132,15 +133,16 @@ class DigitStrokeFeeder:
 		max_x = max(*[x for (x, y) in self.slant_scale_offset_map])
 		max_y = max(*[y for (x, y) in self.slant_scale_offset_map])
 		self.size = (round(max_x * (1 + padding[0])), round(max_y * (1 + padding[1])))
-		self.feed: Callable[[Seg7Elem], list[list[int]]]= lru_cache(maxsize=20)(self._feed)
+		self.feed_elem: Callable[[Seg7Elem], list[list[int]]]= lru_cache(maxsize=20)(self._feed_elem)
+		self.feed_digit: Callable[[Seg7Bit8], list[list[list[int]]]]= lru_cache(maxsize=20)(self._feed_digit)
 	
-	def _feed(self, elem: Seg7Elem):
+	def _feed_elem(self, elem: Seg7Elem):
 		'''convert_seg7bit8_to_strokes'''
 		seg7node6pair = elem.value
 		strokes = []
 		stroke: list[int] = []
 		for i, xy in enumerate(seg7node6pair.node6_map(self.slant_scale_offset_map)):
-			stroke.append([round(r) for r in xy])
+			stroke += [round(r) for r in xy]
 			if i & 1:
 				strokes.append(stroke)
 				stroke = []
@@ -148,13 +150,13 @@ class DigitStrokeFeeder:
 			ofst = np.array(self.size) * 0.1
 			strk0 = np.array(stroke[0]) + ofst
 			dot_strk = np.array([ofst[0], 0]) / 2
-			dot_line_strk = np.array([strk0, strk0 + dot_strk])
-			strokes += [dot_line_strk.tolist()]
+			dot_line_strk = np.array([strk0, strk0 + dot_strk]).round().astype(int)
+			strokes.append(dot_line_strk.tolist())
 		return strokes
 
-	def feed_digit(self, seg7bit8: Seg7Bit8):
+	def _feed_digit(self, seg7bit8: Seg7Bit8):
 		'''convert_seg7bit8_to_strokes_each'''
-		return [self.feed(elem) for elem in expand_seg7bit8_to_seg7elems(seg7bit8)]
+		return [self.feed_elem(elem) for elem in expand_seg7bit8_to_seg7elems(seg7bit8)]
 
 if __name__ == '__main__':
 	import sys

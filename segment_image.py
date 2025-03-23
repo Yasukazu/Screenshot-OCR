@@ -7,7 +7,7 @@ import numpy as np
 from format_num import FormatNum, conv_num_to_bin, formatnums_to_bytearray
 from num_strokes import SEGPOINTS_MAX, BasicDigitStrokes
 from strok7 import SegElem
-from seg_7_digits import hex_to_bit8, bin2_to_bit8, str_to_seg_elems
+from seg_7_digits import hex_to_bit8, str_to_seg_elems # bin2_to_bit8, 
 from segment_strokes import SegmentStrokes
 from image_fill import ImageFill
 from digit_image import BasicDigitImageParam

@@ -9,6 +9,9 @@ from strok7 import STRK_DICT_STEM, StrokeSlant, i_i_tpl
 from format_num import FormatNum, HexFormatNum, conv_num_to_bin, formatnums_to_bytearray
 from num_strokes import SEGPOINTS_MAX, DigitStrokes, BasicDigitStrokes
 from segment_strokes import hex_to_bit8, SegmentStrokes
+from seg_node_pair import DigitStrokeFeeder, encode_str_to_seg7bit8
+from seg7bit8 import Seg7Bit8
+
 class ImageFill(Enum): # single element tuple for ImageDraw color
 	BLACK = (0,)
 	WHITE = (0xff,)
@@ -28,7 +31,7 @@ class DigitImage:
 	STANDARD_LINE_WIDTH = 2
 	STANDARD_LINE_WIDTH_RATIO = 0.2
 
-	def __init__(self, stroke_feeder=BasicDigitStrokes(), bgcolor=ImageFill.WHITE, line_width=STANDARD_LINE_WIDTH): # slant: StrokeSlant=StrokeSlant.SLANT00, scale: int=MIN_SCALE,  offset=(STANDARD_PADDING, STANDARD_PADDING)#
+	def __init__(self, stroke_feeder: DigitStrokeFeeder, bgcolor=ImageFill.WHITE, line_width=STANDARD_LINE_WIDTH): # slant: StrokeSlant=StrokeSlant.SLANT00, scale: int=MIN_SCALE,  offset=(STANDARD_PADDING, STANDARD_PADDING)#=BasicDigitStrokes()
 		self.stroke_feeder = stroke_feeder
 		self.slant = stroke_feeder.slant
 		self.scale = stroke_feeder.scale
@@ -118,35 +121,47 @@ class BasicDigitImage:
 		size = scale, scale * 2
 		return [sz + 2 * stroke_offset[i] for i, sz in enumerate(size)]
 
-	def __init__(self, param: BasicDigitImageParam,
-			slant: StrokeSlant=StrokeSlant.SLANT00, 
-			bgcolor=ImageFill.WHITE): # width: int, scale: int, padding: Sequence[int], line_width: int
-		stroke_scale = param.scale # - padding[0] * 2 - line_width
-		stroke_offset = [pad + param.line_width // 2 or 1 for pad in param.padding]
-		self.stroke_feeder = digit_strokes.DigitStrokes(slant=slant, scale=stroke_scale, offset=(stroke_offset[0], stroke_offset[1]))
-		self.line_width = param.line_width
+	def __init__(self, stroke_feeder: DigitStrokeFeeder, param: BasicDigitImageParam,
+			bgcolor=ImageFill.WHITE): # width: int, scale: int, padding: Sequence[int], line_width: int slant: StrokeSlant=StrokeSlant.SLANT00, 
+		#if (not stroke_feeder) and (not param):raise ValueError("Needs stroke_feeder or param!")
+		# stroke_scale = param.scale # - padding[0] * 2 - line_width
+		# stroke_offset = [pad + param.line_width // 2 or 1 for pad in param.padding]
+		self.stroke_feeder = stroke_feeder # digit_strokes.DigitStrokes(slant=slant, scale=stroke_scale, offset=(stroke_offset[0], stroke_offset[1]))
+		self.param = param
+		# self.line_width = param.line_width
 		self.bgcolor = bgcolor
-		self.size = param.width, param.height
-		self.get: Callable[[int], Image.Image] = lru_cache(maxsize=self.stroke_feeder.get_max())(self._get)
-
-	def _get(self, n: int)-> Image.Image:
-		# img_w = self.scale # stroke_feeder.scale + 2 * self.stroke_feeder.offset[0] + self.line_width
-		# img_h = 2 * self.scale # stroke_feeder.scale + 2 * self.stroke_feeder.offset[1] + self.line_width
+		# self.size = param.width, param.height
+		self.get: Callable[[Seg7Bit8], Image.Image] = lru_cache(maxsize=self.stroke_feeder.max_size)(self._get)
+	
+	@property
+	def line_width(self):
+		return self.param.line_width
+	
+	@property
+	def size(self):
+		return self.param.width, self.param.height
+	
+	def _get(self, s: Seg7Bit8)-> Image.Image:
 		img = Image.new('L', self.size, color=self.bgcolor.value)
 		drw = ImageDraw.Draw(img)
-		strokes = self.stroke_feeder.get(n)
-		for stroke in strokes:
-			drw.line(stroke, width=self.line_width, fill=ImageFill.invert(self.bgcolor).value, joint='curve')
+		digit_strokes = self.stroke_feeder.feed_digit(s)
+		for strokes in digit_strokes:
+			for stroke in strokes:
+				drw.line(stroke, width=self.line_width, fill=ImageFill.invert(self.bgcolor).value, joint='curve')
 		return img
 
-def get_basic_number_image(nn: Sequence[int | FormatNum] | bytearray, digit_image_feeder=BasicDigitImage(param=BasicDigitImage.calc_scale_from_height(BasicDigitImage.HEIGHT)))-> Image.Image: #BasicDigitImage.WIDTH, 
+def get_basic_number_image(nn: Sequence[int | FormatNum] | bytearray, digit_image_feeder: BasicDigitImage)-> Image.Image: #BasicDigitImage.WIDTH, (param=BasicDigitImage.calc_scale_from_height(BasicDigitImage.HEIGHT))
+	from seg7bit8 import BIN1_TO_SEG7BIT8, bin2_to_seg7bit8
+	from bin2 import Bin2
 	b_array = nn if isinstance(nn, bytearray) else formatnums_to_bytearray(nn)
 	number_image_size = len(b_array) * digit_image_feeder.size[0], digit_image_feeder.size[1]
 	number_image = Image.new('L', number_image_size, (0,))
 	offset = (0, 0)
 	x_offset = digit_image_feeder.size[0]
-	for n in b_array:
-		digit_image = digit_image_feeder.get(n)
+	for b in b_array:
+		b2 = Bin2(b)
+		s7b8 = bin2_to_seg7bit8(b2)
+		digit_image = digit_image_feeder.get(s7b8)
 		number_image.paste(digit_image, offset)
 		offset = offset[0] + x_offset, 0
 	return number_image
@@ -156,7 +171,19 @@ if __name__ == '__main__':
 	from pprint import pp
 	height = 40
 	bdiprm = BasicDigitImage.calc_scale_from_height(height)
-	bdi = BasicDigitImage(bdiprm)
+	width=bdiprm.width
+	scale=bdiprm.scale
+	padding=bdiprm.padding
+	line_width=bdiprm.line_width
+	stroke_feeder = DigitStrokeFeeder(scale=scale, offset=padding)
+	num = 3.12
+	num_str = "%.2f" % num
+	digits = list(encode_str_to_seg7bit8(num_str))
+	for digit in digits:
+		bdi = BasicDigitImage(stroke_feeder=stroke_feeder, param=bdiprm)
+		digit_image = bdi.get(digit)
+		digit_image.show()
+	'''bdi = BasicDigitImage(param=bdiprm)
 	di0 = bdi.get(0)
 	di0.show()
 	s_height = 30
@@ -196,4 +223,4 @@ if __name__ == '__main__':
 	print('1:')
 	cProfile.run(get_0_str % 1)
 	print('2nd.0:')
-	cProfile.run(get_0_str % 1)
+	cProfile.run(get_0_str % 1)'''
