@@ -122,30 +122,32 @@ def convert_str_to_seg7elems(n_s: str)-> Iterator[Sequence[Seg7Elem]]:
 
 class SegmentStrokeFeeder:
 	'''Feeds strokes from Seg7Bit8'''
-	def __init__(self, scale: int=1, offset: tuple[int, int]=(0, 0), slant=0.2):
+	def __init__(self, scale: int=1, offset: Sequence[int]=(0, 0), slant=0.2, padding=(0.2, 0.2)):
 		self.scale = scale
 		self.offset = offset
 		seg7node6 = Seg7Node6(slant=slant)
 		self.slant_scale_offset_map = Seg7Node6.scale_offset(scale=scale, offset=offset, seg7node6=seg7node6)
-		max_x = max(*[x for (x, y) in slant_scale_offset_map])
-		max_y = max(*[y for (x, y) in slant_scale_offset_map])
-		self.size = (round(max_x * 1.2), round(max_y * 1.2))
-	def convert_seg7bit8_to_strokes_each(self, seg7bit8: Seg7Bit8):
+		max_x = max(*[x for (x, y) in self.slant_scale_offset_map])
+		max_y = max(*[y for (x, y) in self.slant_scale_offset_map])
+		self.size = (round(max_x * (1 + padding[0])), round(max_y * (1 + padding[1])))
+	def feeding(self, seg7bit8: Seg7Bit8):
+		'''convert_seg7bit8_to_strokes_each'''
 		for n, elem in enumerate(expand_seg7bit8_to_seg7elems(seg7bit8)):
 			seg7node6pair = elem.value
-			stroke = []
+			stroke: list[int] = []
 			for i, xy in enumerate(seg7node6pair.node6_map(self.slant_scale_offset_map)):
 				if i & 1:
-					yield stroke + [xy]
+					stroke.append(xy)
+					yield np.array(stroke) # + tuple(xy)
 					stroke = []
 				else:
-					stroke = [xy]
+					stroke.append(xy) # = [round(x), round(y) for (x, y) in xy]
 			if len(stroke) > 0:
 				ofst = np.array(self.size) * 0.1
 				strk0 = np.array(stroke[0]) + ofst
 				dot_strk = np.array([0, ofst[0]]) / 2
-				strk = np.array([strk0, strk0 + dot_strk])
-				yield strk.ravel().tolist()
+				yield np.array([strk0, strk0 + dot_strk])
+				#yield [round(r) for r in strk.ravel().tolist()]
 
 if __name__ == '__main__':
 	import sys
@@ -154,16 +156,31 @@ if __name__ == '__main__':
 	import seg7yx
 	num = 3.12
 	num_str = "%.2f" % num
-
-	seg7elems = convert_str_to_seg7elems(num_str)
+	digits = list(encode_str_to_seg7bit8(num_str))
 	scale = 20
 	offset = [3, 5]
+	stroke_feeder = SegmentStrokeFeeder(scale=scale, offset=offset, slant=0.2)
+	from PIL import Image, ImageDraw
+	img_box_size = [stroke_feeder.size[0] * len(digits), stroke_feeder.size[1]]
+	img = Image.new('L', img_box_size, 0xff)
+	drw = ImageDraw.Draw(img)
+	drw.rectangle([0, 0, img_box_size[0] - 1, img_box_size[1] - 1],outline=0x55)
+	x_shift = np.array([stroke_feeder.size[0],0])
+	for n, digit in enumerate(digits):
+		for i, strokes in enumerate(stroke_feeder.feeding(digit)):
+			pp(strokes)
+			shifted_strokes = strokes + n * x_shift
+			_strokes = [round(s) for s in shifted_strokes.ravel().tolist()]
+			drw.line(_strokes, width=i + 1)
+	img.show()
+	sys.exit(0)
 	seg7node6 = Seg7Node6(slant=0.2)#.to_list()
 	slant_scale_offset_map = Seg7Node6.scale_offset(scale=scale, offset=offset, seg7node6=seg7node6)
 	max_x = max(*[x for (x, y) in slant_scale_offset_map])
 	max_y = max(*[y for (x, y) in slant_scale_offset_map])
 	size = (round(max_x * 1.2), round(max_y * 1.2))
-	from PIL import Image, ImageDraw
+
+	seg7elems = convert_str_to_seg7elems(num_str)
 
 	for elems in seg7elems:
 		img = Image.new('L', size, 0xff)
