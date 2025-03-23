@@ -1,5 +1,6 @@
+from functools import lru_cache
 from enum import Enum
-from typing import Sequence, Iterator
+from typing import Sequence, Iterator, Callable
 from types import MappingProxyType
 import numpy as np
 from seg7yx import Seg7yx, Seg7yxSlant, Seg7Node6, node6
@@ -120,8 +121,9 @@ def convert_str_to_seg7elems(n_s: str)-> Iterator[Sequence[Seg7Elem]]:
 		yield seg7elems
 		i += 1
 
-class SegmentStrokeFeeder:
+class DigitStrokeFeeder:
 	'''Feeds strokes from Seg7Bit8'''
+
 	def __init__(self, scale: int=1, offset: Sequence[int]=(0, 0), slant=0.2, padding=(0.2, 0.2)):
 		self.scale = scale
 		self.offset = offset
@@ -130,26 +132,29 @@ class SegmentStrokeFeeder:
 		max_x = max(*[x for (x, y) in self.slant_scale_offset_map])
 		max_y = max(*[y for (x, y) in self.slant_scale_offset_map])
 		self.size = (round(max_x * (1 + padding[0])), round(max_y * (1 + padding[1])))
-	def feeding(self, seg7bit8: Seg7Bit8):
+		self.feed: Callable[[Seg7Elem], list[list[int]]]= lru_cache(maxsize=20)(self._feed)
+	
+	def _feed(self, elem: Seg7Elem):
+		'''convert_seg7bit8_to_strokes'''
+		seg7node6pair = elem.value
+		strokes = []
+		stroke: list[int] = []
+		for i, xy in enumerate(seg7node6pair.node6_map(self.slant_scale_offset_map)):
+			stroke.append([round(r) for r in xy])
+			if i & 1:
+				strokes.append(stroke)
+				stroke = []
+		if len(stroke) == 1: # dot
+			ofst = np.array(self.size) * 0.1
+			strk0 = np.array(stroke[0]) + ofst
+			dot_strk = np.array([ofst[0], 0]) / 2
+			dot_line_strk = np.array([strk0, strk0 + dot_strk])
+			strokes += [dot_line_strk.tolist()]
+		return strokes
+
+	def feed_digit(self, seg7bit8: Seg7Bit8):
 		'''convert_seg7bit8_to_strokes_each'''
-		for n, elem in enumerate(expand_seg7bit8_to_seg7elems(seg7bit8)):
-			seg7node6pair = elem.value
-			stroke: list[int] = []
-			for i, xy in enumerate(seg7node6pair.node6_map(self.slant_scale_offset_map)):
-				stroke.append([round(r) for r in xy])
-				if i & 1:
-					# stroke.append(xy)
-					yield stroke # + tuple(xy)
-					stroke = []
-				'''else:
-					stroke.append([round(x), round(y) for (x, y) in xy])'''
-			if len(stroke) > 0:
-				ofst = np.array(self.size) * 0.1
-				strk0 = np.array(stroke[0]) + ofst
-				dot_strk = np.array([0, ofst[0]]) / 2
-				dot_line_strk = np.array([strk0, strk0 + dot_strk])
-				yield dot_line_strk.tolist()
-				#yield [round(r) for r in strk.ravel().tolist()]
+		return [self.feed(elem) for elem in expand_seg7bit8_to_seg7elems(seg7bit8)]
 
 if __name__ == '__main__':
 	import sys
@@ -161,7 +166,7 @@ if __name__ == '__main__':
 	digits = list(encode_str_to_seg7bit8(num_str))
 	scale = 20
 	offset = [3, 5]
-	stroke_feeder = SegmentStrokeFeeder(scale=scale, offset=offset, slant=0.2)
+	stroke_feeder = DigitStrokeFeeder(scale=scale, offset=offset, slant=0.2)
 	from PIL import Image, ImageDraw
 	img_box_size = [stroke_feeder.size[0] * len(digits), stroke_feeder.size[1]]
 	img = Image.new('L', img_box_size, 0xff)
@@ -169,11 +174,14 @@ if __name__ == '__main__':
 	drw.rectangle([0, 0, img_box_size[0] - 1, img_box_size[1] - 1],outline=0x55)
 	x_shift = np.array([stroke_feeder.size[0],0])
 	for n, digit in enumerate(digits):
-		for i, strokes in enumerate(stroke_feeder.feeding(digit)):
-			pp(strokes)
-			shifted_strokes = np.array(strokes) + n * x_shift
-			_strokes = [round(s) for s in shifted_strokes.ravel().tolist()]
-			drw.line(_strokes, width=i + 1)
+		#for m, elem in enumerate(expand_seg7bit8_to_seg7elems(digit)):
+		digit_strokes = stroke_feeder.feed_digit(digit)
+		for e, element_strokes in enumerate(digit_strokes):
+			pp(element_strokes)
+			shifted_element_strokes = np.array(element_strokes) + n * x_shift
+			for strokes in shifted_element_strokes:
+				_strokes = [round(s) for s in strokes.ravel().tolist()]
+				drw.line(_strokes, width=e + 1)
 	img.show()
 	sys.exit(0)
 	seg7node6 = Seg7Node6(slant=0.2)#.to_list()
