@@ -25,6 +25,17 @@ SEG7BIT8_ARRAY = (
 	Seg7Bit8.H
 )
 
+SEG7BIT8_VALUE_ARRAY = (
+	Seg7Bit8.A.value,
+	Seg7Bit8.B.value,
+	Seg7Bit8.C.value,
+	Seg7Bit8.D.value,
+	Seg7Bit8.E.value,
+	Seg7Bit8.F.value,
+	Seg7Bit8.G.value,
+	Seg7Bit8.H.value,
+)
+
 from bin2 import Bin2
 def bin2_to_seg7bit8(b2: Bin2)-> Seg7Bit8:
 	of_int = b2.of_int

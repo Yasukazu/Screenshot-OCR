@@ -57,6 +57,9 @@ class Seg7Node6Pair:
 			rr += [xy6[r] for r in sp.pair]
 		return rr
 
+class Seg7Node6Single(Seg7Node6Pair):
+	pass
+
 class Seg7Elem(Enum):
 	A = Seg7Node6Pair((0, 1))
 	B = Seg7Node6Pair((1, 3))
@@ -65,7 +68,18 @@ class Seg7Elem(Enum):
 	E = Seg7Node6Pair((4, 2))
 	F = Seg7Node6Pair((2, 0))
 	G = Seg7Node6Pair((2, 3))
-	H = Seg7Node6Pair((5, )) # comma / period / dot
+	H = Seg7Node6Single((5, )) # comma / period / dot
+
+NAME_TO_SEG7ELEM = MappingProxyType({
+	'A': Seg7Elem.A,
+	'B': Seg7Elem.B,
+	'C': Seg7Elem.C,
+	'D': Seg7Elem.D,
+	'E': Seg7Elem.E,
+	'F': Seg7Elem.F,
+	'G': Seg7Elem.G,
+	'H': Seg7Elem.H,
+})
 
 SEG7BIT8_TO_SEG7ELEM = MappingProxyType({
 	Seg7Bit8.A: Seg7Elem.A,
@@ -91,7 +105,11 @@ SEG7BIT8_TO_SEG7NODE6PAIR = MappingProxyType({
 
 
 def expand_seg7bit8_to_seg7elems(s7: Seg7Bit8)-> list[Seg7Elem]:
-	return [SEG7BIT8_TO_SEG7ELEM[b8] for b8 in SEG7BIT8_ARRAY if s7 & b8]
+	smsm = []
+	for b8 in SEG7BIT8_ARRAY:
+		if s7 & b8:
+			smsm.append(SEG7BIT8_TO_SEG7ELEM[b8])
+	return smsm
 
 def encode_str_to_seg7bit8(n_s: str)-> Iterator[Seg7Bit8]:
 	INDEX = '0123456789abcdef-'
@@ -146,17 +164,19 @@ class DigitStrokeFeeder:
 			if i & 1:
 				strokes.append(stroke)
 				stroke = []
-		if len(stroke) == 1: # dot
+		if elem == Seg7Elem.H: # dot
 			ofst = np.array(self.size) * 0.1
 			strk0 = np.array(stroke[0]) + ofst
 			dot_strk = np.array([ofst[0], 0]) / 2
-			dot_line_strk = np.array([strk0, strk0 + dot_strk]).round().astype(int)
-			strokes.append(dot_line_strk.tolist())
+			strokes.append(np.array([strk0, strk0 + dot_strk]).round().astype(int))
 		return strokes
 
 	def _feed_digit(self, seg7bit8: Seg7Bit8):
 		'''convert_seg7bit8_to_strokes_each'''
-		return [self.feed_elem(elem) for elem in expand_seg7bit8_to_seg7elems(seg7bit8)]
+		stst = []
+		for elem in expand_seg7bit8_to_seg7elems(seg7bit8):
+			stst.append(self.feed_elem(elem))
+		return stst
 
 if __name__ == '__main__':
 	import sys

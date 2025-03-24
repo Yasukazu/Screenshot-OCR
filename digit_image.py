@@ -179,8 +179,8 @@ if __name__ == '__main__':
 	num = 3.12
 	num_str = "%.2f" % num
 	digits = list(encode_str_to_seg7bit8(num_str))
+	bdi = BasicDigitImage(stroke_feeder=stroke_feeder, param=bdiprm)
 	for digit in digits:
-		bdi = BasicDigitImage(stroke_feeder=stroke_feeder, param=bdiprm)
 		digit_image = bdi.get(digit)
 		digit_image.show()
 	'''bdi = BasicDigitImage(param=bdiprm)
