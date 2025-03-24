@@ -17,8 +17,8 @@ class Seg7Node6Pair:
 		for x in pair:
 			assert 0 <= pair[0] < 6
 		self.pair = pair # (pair[0], pair[1]) if len(pair) > 1 else (pair[0],)
-	def node6_map(self, nodes: node6):
-		return (nodes[r] for r in self.pair)
+	def node6_map(self, nodes: node6, ofst: tuple[int, int]):
+		return [nodes[r] for r in self.pair]
 	@classmethod
 	def map_nodes(cls, nodes: node6, *spsp: 'Seg7Node6Pair')-> list[list[float]]:
 		# assert len(node6) == 6
@@ -58,7 +58,11 @@ class Seg7Node6Pair:
 		return rr
 
 class Seg7Node6Single(Seg7Node6Pair):
-	pass
+		def node6_map(self, nodes: node6, ofst: tuple[int, int]):
+			_xy = [nodes[r] for r in self.pair]
+			xy = _xy[0][0] + ofst[0], _xy[0][1] + ofst[1]
+			xy2 = xy[0] + ofst[0], xy[1]
+			return [xy, xy2]
 
 class Seg7Elem(Enum):
 	A = Seg7Node6Pair((0, 1))
@@ -147,20 +151,21 @@ class DigitStrokeFeeder:
 		self.scale = scale
 		self.offset = offset
 		seg7node6 = Seg7Node6(slant=slant)
-		self.slant_scale_offset_map = Seg7Node6.scale_offset(scale=scale, offset=offset, seg7node6=seg7node6)
-		max_x = max(*[x for (x, y) in self.slant_scale_offset_map])
-		max_y = max(*[y for (x, y) in self.slant_scale_offset_map])
+		self.slant_scale_offset_map6 = Seg7Node6.scale_offset(scale=scale, offset=offset, seg7node6=seg7node6)
+		max_x = max(*[x for (x, y) in self.slant_scale_offset_map6])
+		max_y = max(*[y for (x, y) in self.slant_scale_offset_map6])
 		self.size = (round(max_x * (1 + padding[0])), round(max_y * (1 + padding[1])))
 		self.feed_elem: Callable[[Seg7Elem], list[list[int]]]= lru_cache(maxsize=20)(self._feed_elem)
 		self.feed_digit: Callable[[Seg7Bit8], list[list[list[int]]]]= lru_cache(maxsize=20)(self._feed_digit)
 	
-	def _feed_elem(self, elem: Seg7Elem):
+	def _feed_elem(self, elem: Seg7Elem, merge=False):
 		'''convert_seg7bit8_to_strokes'''
 		seg7node6pair = elem.value
-		strokes = []
-		stroke: list[int] = []
-		for i, xy in enumerate(seg7node6pair.node6_map(self.slant_scale_offset_map)):
-			stroke += [round(r) for r in xy]
+		stroke = seg7node6pair.node6_map(self.slant_scale_offset_map6, ofst=(round(self.scale * 0.1), round(self.scale * 0.1)))
+		return stroke
+		'''
+			strok_gen = (round(r) for r in xy)
+			stroke += list(strok_gen) if merge else strok_gen
 			if i & 1:
 				strokes.append(stroke)
 				stroke = []
@@ -169,7 +174,7 @@ class DigitStrokeFeeder:
 			strk0 = np.array(stroke[0]) + ofst
 			dot_strk = np.array([ofst[0], 0]) / 2
 			strokes.append(np.array([strk0, strk0 + dot_strk]).round().astype(int))
-		return strokes
+		return strokes'''
 
 	def _feed_digit(self, seg7bit8: Seg7Bit8):
 		'''convert_seg7bit8_to_strokes_each'''
@@ -183,7 +188,7 @@ if __name__ == '__main__':
 	from pprint import pp
 	from ipycanvas import Canvas
 	import seg7yx
-	num = 3.12
+	num = 1.23
 	num_str = "%.2f" % num
 	digits = list(encode_str_to_seg7bit8(num_str))
 	scale = 20

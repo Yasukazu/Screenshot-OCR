@@ -105,52 +105,12 @@ class BasicDigitImageParam:
 		return BasicDigitImageParam(width=width, scale=scale, padding=(padding, padding), line_width=line_width)
 
 class DigitDraw:
-	WIDTH = 10
-	HEIGHT = WIDTH * 2
-	SIZE = [WIDTH, HEIGHT]
-	PADDING = (2, 2)
-	LINE_WIDTH = 2
-
-	@classmethod
-	def calc_digit_image_scale(cls, size: int, padding: int, line_width: int)-> int:
-		offset = padding + line_width // 2
-		scale = size - 2 * offset
-		return scale
-
-	@classmethod
-	def calc_scale_from_height(cls, height: int=HEIGHT, padding: int=-1, line_width: int=-1)-> BasicDigitImageParam:
-		if padding < 0:
-			padding = height // 8
-		if line_width < 0:
-			line_width = height // 10 or 1
-		scale = (height - 2 * padding - line_width) // 2 
-		if scale - line_width <= 0:
-			raise ValueError(f"scale({scale}) is too small to show!")
-		width = scale + 2 * padding + line_width
-		return BasicDigitImageParam(width=width, scale=scale, padding=(padding, padding), line_width=line_width)
-
-	@classmethod
-	def calc_digit_image_scale_from_height(cls, height: int, padding: int, line_width: int)-> int:
-		offset = padding + line_width // 2
-		scale = height // 2 - 2 * offset
-		return scale
-	
-	@classmethod
-	def calc_digit_image_size(cls, scale: int, padding: tuple[int, int]=PADDING, line_width=LINE_WIDTH)-> list[float]:
-		stroke_offset = [(pad + line_width // 2 or 1 ) for pad in padding]
-		size = scale, scale * 2
-		return [sz + 2 * stroke_offset[i] for i, sz in enumerate(size)]
 
 	def __init__(self, stroke_feeder: DigitStrokeFeeder, param: BasicDigitImageParam,
-			bgcolor=ImageFill.WHITE): # width: int, scale: int, padding: Sequence[int], line_width: int slant: StrokeSlant=StrokeSlant.SLANT00, 
-		#if (not stroke_feeder) and (not param):raise ValueError("Needs stroke_feeder or param!")
-		# stroke_scale = param.scale # - padding[0] * 2 - line_width
-		# stroke_offset = [pad + param.line_width // 2 or 1 for pad in param.padding]
-		self.stroke_feeder = stroke_feeder # digit_strokes.DigitStrokes(slant=slant, scale=stroke_scale, offset=(stroke_offset[0], stroke_offset[1]))
+			bgcolor=ImageFill.WHITE):
+		self.stroke_feeder = stroke_feeder
 		self.param = param
-		# self.line_width = param.line_width
 		self.bgcolor = bgcolor
-		# self.size = param.width, param.height
 		self.get: Callable[[Seg7Bit8], Image.Image] = lru_cache(maxsize=self.stroke_feeder.max_size)(self._get)
 	
 	@property
