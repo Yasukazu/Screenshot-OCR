@@ -10,7 +10,7 @@ from strok7 import SegElem
 from seg_7_digits import hex_to_bit8, str_to_seg_elems # bin2_to_bit8, 
 from segment_strokes import SegmentStrokes
 from image_fill import ImageFill
-from digit_image import BasicDigitImageParam
+from digit_image import DigitImageParam
 
 class SegmentImage:
 	WIDTH = 10
@@ -26,7 +26,7 @@ class SegmentImage:
 		return scale
 
 	@classmethod
-	def calc_scale_from_height(cls, height: int=HEIGHT, padding: int=-1, line_width: int=-1)-> BasicDigitImageParam:
+	def calc_scale_from_height(cls, height: int=HEIGHT, padding: int=-1, line_width: int=-1)-> DigitImageParam:
 		if height <= 0 or line_width == 0:
 			raise ValueError("height or line_width is/are wrong!")
 		if padding < 0:
@@ -37,7 +37,7 @@ class SegmentImage:
 		if scale - line_width <= 0:
 			raise ValueError(f"scale({scale}) is too small to show!")
 		width = scale + 2 * padding + line_width
-		return BasicDigitImageParam(width=width, scale=scale, padding=(padding, padding), line_width=line_width)
+		return DigitImageParam(width=width, scale=scale, padding=(padding, padding), line_width=line_width)
 
 	@classmethod
 	def calc_digit_image_scale_from_height(cls, height: int, padding: int, line_width: int)-> int:
@@ -51,7 +51,7 @@ class SegmentImage:
 		size = scale, scale * 2
 		return [sz + 2 * stroke_offset[i] for i, sz in enumerate(size)]
 
-	def __init__(self, param: BasicDigitImageParam, 
+	def __init__(self, param: DigitImageParam, 
 			bgcolor=ImageFill.WHITE): # width: int, scale: int, padding: Sequence[int], line_width: int　slant: StrokeSlant=StrokeSlant.SLANT00, 
 		stroke_scale = param.scale # - padding[0] * 2 - line_width
 		stroke_offset = [pad + param.line_width // 2 or 1 for pad in param.padding]
