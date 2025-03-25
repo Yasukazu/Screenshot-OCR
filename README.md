@@ -29,3 +29,6 @@
    G
   E C
    D
+
+## Extract Text from PNG image file:
+ - `extract_txt_from_png.py`
