@@ -38,7 +38,7 @@ class DigitImage:
 		self.offset = stroke_feeder.offset
 		self.line_width = line_width
 		self.bgcolor = bgcolor
-		self.get: Callable[[int], Image.Image] = lru_cache(maxsize=SEGPOINTS_MAX)(self._get)
+		self.get: Callable[[Seg7Bit8], Image.Image] = lru_cache(maxsize=SEGPOINTS_MAX)(self._get)
 
 	@classmethod
 	def calc_font_scale(cls, scale: int=MIN_SCALE, line_width_ratio: float=STANDARD_LINE_WIDTH_RATIO, padding_ratio: float=STANDARD_PADDING_RATIO)-> DigitImageCalcResult:
@@ -49,12 +49,13 @@ class DigitImage:
 			raise ValueError(f"Insufficient scale:{scale} for line-width-ratio{line_width_ratio}!")	
 		return DigitImageCalcResult(scale=scale, font_scale=f_scale, padding=padding, line_width=line_width)
 
-	def _get(self, n: int)-> Image.Image:
+	
+	def _get(self, s7b8: Seg7Bit8)-> Image.Image:
 		img_w = self.stroke_feeder.scale + 2 * self.stroke_feeder.offset[0]
 		img_h = 2 * self.stroke_feeder.scale + 2 * self.stroke_feeder.offset[1]
 		img = Image.new('L', (img_w, img_h), color=self.bgcolor.value)
 		drw = ImageDraw.Draw(img)
-		strokes = self.stroke_feeder.get(n)
+		strokes = self.stroke_feeder.get_digit(s7b8)
 		for stroke in strokes:
 			drw.line(stroke, width=self.line_width, fill=ImageFill.invert(self.bgcolor).value, joint='curve')
 		return img
@@ -70,7 +71,7 @@ from collections import namedtuple
 from dataclasses import dataclass, field
 
 @dataclass
-class BasicDigitImageParam:
+class DigitDrawParam:
 	width: int
 	scale: int
 	padding: tuple[int, int]
@@ -92,8 +93,16 @@ class BasicDigitImageParam:
 			raise ValueError("The value of scale must be larger than line_width!")
 		self.height = self.width + self.scale
 
+
+
+class DigitImageDraw:
+	WIDTH = 10
+	HEIGHT = WIDTH * 2
+	SIZE = [WIDTH, HEIGHT]
+	PADDING = (2, 2)
+	LINE_WIDTH = 2
 	@classmethod
-	def calc_scale_from_height(cls, height: int=HEIGHT, padding: int=-1, line_width: int=-1)-> 'BasicDigitImageParam':
+	def calc_scale_from_height(cls, height: int=HEIGHT, padding: int=-1, line_width: int=-1)-> DigitDrawParam:
 		if padding < 0:
 			padding = height // 8
 		if line_width < 0:
@@ -102,11 +111,8 @@ class BasicDigitImageParam:
 		if scale - line_width <= 0:
 			raise ValueError(f"scale({scale}) is too small to show!")
 		width = scale + 2 * padding + line_width
-		return BasicDigitImageParam(width=width, scale=scale, padding=(padding, padding), line_width=line_width)
-
-class DigitDraw:
-
-	def __init__(self, stroke_feeder: DigitStrokeFeeder, param: BasicDigitImageParam,
+		return DigitDrawParam(width=width, scale=scale, padding=(padding, padding), line_width=line_width)
+	def __init__(self, stroke_feeder: DigitStrokeFeeder, param: DigitDrawParam,
 			bgcolor=ImageFill.WHITE):
 		self.stroke_feeder = stroke_feeder
 		self.param = param
@@ -124,13 +130,18 @@ class DigitDraw:
 	def _get(self, s: Seg7Bit8)-> Image.Image:
 		img = Image.new('L', self.size, color=self.bgcolor.value)
 		drw = ImageDraw.Draw(img)
-		digit_strokes = self.stroke_feeder.feed_digit(s)
+		digit_strokes = self.stroke_feeder.get_digit(s)
 		for strokes in digit_strokes:
 			for stroke in strokes:
 				drw.line(stroke, width=self.line_width, fill=ImageFill.invert(self.bgcolor).value, joint='curve')
 		return img
 
-def get_basic_number_image(nn: Sequence[int | FormatNum] | bytearray, digit_image_feeder: DigitDraw)-> Image.Image: #BasicDigitImage.WIDTH, (param=BasicDigitImage.calc_scale_from_height(BasicDigitImage.HEIGHT))
+	def draw(self, drw: ImageDraw.ImageDraw, s: Seg7Bit8):
+		for strokes in self.stroke_feeder.get_digit_each(s):
+			for stroke in strokes:
+				drw.line(stroke, width=self.line_width, fill=ImageFill.invert(self.bgcolor).value, joint='curve')
+
+def get_basic_number_image(nn: Sequence[int | FormatNum] | bytearray, digit_image_feeder: DigitImage)-> Image.Image: #BasicDigitImage.WIDTH, (param=BasicDigitImage.calc_scale_from_height(BasicDigitImage.HEIGHT))
 	from seg7bit8 import BIN1_TO_SEG7BIT8, bin2_to_seg7bit8
 	from bin2 import Bin2
 	b_array = nn if isinstance(nn, bytearray) else formatnums_to_bytearray(nn)
@@ -150,7 +161,7 @@ if __name__ == '__main__':
 	import sys
 	from pprint import pp
 	height = 40
-	bdiprm = DigitDraw.calc_scale_from_height(height)
+	bdiprm = DigitImage.calc_scale_from_height(height)
 	width=bdiprm.width
 	scale=bdiprm.scale
 	padding=bdiprm.padding
@@ -159,48 +170,9 @@ if __name__ == '__main__':
 	num = 3.12
 	num_str = "%.2f" % num
 	digits = list(encode_str_to_seg7bit8(num_str))
-	bdi = DigitDraw(stroke_feeder=stroke_feeder, param=bdiprm)
+	bdi = DigitImage(stroke_feeder=stroke_feeder, param=bdiprm)
+	img = Image.new('L', self.size, color=self.bgcolor.value)
+	drw = ImageDraw.Draw(img)
 	for digit in digits:
 		digit_image = bdi.get(digit)
 		digit_image.show()
-	'''bdi = BasicDigitImage(param=bdiprm)
-	di0 = bdi.get(0)
-	di0.show()
-	s_height = 30
-	s_param = BasicDigitImage.calc_scale_from_height(s_height)
-	digit_image_S = BasicDigitImage(s_param)
-	multi_image_numbers = [0, 2]
-	multi_number_image_size = (len(multi_image_numbers) * digit_image_S.size[0], digit_image_S.size[1])
-	multi_number_image = Image.new('L', multi_number_image_size, (0,))
-	x_offset = digit_image_S.size[0]
-	offset = (0, 0)
-	for n in multi_image_numbers:
-		digit_image = digit_image_S.get(n)
-		multi_number_image.paste(digit_image, offset)
-		offset = offset[0] + x_offset, 0
-	# digit_strokes_L = BasicDigitStrokes(scale=20, offset=(8, 8))
-	l_height = 70
-	l_param = BasicDigitImage.calc_scale_from_height(s_height)
-	digit_image_L = BasicDigitImage(l_param)
-	digit_image_L_0 = digit_image_L.get(0)
-	digit_image_L_0.show()
-	scale = 16
-	digit_image_calc_result = DigitImage.calc_font_scale(scale=scale, line_width_ratio=0.25, padding_ratio=0.25)
-	pp(digit_image_calc_result)
-	digit_image = DigitImage()
-	# scale, padding = digit_image.calc_scale_padding(scale=10, padding=2)
-	for n in range(SEGPOINTS_MAX):
-		# ofst_iw_ih = digit_image.calc_get_n(i)
-		# pp(ofst_iw_ih)
-		im = digit_image.get(n)
-		im.show()
-	sys.exit(0)
-	get_0_str = 'im = digit_image.get_n(%d)'
-	import cProfile
-	cProfile.run(get_0_str % 0)
-	print('2nd.0:')
-	cProfile.run(get_0_str % 0)
-	print('1:')
-	cProfile.run(get_0_str % 1)
-	print('2nd.0:')
-	cProfile.run(get_0_str % 1)'''

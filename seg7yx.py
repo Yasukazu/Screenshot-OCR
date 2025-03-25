@@ -46,7 +46,7 @@ class Seg7yx:
 		dst[2] = src[3]
 		dst[3] = src[5]
 		dst[5] = src[2]
-		return dst
+		return Node6(dst)
 
 	def to_tuple(self)-> Sequence[Sequence[float]]:
 		r = []

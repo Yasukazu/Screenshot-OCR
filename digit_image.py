@@ -144,7 +144,7 @@ class BasicDigitImage:
 	def _get(self, s: Seg7Bit8)-> Image.Image:
 		img = Image.new('L', self.size, color=self.bgcolor.value)
 		drw = ImageDraw.Draw(img)
-		digit_strokes = self.stroke_feeder.feed_digit(s)
+		digit_strokes = self.stroke_feeder.get_digit(s)
 		for strokes in digit_strokes:
 			for stroke in strokes:
 				drw.line(stroke, width=self.line_width, fill=ImageFill.invert(self.bgcolor).value, joint='curve')
