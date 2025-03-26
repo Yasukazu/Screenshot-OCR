@@ -1,5 +1,8 @@
 from typing import Sequence
 from pprint import pp
+from pathlib import Path
+import os
+from dotenv import load_dotenv
 from PIL import Image
 import pyocr
 import pyocr.builders
@@ -12,8 +15,14 @@ tool = tools[0]
 print(tool.get_name())
 # 'Tesseract (sh)'
 from path_feeder import PathFeeder
-path_feeder = PathFeeder()
-fullpath = path_feeder.first_fullpath
+load_dotenv()
+input_path = os.environ['SCREEN_BASE_DIR']
+input_dir = Path(input_path)
+path_feeder = PathFeeder(input_dir=input_dir, type_dir=False)
+for stem in path_feeder.feed():
+    break
+fullpath = path_feeder.dir / f"{stem}{path_feeder.ext}"
+# fullpath = input_dir / f"{month:02}{stem}{path_feeder.ext}"
 img1 = Image.open(fullpath).convert('L')
 txt_lines = tool.image_to_string(
     img1,
@@ -36,6 +45,8 @@ def next_gyoumu(txt_lines: Sequence[pyocr.builders.LineBox]):
 
 n_gyoumu = next_gyoumu(txt_lines)
 gyoumu_date = get_date(n_gyoumu)
+if gyoumu_date != (int(stem[:2]), int(stem[2:])): # path_feeder.month, 
+    ValueError("Unmatch date!")
 for w_box in n_gyoumu.word_boxes:
     pp(w_box.content)
 for tx in txt_lines:

@@ -73,17 +73,18 @@ def get_input_path(year=0, month=0)-> Path:
 
 from typing import Generator, Iterator
 class PathFeeder:
-	def __init__(self, year=0, month=0, from_=1, to=-1, input_type:FileExt=FileExt.PNG):
+	def __init__(self, year=0, month=0, from_=1, to=-1, input_type:FileExt=FileExt.PNG, input_dir=input_dir, type_dir=True):
 		last_date = get_year_month(year=year, month=month)
 		self.year = last_date.year
 		self.month = last_date.month
-		input_path = input_dir / str(self.year) / ("%02d" % self.month) / input_type.value.dir
+		input_path = input_dir / str(self.year) / ("%02d" % self.month) / input_type.value.dir if type_dir else input_dir / str(self.year) / ("%02d" % self.month) # / "%02d%02d" % (self.month, sel
 		if not input_path.exists():
 			raise ValueError(f"No path: {input_path}")
 		self.input_path = input_path
 		self.to = monthrange(self.year, self.month)[1] if to < 0 else to
 		self.from_ = from_
 		self.input_type = input_type
+		self.type_dir = type_dir
 	
 	@property
 	def dir(self)-> Path:
@@ -96,7 +97,7 @@ class PathFeeder:
 	def feed(self, padding=True) -> Iterator[str]:
 		if (self.to + 1) - self.from_ > 0:
 			for day in range(self.from_, self.to + 1):
-				stem = f"{day:02}"
+				stem = f"{day:02}" if self.type_dir else f"{self.month:02}{day:02}"
 				input_fullpath = self.input_path / (stem + self.input_type.value.ext)
 				if not padding:
 					if input_fullpath.exists():
