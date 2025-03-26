@@ -1,5 +1,8 @@
+from typing import Sequence
+from pprint import pp
 from PIL import Image
 import pyocr
+import pyocr.builders
 #import cv2
 #from google.colab.patches import cv2_imshow
 '''[<module 'pyocr.tesseract' from '/home/yasukazu/github/screen/.venv/lib/python3.13/site-packages/pyocr/tesseract.py'>,
@@ -12,11 +15,31 @@ from path_feeder import PathFeeder
 path_feeder = PathFeeder()
 fullpath = path_feeder.first_fullpath
 img1 = Image.open(fullpath).convert('L')
-txt1 = tool.image_to_string(
+txt_lines = tool.image_to_string(
     img1,
     lang='jpn+eng',
-    builder=pyocr.builders.DigitLineBoxBuilder 
+    builder=pyocr.builders.LineBoxBuilder(tesseract_layout=3) # Digit
 )
+
+def get_date(line_box: pyocr.builders.LineBox):
+    content = line_box.content.split()
+    if (content[1] != '月') or (content[3] != '日'):
+        raise ValueError("Not 月日!")
+    return int(content[0]), int(content[2])
+
+def next_gyoumu(txt_lines: Sequence[pyocr.builders.LineBox]):
+    for n, tx in enumerate(txt_lines):
+        joined_tx = ''.join([t.strip() for t in tx.content])
+        if joined_tx[0:4] == '業務開始':
+            break
+    return txt_lines[n + 1] #.content
+
+n_gyoumu = next_gyoumu(txt_lines)
+gyoumu_date = get_date(n_gyoumu)
+for w_box in n_gyoumu.word_boxes:
+    pp(w_box.content)
+for tx in txt_lines:
+    print(tx)
 #builders.TextBuilder(tesseract_layout=3)
 '''In [9]: dir(pyocr.builders)
 Out[9]: 
@@ -50,4 +73,4 @@ Out[9]:
     371 if status:
     372     raise TesseractError(status, errors)
 
-AttributeError: type object 'DigitLineBoxBuilder' has no attribute 'tesseract_flags''''
+AttributeError: type object 'DigitLineBoxBuilder' has no attribute 'tesseract_flags'''

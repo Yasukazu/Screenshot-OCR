@@ -470,6 +470,18 @@ wheels = [
 ]
 
 [[package]]
+name = "pyocr"
+version = "0.8.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pillow" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/03/fc/a44ddc6b778dbc450db0e782feab3dcf329401efed9d1a0c820226ca28da/pyocr-0.8.5.tar.gz", hash = "sha256:eff33d95032426a92640e56fa0d71b496ee531c1d341a15cc610610a7c5eac55", size = 71843 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/91/1c/3ef6485732685ad9c938c9ebb3fad0570f58bdc54e1242cdfa40040a630e/pyocr-0.8.5-py3-none-any.whl", hash = "sha256:3a534eee5ac6ce681159d67528b8953f0f2a7a5aad8733373ea7b3e8ac13a0b4", size = 40003 },
+]
+
+[[package]]
 name = "python-dateutil"
 version = "2.9.0.post0"
 source = { registry = "https://pypi.org/simple" }
@@ -509,6 +521,7 @@ dependencies = [
     { name = "numpy", version = "2.2.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "pandas" },
     { name = "pillow" },
+    { name = "pyocr" },
 ]
 
 [package.metadata]
@@ -517,6 +530,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.0.2" },
     { name = "pandas", specifier = ">=2.2.3" },
     { name = "pillow", specifier = ">=11.1.0" },
+    { name = "pyocr", specifier = ">=0.8.5" },
 ]
 
 [[package]]
