@@ -10,78 +10,78 @@ import pyocr.builders
 #from google.colab.patches import cv2_imshow
 '''[<module 'pyocr.tesseract' from '/home/yasukazu/github/screen/.venv/lib/python3.13/site-packages/pyocr/tesseract.py'>,
  <module 'pyocr.libtesseract' from '/home/yasukazu/github/screen/.venv/lib/python3.13/site-packages/pyocr/libtesseract/__init__.py'>]# '''
-tools = pyocr.get_available_tools()
-tool = tools[0]
-print(tool.get_name())
-# 'Tesseract (sh)'
-from path_feeder import PathFeeder
-load_dotenv()
-input_path = os.environ['SCREEN_BASE_DIR']
-input_dir = Path(input_path)
-path_feeder = PathFeeder(input_dir=input_dir, type_dir=False)
-for stem in path_feeder.feed():
-    break
-fullpath = path_feeder.dir / f"{stem}{path_feeder.ext}"
-# fullpath = input_dir / f"{month:02}{stem}{path_feeder.ext}"
-img1 = Image.open(fullpath).convert('L')
-txt_lines = tool.image_to_string(
-    img1,
-    lang='jpn+eng',
-    builder=pyocr.builders.LineBoxBuilder(tesseract_layout=3) # Digit
-)
 
 def get_date(line_box: pyocr.builders.LineBox):
-    content = line_box.content.split()
-    if (content[1] != '月') or (content[3] != '日'):
-        raise ValueError("Not 月日!")
-    return int(content[0]), int(content[2])
+	content = line_box.content.split()
+	if (content[1] != '月') or (content[3] != '日'):
+		raise ValueError("Not 月日!")
+	return int(content[0]), int(content[2])
 
 def next_gyoumu(txt_lines: Sequence[pyocr.builders.LineBox]):
-    for n, tx in enumerate(txt_lines):
-        joined_tx = ''.join([t.strip() for t in tx.content])
-        if joined_tx[0:4] == '業務開始':
-            break
-    return txt_lines[n + 1] #.content
+	for n, tx in enumerate(txt_lines):
+		joined_tx = ''.join([t.strip() for t in tx.content])
+		if joined_tx[0:4] == '業務開始':
+			break
+	return txt_lines[n + 1] #.content
 
-n_gyoumu = next_gyoumu(txt_lines)
-gyoumu_date = get_date(n_gyoumu)
-if gyoumu_date != (int(stem[:2]), int(stem[2:])): # path_feeder.month, 
-    ValueError("Unmatch date!")
-for w_box in n_gyoumu.word_boxes:
-    pp(w_box.content)
+load_dotenv()
+
+from path_feeder import PathFeeder
+from collections import namedtuple
+from dataclasses import dataclass
+@dataclass
+class PathSet:
+	path: Path
+	stem: str
+	ext: str
+	def stem_without_delim(self, delim: str):
+		return ''.join([s for s in self.stem if s!= delim])
+class MyOcr:
+	tools = pyocr.get_available_tools()
+	tool = tools[0]
+	input_path = os.environ['SCREEN_BASE_DIR']
+	input_dir = Path(input_path)
+	delim = ' '
+
+	@classmethod
+	def get_tool_name(cls):
+		return(cls.tool.get_name())	# 'Tesseract (sh)'
+
+	def __init__(self):
+		self.path_feeder = PathFeeder(input_dir=MyOcr.input_dir, type_dir=False)
+	def each_path_set(self):
+		for stem in self.path_feeder.feed(delim=self.delim, padding=False):
+			yield PathSet(self.path_feeder.dir, stem, self.path_feeder.ext)
+	def run_ocr(self, path_set: PathSet, lang='jpn+eng'):
+		#stem_without_delim = ''.join([s for s in path_set[1] if s!= self.delim])
+		fullpath = path_set.path / (path_set.stem_without_delim(self.delim) + path_set.ext)
+		img1 = Image.open(fullpath).convert('L')
+		return self.tool.image_to_string(
+			img1,
+			lang=lang,
+			builder=pyocr.builders.LineBoxBuilder(tesseract_layout=3) # Digit
+		)
+
+
+	@classmethod
+	def check_date(cls, path_set: PathSet, txt_lines: Sequence[pyocr.builders.LineBox]):
+		n_gyoumu = next_gyoumu(txt_lines)
+		gyoumu_date = get_date(n_gyoumu)
+		if gyoumu_date != (int(path_set.stem.split()[0]), int(path_set.stem.split()[1])): # path_feeder.month, 
+			ValueError(f"Unmatch {gyoumu_date} : {path_set.stem}!")
+
+'''for w_box in n_gyoumu.word_boxes:
+	pp(w_box.content)
 for tx in txt_lines:
-    print(tx)
-#builders.TextBuilder(tesseract_layout=3)
-'''In [9]: dir(pyocr.builders)
-Out[9]: 
-['BaseBuilder',
- 'Box',
- 'DigitBuilder',
- 'DigitLineBoxBuilder',
- 'HTMLParser',
- 'LineBox',
- 'LineBoxBuilder',
- 'TextBuilder',
- 'WordBoxBuilder','''
-'''pagesegmode values are:
-0 = Orientation and script detection (OSD) only.
-1 = Automatic page segmentation with OSD.
-2 = Automatic page segmentation, but no OSD, or OCR
-3 = Fully automatic page segmentation, but no OSD. (Default)
-4 = Assume a single column of text of variable sizes.
-5 = Assume a single uniform block of vertically aligned text.
-6 = Assume a single uniform block of text.
-7 = Treat the image as a single text line.
-8 = Treat the image as a single word.
-9 = Treat the image as a single word in a circle.
-10 = Treat the image as a single character.'''
-'''   365     image = image.convert("RGB")
-    366 image.save(os.path.join(tmpdir, "input.bmp"))
-    367 (status, errors) = run_tesseract("input.bmp", "output", cwd=tmpdir,
-    368                                  lang=lang,
---> 369                                  flags=builder.tesseract_flags,
-    370                                  configs=builder.tesseract_configs)
-    371 if status:
-    372     raise TesseractError(status, errors)
+	print(tx)'''
 
-AttributeError: type object 'DigitLineBoxBuilder' has no attribute 'tesseract_flags'''
+def main():
+	my_ocr = MyOcr()
+	for path_set in my_ocr.each_path_set():
+		result = my_ocr.run_ocr(path_set=path_set)
+		my_ocr.check_date(path_set, result)
+		pp(path_set)
+
+
+if __name__ == '__main__':
+	main()

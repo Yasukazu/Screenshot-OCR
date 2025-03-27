@@ -94,11 +94,11 @@ class PathFeeder:
 	def ext(self)-> str:
 		return self.input_type.value.ext
 
-	def feed(self, padding=True) -> Iterator[str]:
+	def feed(self, padding=True, delim='') -> Iterator[str]:
 		if (self.to + 1) - self.from_ > 0:
 			for day in range(self.from_, self.to + 1):
-				stem = f"{day:02}" if self.type_dir else f"{self.month:02}{day:02}"
-				input_fullpath = self.input_path / (stem + self.input_type.value.ext)
+				stem = f"{day:02}" if self.type_dir else f"{self.month:02}{delim}{day:02}"
+				input_fullpath = self.input_path / (''.join([s for s in stem if s!= delim]) + self.input_type.value.ext)
 				if not padding:
 					if input_fullpath.exists():
 						yield stem
