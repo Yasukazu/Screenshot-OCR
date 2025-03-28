@@ -41,6 +41,24 @@ class DigitImage:
 		self.get: Callable[[Seg7Bit8], Image.Image] = lru_cache(maxsize=SEGPOINTS_MAX)(self._get)
 
 	@classmethod
+	def calc_scale_from_height(cls, height: int=HEIGHT, padding: int=-1, line_width: int=-1)-> DigitDrawParam:
+		if padding < 0:
+			padding = height // 8
+		if line_width < 0:
+			line_width = height // 10 or 1
+		scale = (height - 2 * padding - line_width) // 2 
+		if scale - line_width <= 0:
+			raise ValueError(f"scale({scale}) is too small to show!")
+		width = scale + 2 * padding + line_width
+		return DigitDrawParam(width=width, scale=scale, padding=(padding, padding), line_width=line_width)
+
+	@property
+	def size(self):
+		width = self.stroke_feeder.scale + 2 * self.stroke_feeder.offset[0]
+		height = 2 * self.stroke_feeder.scale + 2 * self.stroke_feeder.offset[1]
+		return width, height
+		
+	@classmethod
 	def calc_font_scale(cls, scale: int=MIN_SCALE, line_width_ratio: float=STANDARD_LINE_WIDTH_RATIO, padding_ratio: float=STANDARD_PADDING_RATIO)-> DigitImageCalcResult:
 		padding = int(scale * padding_ratio)
 		f_scale = scale - 2 * padding
@@ -51,8 +69,7 @@ class DigitImage:
 
 	
 	def _get(self, s7b8: Seg7Bit8)-> Image.Image:
-		img_w = self.stroke_feeder.scale + 2 * self.stroke_feeder.offset[0]
-		img_h = 2 * self.stroke_feeder.scale + 2 * self.stroke_feeder.offset[1]
+
 		img = Image.new('L', (img_w, img_h), color=self.bgcolor.value)
 		drw = ImageDraw.Draw(img)
 		strokes = self.stroke_feeder.get_digit(s7b8)
@@ -60,6 +77,10 @@ class DigitImage:
 			drw.line(stroke, width=self.line_width, fill=ImageFill.invert(self.bgcolor).value, joint='curve')
 		return img
 
+	def draw(self, drw: ImageDraw.ImageDraw, s: Seg7Bit8):
+		for strokes in self.stroke_feeder.get_digit_each(s):
+			for stroke in strokes:
+				drw.line(stroke, width=self.line_width, fill=ImageFill.invert(self.bgcolor).value, joint='curve')
 
 	def calc_scale_padding(self, scale=MIN_SCALE, padding=STANDARD_PADDING_RATIO, slant: StrokeSlant=StrokeSlant.SLANT02)-> tuple[int, float]:
 		padding = scale * padding or 1
@@ -101,6 +122,7 @@ class DigitImageDraw:
 	SIZE = [WIDTH, HEIGHT]
 	PADDING = (2, 2)
 	LINE_WIDTH = 2
+
 	@classmethod
 	def calc_scale_from_height(cls, height: int=HEIGHT, padding: int=-1, line_width: int=-1)-> DigitDrawParam:
 		if padding < 0:
@@ -112,6 +134,7 @@ class DigitImageDraw:
 			raise ValueError(f"scale({scale}) is too small to show!")
 		width = scale + 2 * padding + line_width
 		return DigitDrawParam(width=width, scale=scale, padding=(padding, padding), line_width=line_width)
+
 	def __init__(self, stroke_feeder: DigitStrokeFeeder, param: DigitDrawParam,
 			bgcolor=ImageFill.WHITE):
 		self.stroke_feeder = stroke_feeder
@@ -170,8 +193,8 @@ if __name__ == '__main__':
 	num = 3.12
 	num_str = "%.2f" % num
 	digits = list(encode_str_to_seg7bit8(num_str))
-	bdi = DigitImage(stroke_feeder=stroke_feeder, param=bdiprm)
-	img = Image.new('L', self.size, color=self.bgcolor.value)
+	bdi = DigitImage(stroke_feeder=stroke_feeder) #, param=bdiprm)
+	img = Image.new('L', bdi.size, color=bdi.bgcolor.value)
 	drw = ImageDraw.Draw(img)
 	for digit in digits:
 		digit_image = bdi.get(digit)

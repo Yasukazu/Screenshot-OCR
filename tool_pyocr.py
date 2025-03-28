@@ -3,6 +3,7 @@ from pprint import pp
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+load_dotenv()
 from PIL import Image, ImageDraw
 import pyocr
 import pyocr.builders
@@ -24,7 +25,6 @@ def next_gyoumu(txt_lines: Sequence[pyocr.builders.LineBox]):
 			break
 	return txt_lines[n + 1] #.content
 
-load_dotenv()
 
 from path_feeder import PathFeeder
 from collections import namedtuple
@@ -39,24 +39,23 @@ class PathSet:
 class MyOcr:
 	tools = pyocr.get_available_tools()
 	tool = tools[0]
-	input_path = os.environ['SCREEN_BASE_DIR']
-	input_dir = Path(input_path)
+	input_dir = Path(os.environ['SCREEN_BASE_DIR'])
 	delim = ' '
 
 	@classmethod
 	def get_tool_name(cls):
 		return(cls.tool.get_name())	# 'Tesseract (sh)'
 
-	def __init__(self):
-		self.path_feeder = PathFeeder(input_dir=MyOcr.input_dir, type_dir=False)
+	def __init__(self, month=0):
+		self.path_feeder = PathFeeder(input_dir=MyOcr.input_dir, type_dir=False, month=month)
 		self.txt_lines: Sequence[pyocr.builders.LineBox] | None = None
 		self.image: Image.Image | None = None
 	def each_path_set(self):
 		for stem in self.path_feeder.feed(delim=self.delim, padding=False):
 			yield PathSet(self.path_feeder.dir, stem, self.path_feeder.ext)
-	def run_ocr(self, path_set: PathSet, lang='jpn+eng'):
+	def run_ocr(self, path_set: PathSet, lang='jpn+eng', delim=' '):
 		#stem_without_delim = ''.join([s for s in path_set[1] if s!= self.delim])
-		fullpath = path_set.path / (path_set.stem_without_delim(self.delim) + path_set.ext)
+		fullpath = path_set.path / (path_set.stem_without_delim(delim) + path_set.ext)
 		self.image = Image.open(fullpath).convert('L')
 		self.txt_lines = self.tool.image_to_string(
 			self.image,
@@ -99,4 +98,9 @@ def main():
 
 
 if __name__ == '__main__':
-	main()
+	import sys
+	my_ocr = MyOcr(month=3)
+	path_set = PathSet(my_ocr.path_feeder.dir, sys.argv[1], '.jpg')
+	my_ocr.run_ocr(path_set=path_set, delim='')
+	for line in my_ocr.txt_lines:
+		pp(line.content)
