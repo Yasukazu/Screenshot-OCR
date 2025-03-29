@@ -145,7 +145,7 @@ if __name__ == '__main__':
 	con = sqlite3.connect(str(sqlite_fullpath))
 	cur = con.cursor()
 	tbl_name = f"text_lines-{month:02}"
-	create_tbl_sql = f"CREATE TABLE if not exists `{tbl_name}` (app INTEGER, day INTEGER, wages INTEGER, title TEXT, txt_lines BLOB, PRIMARY KEY (app, day))"
+	create_tbl_sql = f"CREATE TABLE if not exists `{tbl_name}` (app INTEGER, day INTEGER, wages INTEGER, title TEXT, stem TEXT, txt_lines BLOB, PRIMARY KEY (app, day))"
 	cur.execute(create_tbl_sql)
 	# with shelve.open(shelv_fullpath) as shlv:
 	for img_file in img_dir.glob("*.png"):
@@ -158,9 +158,8 @@ if __name__ == '__main__':
 		date = my_ocr.date
 		date_str = f"{date[0]:02}{date[1]:02}"
 		pkl = pickle.dumps(txt_lines)
-		cur.execute(f"INSERT INTO `{tbl_name}` VALUES (?, ?, ?, ?, ?);", (app, date.day, my_ocr.wages, my_ocr.title, pkl))
+		cur.execute(f"INSERT INTO `{tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app, date.day, my_ocr.wages, my_ocr.title, stem, pkl))
 		# shlv[date_str] = txt_lines
 		for line in txt_lines:
 			pp(line.content)
-		break
-	con.commit()
+		con.commit()
