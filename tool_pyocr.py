@@ -1,3 +1,4 @@
+import re
 from typing import Sequence
 from collections import namedtuple
 from pprint import pp
@@ -80,11 +81,31 @@ class MyOcr:
 		return self
 
 	@property
+	def title(self):
+		if not self.txt_lines:
+			raise ValueError('`txt_lines` is None!')
+		return ''.join(self.txt_lines[0].content.split())
+
+	@property
 	def date(self):
 		if not self.txt_lines:
 			raise ValueError('`txt_lines` is None!')
 		n_gyoumu = next_gyoumu(self.txt_lines)
 		return get_date(n_gyoumu)
+	@property
+	def wages(self):
+		if not self.txt_lines:
+			raise ValueError('`txt_lines` is None!')
+		content = self.txt_lines[-1].content
+
+		content_num = ''.join(re.findall(r'\d+', content)) # ''.join([n for n in content if '0123456789'.index(n) >= 0])
+		try:
+			num = int(content_num)
+			if not (1000 < num < 9999):
+				raise ValueError(f"Unexpected value: {num}")
+			return num
+		except ValueError as err:
+			raise ValueError(f"Failed to convert into an integer: {content_num}\n{err}")
 
 	def check_date(self, path_set: PathSet):#, txt_lines: Sequence[pyocr.builders.LineBox]):
 		if not self.txt_lines:
@@ -124,7 +145,7 @@ if __name__ == '__main__':
 	con = sqlite3.connect(str(sqlite_fullpath))
 	cur = con.cursor()
 	tbl_name = f"text_lines-{month:02}"
-	create_tbl_sql = f"CREATE TABLE if not exists `{tbl_name}` (app INTEGER, day INTEGER, txt_lines BLOB, PRIMARY KEY (app, day))"
+	create_tbl_sql = f"CREATE TABLE if not exists `{tbl_name}` (app INTEGER, day INTEGER, wages INTEGER, title TEXT, txt_lines BLOB, PRIMARY KEY (app, day))"
 	cur.execute(create_tbl_sql)
 	# with shelve.open(shelv_fullpath) as shlv:
 	for img_file in img_dir.glob("*.png"):
@@ -137,7 +158,7 @@ if __name__ == '__main__':
 		date = my_ocr.date
 		date_str = f"{date[0]:02}{date[1]:02}"
 		pkl = pickle.dumps(txt_lines)
-		cur.execute(f"INSERT INTO `{tbl_name}` VALUES (?, ?, ?);", (app, date.day, pkl))
+		cur.execute(f"INSERT INTO `{tbl_name}` VALUES (?, ?, ?, ?, ?);", (app, date.day, my_ocr.wages, my_ocr.title, pkl))
 		# shlv[date_str] = txt_lines
 		for line in txt_lines:
 			pp(line.content)
