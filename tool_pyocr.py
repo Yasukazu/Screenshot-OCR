@@ -148,6 +148,12 @@ if __name__ == '__main__':
 	create_tbl_sql = f"CREATE TABLE if not exists `{tbl_name}` (app INTEGER, day INTEGER, wages INTEGER, title TEXT, stem TEXT, txt_lines BLOB, PRIMARY KEY (app, day))"
 	cur.execute(create_tbl_sql)
 	# with shelve.open(shelv_fullpath) as shlv:
+	# existing date data
+	qry = f"SELECT day from `{tbl_name}` where app = ?;"
+	prm = (app, ) # date.day)
+	result = cur.execute(qry, prm)
+	existing_day_list = [r[0]	for r in result]
+
 	for img_file in img_dir.glob("*.png"):
 		ext_dot = img_file.name.rfind('.')
 		stem = img_file.stem
@@ -156,10 +162,13 @@ if __name__ == '__main__':
 		path_set = PathSet(parent, stem, ext) # sys.argv[1], '.jpg')
 		txt_lines = my_ocr.run_ocr(path_set=path_set, delim='')
 		date = my_ocr.date
-		date_str = f"{date[0]:02}{date[1]:02}"
-		pkl = pickle.dumps(txt_lines)
-		cur.execute(f"INSERT INTO `{tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app, date.day, my_ocr.wages, my_ocr.title, stem, pkl))
-		# shlv[date_str] = txt_lines
-		for line in txt_lines:
-			pp(line.content)
-		con.commit()
+		# check exist
+		if date.day in existing_day_list:
+			print(f"{date.day} day exists.")
+		else:
+			pkl = pickle.dumps(txt_lines)
+			cur.execute(f"INSERT INTO `{tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app, date.day, my_ocr.wages, my_ocr.title, stem, pkl))
+			# shlv[date_str] = txt_lines
+			for line in txt_lines:
+				pp(line.content)
+			con.commit()
