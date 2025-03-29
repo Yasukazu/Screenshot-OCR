@@ -1,4 +1,5 @@
 from typing import Sequence
+from collections import namedtuple
 from pprint import pp
 from pathlib import Path
 import os
@@ -12,11 +13,13 @@ import pyocr.builders
 '''[<module 'pyocr.tesseract' from '/home/yasukazu/github/screen/.venv/lib/python3.13/site-packages/pyocr/tesseract.py'>,
  <module 'pyocr.libtesseract' from '/home/yasukazu/github/screen/.venv/lib/python3.13/site-packages/pyocr/libtesseract/__init__.py'>]# '''
 
+Date = namedtuple('Date', ['month', 'day'])
+
 def get_date(line_box: pyocr.builders.LineBox):
 	content = line_box.content.split()
 	if (content[1] != '月') or (content[3] != '日'):
 		raise ValueError("Not 月日!")
-	return int(content[0]), int(content[2])
+	return Date(month=int(content[0]), day=int(content[2]))
 
 def next_gyoumu(txt_lines: Sequence[pyocr.builders.LineBox]):
 	for n, tx in enumerate(txt_lines):
@@ -62,7 +65,7 @@ class MyOcr:
 			lang=lang,
 			builder=pyocr.builders.LineBoxBuilder(tesseract_layout=3) # Digit
 		)
-		return self
+		return self.txt_lines
 	
 	def draw_boxes(self):
 		if not self.txt_lines:
@@ -76,7 +79,13 @@ class MyOcr:
 		self.image.show()
 		return self
 
-	#@classmethod
+	@property
+	def date(self):
+		if not self.txt_lines:
+			raise ValueError('`txt_lines` is None!')
+		n_gyoumu = next_gyoumu(self.txt_lines)
+		return get_date(n_gyoumu)
+
 	def check_date(self, path_set: PathSet):#, txt_lines: Sequence[pyocr.builders.LineBox]):
 		if not self.txt_lines:
 			raise ValueError('txt_lines is None!')
@@ -94,18 +103,43 @@ def main():
 	my_ocr = MyOcr()
 	for path_set in my_ocr.each_path_set():
 		my_ocr.run_ocr(path_set=path_set).draw_boxes().check_date(path_set)
-		pp(path_set)
+		pp(path_set, my_ocr.date)
 
 
 if __name__ == '__main__':
 	import sys
-	my_ocr = MyOcr(month=3)
+	import shelve
+	import pickle
+	SHELVE_HDR = 'shlv-'
+	month = 3
+	my_ocr = MyOcr(month=month)
 	img_dir = my_ocr.path_feeder.dir
+	img_parent_dir = img_dir.parent
+	sqlite_name = 'txt_lines.sqlite'
+	sqlite_fullpath = img_parent_dir / sqlite_name
+	shelv_name = f"{SHELVE_HDR}{month:02}"
+	shelv_fullpath = img_dir / shelv_name
+	import sqlite3
+	app = 1 # tm
+	con = sqlite3.connect(str(sqlite_fullpath))
+	cur = con.cursor()
+	tbl_name = f"text_lines-{month:02}"
+	create_tbl_sql = f"CREATE TABLE if not exists `{tbl_name}` (app INTEGER, day INTEGER, txt_lines BLOB, PRIMARY KEY (app, day))"
+	cur.execute(create_tbl_sql)
+	# with shelve.open(shelv_fullpath) as shlv:
 	for img_file in img_dir.glob("*.png"):
-		ext_dot = img_file.stem.rfind('.')
-		stem = img_file.stem[:ext_dot]
-		ext = img_file.stem[ext_dot:]
-		path_set = PathSet(my_ocr.path_feeder.dir, sys.argv[1], '.jpg')
-		my_ocr.run_ocr(path_set=path_set, delim='')
-		for line in my_ocr.txt_lines:
+		ext_dot = img_file.name.rfind('.')
+		stem = img_file.stem
+		ext = img_file.name[ext_dot:]
+		parent = my_ocr.path_feeder.dir
+		path_set = PathSet(parent, stem, ext) # sys.argv[1], '.jpg')
+		txt_lines = my_ocr.run_ocr(path_set=path_set, delim='')
+		date = my_ocr.date
+		date_str = f"{date[0]:02}{date[1]:02}"
+		pkl = pickle.dumps(txt_lines)
+		cur.execute(f"INSERT INTO `{tbl_name}` VALUES (?, ?, ?);", (app, date.day, pkl))
+		# shlv[date_str] = txt_lines
+		for line in txt_lines:
 			pp(line.content)
+		break
+	con.commit()
