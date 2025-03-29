@@ -100,7 +100,12 @@ def main():
 if __name__ == '__main__':
 	import sys
 	my_ocr = MyOcr(month=3)
-	path_set = PathSet(my_ocr.path_feeder.dir, sys.argv[1], '.jpg')
-	my_ocr.run_ocr(path_set=path_set, delim='')
-	for line in my_ocr.txt_lines:
-		pp(line.content)
+	img_dir = my_ocr.path_feeder.dir
+	for img_file in img_dir.glob("*.png"):
+		ext_dot = img_file.stem.rfind('.')
+		stem = img_file.stem[:ext_dot]
+		ext = img_file.stem[ext_dot:]
+		path_set = PathSet(my_ocr.path_feeder.dir, sys.argv[1], '.jpg')
+		my_ocr.run_ocr(path_set=path_set, delim='')
+		for line in my_ocr.txt_lines:
+			pp(line.content)
