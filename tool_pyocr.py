@@ -120,55 +120,87 @@ class MyOcr:
 for tx in txt_lines:
 	print(tx)'''
 
-def main():
-	my_ocr = MyOcr()
-	for path_set in my_ocr.each_path_set():
-		my_ocr.run_ocr(path_set=path_set).draw_boxes().check_date(path_set)
-		pp(path_set, my_ocr.date)
+import pickle
+import sqlite3
 
+
+class Main:
+	sqlite_name = 'txt_lines.sqlite'
+	def __init__(self, month=0):
+		self.month = month
+		self.my_ocr = MyOcr(month=month)
+		self.img_dir = self.my_ocr.path_feeder.dir
+		img_parent_dir = self.img_dir.parent
+		sqlite_fullpath = img_parent_dir / Main.sqlite_name
+		self.app = 1 # tm
+		if sqlite3.threadsafety == 3:
+			check_same_thread = False
+		else:
+			check_same_thread = True
+		self.con = sqlite3.connect(str(sqlite_fullpath), check_same_thread=check_same_thread)
+		self.tbl_name = f"text_lines-{self.month:02}"
+		create_tbl_sql = f"CREATE TABLE if not exists `{self.tbl_name}` (app INTEGER, day INTEGER, wages INTEGER, title TEXT, stem TEXT, txt_lines BLOB, PRIMARY KEY (app, day))"
+		cur = self.con.cursor()
+		cur.execute(create_tbl_sql)
+
+	def sum_wages(self):
+		cur = self.con.cursor()
+		sum_q = f"SELECT SUM(wages) from `{self.tbl_name}`"
+		result = cur.execute(sum_q)
+		if result:
+			return [r[0] for r in result][0]
+
+	def get_existing_days(self):
+		qry = f"SELECT day from `{self.tbl_name}` where app = ?;"
+		prm = (self.app, ) # date.day)
+		cur = self.con.cursor()
+		result = cur.execute(qry, prm)
+		if result:
+			return [r[0]	for r in result]
+
+	def add_png_as_txt_lines(self):
+		for img_file in self.img_dir.glob("*.png"):
+			ext_dot = img_file.name.rfind('.')
+			stem = img_file.stem
+			ext = img_file.name[ext_dot:]
+			parent = self.my_ocr.path_feeder.dir
+			path_set = PathSet(parent, stem, ext)
+			txt_lines = self.my_ocr.run_ocr(path_set=path_set, delim='')
+			date = self.my_ocr.date
+			# check if exist
+			existing_day_list = self.get_existing_days()
+			if not existing_day_list:
+				return
+			if date.day in existing_day_list:
+				print(f"Day {date.day} exists.")
+			else:
+				txt_lines = self.my_ocr.run_ocr(path_set=path_set)
+				if not txt_lines:
+					raise ValueError(f"Unable to extract from {path_set}")
+				pkl = pickle.dumps(txt_lines)
+				cur = self.con.cursor()
+				cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (self.app, date.day, self.my_ocr.wages, self.my_ocr.title, stem, pkl))
+				for line in txt_lines:
+					pp(line.content)
+				self.con.commit()
 
 if __name__ == '__main__':
 	import sys
-	import shelve
-	import pickle
-	SHELVE_HDR = 'shlv-'
-	month = 3
-	my_ocr = MyOcr(month=month)
-	img_dir = my_ocr.path_feeder.dir
-	img_parent_dir = img_dir.parent
-	sqlite_name = 'txt_lines.sqlite'
-	sqlite_fullpath = img_parent_dir / sqlite_name
-	shelv_name = f"{SHELVE_HDR}{month:02}"
-	shelv_fullpath = img_dir / shelv_name
-	import sqlite3
-	app = 1 # tm
-	con = sqlite3.connect(str(sqlite_fullpath))
-	cur = con.cursor()
-	tbl_name = f"text_lines-{month:02}"
-	create_tbl_sql = f"CREATE TABLE if not exists `{tbl_name}` (app INTEGER, day INTEGER, wages INTEGER, title TEXT, stem TEXT, txt_lines BLOB, PRIMARY KEY (app, day))"
-	cur.execute(create_tbl_sql)
-	# with shelve.open(shelv_fullpath) as shlv:
-	# existing date data
-	qry = f"SELECT day from `{tbl_name}` where app = ?;"
-	prm = (app, ) # date.day)
-	result = cur.execute(qry, prm)
-	existing_day_list = [r[0]	for r in result]
-
-	for img_file in img_dir.glob("*.png"):
-		ext_dot = img_file.name.rfind('.')
-		stem = img_file.stem
-		ext = img_file.name[ext_dot:]
-		parent = my_ocr.path_feeder.dir
-		path_set = PathSet(parent, stem, ext) # sys.argv[1], '.jpg')
-		txt_lines = my_ocr.run_ocr(path_set=path_set, delim='')
-		date = my_ocr.date
-		# check exist
-		if date.day in existing_day_list:
-			print(f"{date.day} day exists.")
-		else:
-			pkl = pickle.dumps(txt_lines)
-			cur.execute(f"INSERT INTO `{tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app, date.day, my_ocr.wages, my_ocr.title, stem, pkl))
-			# shlv[date_str] = txt_lines
-			for line in txt_lines:
-				pp(line.content)
-			con.commit()
+	month = int(sys.argv[1])
+	main = Main(month=month)
+	from consolemenu import ConsoleMenu
+	from consolemenu.items import FunctionItem
+	def show_total_wages():
+		print(main.sum_wages())
+		input('Hit Enter key, please:')
+	def show_existing_days():
+		print(main.get_existing_days())
+		input('Hit Enter key, please:')
+	function_items = [
+		FunctionItem("Show the total wages", show_total_wages),
+		FunctionItem("Show existing days", show_existing_days),# ["Enter"]),
+	]
+	menu = ConsoleMenu("Menu", "-- OCR DB --")
+	for f_it in function_items:
+		menu.append_item(f_it)
+	menu.show()
