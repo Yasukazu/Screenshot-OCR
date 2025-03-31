@@ -1,4 +1,5 @@
 from enum import IntEnum
+from types import MappingProxyType
 import re
 from typing import Sequence
 from collections import namedtuple
@@ -25,11 +26,12 @@ def get_date(line_box: pyocr.builders.LineBox):
 	return Date(month=int(content[0]), day=int(content[2]))
 
 def next_gyoumu(txt_lines: Sequence[pyocr.builders.LineBox]):
+	assert len(txt_lines) > 1
 	for n, tx in enumerate(txt_lines):
 		joined_tx = ''.join([t.strip() for t in tx.content])
 		if joined_tx[0:4] == '業務開始':
-			break
-	return txt_lines[n + 1] #.content
+			return n
+	#return txt_lines[n + 1] #.content
 
 
 from path_feeder import PathFeeder
@@ -47,6 +49,12 @@ class AppType(IntEnum):
 	NUL = 0
 	T = 1
 	M = 2
+
+APP_TYPE_TO_STEM_END = MappingProxyType({
+	AppType.T: ".co.taimee",
+	AppType.M: ".mercari.work.android"
+})
+
 class MyOcr:
 	tools = pyocr.get_available_tools()
 	tool = tools[0]
@@ -63,10 +71,18 @@ class MyOcr:
 			if txt_line.content.replace(' ', '').find('おしごと詳細') >= 0:
 				return AppType.M
 		return AppType.NUL # TODO: check for 'TM'
-
+	@classmethod
+	def get_title(cls, app_type: AppType, txt_lines: Sequence[LineBox], n: int):
+		match app_type:
+			case AppType.T:
+				return cls.t_title(txt_lines=txt_lines)
+			case AppType.M:
+				return cls.m_title(txt_lines, n)
 	@classmethod
 	def get_wages(cls, app_type: AppType, txt_lines: Sequence[LineBox]):
 		match app_type:
+			case AppType.T:
+				return cls.t_wages(txt_lines=txt_lines)
 			case AppType.M:
 				for n in range(len(txt_lines)):
 					if txt_lines[n].content.replace(' ', '').find('このおしごとの給与'
@@ -78,8 +94,10 @@ class MyOcr:
 							raise ValueError("Improper wage!")
 			case _: # TODO: check for 'TM'
 				raise ValueError("Undefined AppType!")
-	M_DATE_PATT_1 = re.compile(r"(\d+)/(\d+)\(")
-	M_DATE_PATT_2 = re.compile(r"時間$")
+
+	M_DATE_PATT_1 = re.compile(r"[^\d]*((\d+)/(\d+))\(")
+	M_DATE_PATT_2 = re.compile(r".*時間$")
+
 	@classmethod
 	def get_date(cls, app_type: AppType, txt_lines: Sequence[LineBox]):
 		match app_type:
@@ -90,10 +108,14 @@ class MyOcr:
 					mt2 = MyOcr.M_DATE_PATT_2.match(cntnt)
 					if mt and mt2:
 						grps = mt.groups()
-						date = Date(grps[0], grps[1])
-						return date
-						#else:							raise ValueError("Improper wage!")
-			case _: # TODO: check for 'TM'
+						date = Date(grps[1], grps[2])
+						return n, date
+				raise ValueError("Unmatch AppType.M txt_lines!")				
+			case AppType.T:
+				n_gyoumu = next_gyoumu(txt_lines)
+				date = get_date(txt_lines[ n_gyoumu])
+				return n_gyoumu, date
+			case _:
 				raise ValueError("Undefined AppType!")
 
 	def __init__(self, month=0):
@@ -126,25 +148,29 @@ class MyOcr:
 			draw.rectangle(cood, outline=0x55)
 		self.image.show()
 		return self
+	
+	def endswith(self, pattern: str):
+		for file in self.input_dir.iterdir():
+			if file.is_file and file.stem.endswith(pattern):
+				yield file
 
-	@property
-	def title(self):
-		if not self.txt_lines:
-			raise ValueError('`txt_lines` is None!')
-		return ''.join(self.txt_lines[0].content.split())
 
-	@property
-	def date(self):
+	@classmethod
+	def t_title(cls, txt_lines: Sequence[LineBox]):
+		return ''.join(txt_lines[0].content.split())
+	@classmethod
+	def m_title(cls, txt_lines: Sequence[LineBox], n: int):
+		return ''.join([txt_lines[i].content.replace(' ', '') for i in range(n - 3, n - 1)])
+
+	'''def get_date(self, app_tpe: AppType):
 		if not self.txt_lines:
-			raise ValueError('`txt_lines` is None!')
+			raise bb ValueError('`txt_lines` is None!')
+		match
 		n_gyoumu = next_gyoumu(self.txt_lines)
-		return get_date(n_gyoumu)
-	@property
-	def wages(self):
-		if not self.txt_lines:
-			raise ValueError('`txt_lines` is None!')
-		content = self.txt_lines[-1].content
-
+		return get_date(n_gyoumu)'''
+	@classmethod
+	def t_wages(cls, txt_lines: Sequence[LineBox]):
+		content = txt_lines[-1].content
 		content_num = ''.join(re.findall(r'\d+', content)) # ''.join([n for n in content if '0123456789'.index(n) >= 0])
 		try:
 			num = int(content_num)
@@ -158,7 +184,7 @@ class MyOcr:
 		if not self.txt_lines:
 			raise ValueError('txt_lines is None!')
 		n_gyoumu = next_gyoumu(self.txt_lines)
-		gyoumu_date = get_date(n_gyoumu)
+		gyoumu_date = get_date(self.txt_lines[n_gyoumu])
 		if gyoumu_date != (int(path_set.stem.split()[0]), int(path_set.stem.split()[1])): # path_feeder.month, 
 			raise ValueError(f"Unmatch {gyoumu_date} : {path_set.stem}!")
 
@@ -196,42 +222,44 @@ class Main:
 		if result:
 			return [r[0] for r in result][0]
 
-	def get_existing_days(self):
+	def get_existing_days(self, app_type: AppType):
 		qry = f"SELECT day from `{self.tbl_name}` where app = ?;"
-		prm = (self.app, ) # date.day)
+		prm = (app_type.value, ) # date.day)
 		cur = self.con.cursor()
 		result = cur.execute(qry, prm)
 		if result:
 			return [r[0]	for r in result]
 
-	def add_image_files_as_txt_lines(self, pattern='*.png'):
-		ocr_done = 0
-		for img_file in self.img_dir.glob(pattern):
-			ext_dot = img_file.name.rfind('.')
+	def add_image_files_as_txt_lines(self, app_type: AppType, ext='.png'):
+		if app_type == AppType.NUL:
+			raise ValueError('AppType is NUL!')
+		ocr_done = []
+		for img_file in self.img_dir.glob('*' + ext):
+			if not img_file.stem.endswith(APP_TYPE_TO_STEM_END[app_type]):
+				continue
+			#ext_dot = img_file.name.rfind('.')
+			#ext = img_file.name[ext_dot:]
 			stem = img_file.stem
-			ext = img_file.name[ext_dot:]
 			parent = self.my_ocr.path_feeder.dir
 			path_set = PathSet(parent, stem, ext)
 			txt_lines = self.my_ocr.run_ocr(path_set=path_set, delim='')
-			app = self.my_ocr.get_app_type(txt_lines) if txt_lines else 0
-			date = self.my_ocr.date
-			# check if exist
-			existing_day_list = self.get_existing_days()
-			if not existing_day_list:
-				return
-			if date.day in existing_day_list:
-				print(f"Day {date.day} exists.")
+			if not txt_lines:
+				raise ValueError(f"Unable to extract from {path_set}")
+			# app_type = self.my_ocr.get_app_type(txt_lines) if txt_lines else AppType.NUL
+			n, date = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
+			existing_day_list = self.get_existing_days(app_type=app_type)
+			if existing_day_list and (date.day in existing_day_list):
+				print(f"Day {date.day} of App {app_type} exists.")
 			else:
-				txt_lines = self.my_ocr.run_ocr(path_set=path_set)
-				if not txt_lines:
-					raise ValueError(f"Unable to extract from {path_set}")
+				wages = self.my_ocr.get_wages(app_type=app_type, txt_lines=txt_lines)
+				title = self.my_ocr.get_title(app_type, txt_lines, n)
 				pkl = pickle.dumps(txt_lines)
 				cur = self.con.cursor()
-				cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app, date.day, self.my_ocr.wages, self.my_ocr.title, stem, pkl))
+				cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app_type.value, date.day, wages, title, stem, pkl))
 				for line in txt_lines:
 					pp(line.content)
 				self.con.commit()
-				ocr_done += 1
+				ocr_done.append((app_type, date))
 		return ocr_done
 
 if __name__ == '__main__':
@@ -246,12 +274,17 @@ if __name__ == '__main__':
 		print(main.sum_wages())
 		input('Hit Enter key, please:')
 	def show_existing_days():
-		print(main.get_existing_days())
+		app = input("App type: Tm: 1, MH: 2")
+		app_type = [AppType.NUL, AppType.T, AppType.M][int(app)]
+		print(main.get_existing_days(app_type ))
 		input('Hit Enter key, please:')
 	def run_ocr():
-		patt_list = ["t.*.png", "Screenshot_*.png"]
-		selected = SelectionMenu.get_selection(patt_list)
-		txt_lines = main.add_image_files_as_txt_lines(pattern=patt_list[selected])
+		app_type_list = [AppType.T, AppType.M]
+		patt_list = [APP_TYPE_TO_STEM_END[AppType.T], APP_TYPE_TO_STEM_END[AppType.M]]#["t.*.png", "Screenshot_*.png"]
+		selected = SelectionMenu.get_selection([APP_TYPE_TO_STEM_END[at] for at in app_type_list])
+		txt_lines = main.add_image_files_as_txt_lines(
+			app_type_list[selected]
+		)
 		txt_lines_len = len(txt_lines) if txt_lines else 0
 		input(f'{txt_lines_len} file(s) is / are OCRed. Hit Enter key to return to the main menu:')
 	function_items = [
