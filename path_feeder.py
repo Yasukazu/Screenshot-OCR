@@ -94,6 +94,9 @@ class PathFeeder:
 	def ext(self)-> str:
 		return self.input_type.value.ext
 
+	def glob(self, pattern='*'):
+		for file in self.input_path.glob(pattern=pattern):
+			yield file
 	def feed(self, padding=True, delim='') -> Iterator[str]:
 		if (self.to + 1) - self.from_ > 0:
 			for day in range(self.from_, self.to + 1):

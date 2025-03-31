@@ -1,3 +1,4 @@
+from enum import IntEnum
 import re
 from typing import Sequence
 from collections import namedtuple
@@ -9,6 +10,7 @@ load_dotenv()
 from PIL import Image, ImageDraw
 import pyocr
 import pyocr.builders
+from pyocr.builders import LineBox
 #import cv2
 #from google.colab.patches import cv2_imshow
 '''[<module 'pyocr.tesseract' from '/home/yasukazu/github/screen/.venv/lib/python3.13/site-packages/pyocr/tesseract.py'>,
@@ -40,6 +42,11 @@ class PathSet:
 	ext: str
 	def stem_without_delim(self, delim: str):
 		return ''.join([s for s in self.stem if s!= delim])
+
+class AppType(IntEnum):
+	NUL = 0
+	T = 1
+	M = 2
 class MyOcr:
 	tools = pyocr.get_available_tools()
 	tool = tools[0]
@@ -50,14 +57,54 @@ class MyOcr:
 	def get_tool_name(cls):
 		return(cls.tool.get_name())	# 'Tesseract (sh)'
 
+	@classmethod
+	def get_app_type(cls, txt_lines: Sequence[LineBox]):
+		for txt_line in txt_lines:
+			if txt_line.content.replace(' ', '').find('おしごと詳細') >= 0:
+				return AppType.M
+		return AppType.NUL # TODO: check for 'TM'
+
+	@classmethod
+	def get_wages(cls, app_type: AppType, txt_lines: Sequence[LineBox]):
+		match app_type:
+			case AppType.M:
+				for n in range(len(txt_lines)):
+					if txt_lines[n].content.replace(' ', '').find('このおしごとの給与'
+		) >= 0:
+						wages = int(''.join([i for i in txt_lines[n + 1].content.replace(' ', '') if i in '0123456789']))
+						if wages in range(1000, 9999):
+							return wages
+						else:
+							raise ValueError("Improper wage!")
+			case _: # TODO: check for 'TM'
+				raise ValueError("Undefined AppType!")
+	M_DATE_PATT_1 = re.compile(r"(\d+)/(\d+)\(")
+	M_DATE_PATT_2 = re.compile(r"時間$")
+	@classmethod
+	def get_date(cls, app_type: AppType, txt_lines: Sequence[LineBox]):
+		match app_type:
+			case AppType.M:
+				for n in range(len(txt_lines)):
+					cntnt = txt_lines[n].content.replace(' ', '')
+					mt = MyOcr.M_DATE_PATT_1.match(cntnt)
+					mt2 = MyOcr.M_DATE_PATT_2.match(cntnt)
+					if mt and mt2:
+						grps = mt.groups()
+						date = Date(grps[0], grps[1])
+						return date
+						#else:							raise ValueError("Improper wage!")
+			case _: # TODO: check for 'TM'
+				raise ValueError("Undefined AppType!")
+
 	def __init__(self, month=0):
+		self.month = month
 		self.path_feeder = PathFeeder(input_dir=MyOcr.input_dir, type_dir=False, month=month)
 		self.txt_lines: Sequence[pyocr.builders.LineBox] | None = None
 		self.image: Image.Image | None = None
 	def each_path_set(self):
 		for stem in self.path_feeder.feed(delim=self.delim, padding=False):
 			yield PathSet(self.path_feeder.dir, stem, self.path_feeder.ext)
-	def run_ocr(self, path_set: PathSet, lang='jpn+eng', delim=' '):
+	def run_ocr(self, path_set: PathSet, lang='jpn+eng', delim=''):
 		#stem_without_delim = ''.join([s for s in path_set[1] if s!= self.delim])
 		fullpath = path_set.path / (path_set.stem_without_delim(delim) + path_set.ext)
 		self.image = Image.open(fullpath).convert('L')
@@ -123,16 +170,15 @@ for tx in txt_lines:
 import pickle
 import sqlite3
 
-
 class Main:
 	sqlite_name = 'txt_lines.sqlite'
-	def __init__(self, month=0):
+	def __init__(self, month=0, app=1):
 		self.month = month
 		self.my_ocr = MyOcr(month=month)
 		self.img_dir = self.my_ocr.path_feeder.dir
 		img_parent_dir = self.img_dir.parent
 		sqlite_fullpath = img_parent_dir / Main.sqlite_name
-		self.app = 1 # tm
+		self.app = app # tm
 		if sqlite3.threadsafety == 3:
 			check_same_thread = False
 		else:
@@ -158,14 +204,16 @@ class Main:
 		if result:
 			return [r[0]	for r in result]
 
-	def add_png_as_txt_lines(self):
-		for img_file in self.img_dir.glob("*.png"):
+	def add_image_files_as_txt_lines(self, pattern='*.png'):
+		ocr_done = 0
+		for img_file in self.img_dir.glob(pattern):
 			ext_dot = img_file.name.rfind('.')
 			stem = img_file.stem
 			ext = img_file.name[ext_dot:]
 			parent = self.my_ocr.path_feeder.dir
 			path_set = PathSet(parent, stem, ext)
 			txt_lines = self.my_ocr.run_ocr(path_set=path_set, delim='')
+			app = self.my_ocr.get_app_type(txt_lines) if txt_lines else 0
 			date = self.my_ocr.date
 			# check if exist
 			existing_day_list = self.get_existing_days()
@@ -179,23 +227,33 @@ class Main:
 					raise ValueError(f"Unable to extract from {path_set}")
 				pkl = pickle.dumps(txt_lines)
 				cur = self.con.cursor()
-				cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (self.app, date.day, self.my_ocr.wages, self.my_ocr.title, stem, pkl))
+				cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app, date.day, self.my_ocr.wages, self.my_ocr.title, stem, pkl))
 				for line in txt_lines:
 					pp(line.content)
 				self.con.commit()
+				ocr_done += 1
+		return ocr_done
 
 if __name__ == '__main__':
 	import sys
 	month = int(sys.argv[1])
-	main = Main(month=month)
-	from consolemenu import ConsoleMenu
-	from consolemenu.items import FunctionItem
+	app = int(sys.argv[2])
+	main = Main(month=month, app=app)
+	from consolemenu import ConsoleMenu, SelectionMenu
+	from consolemenu.items import FunctionItem, SubmenuItem
+	import consolemenu.items
 	def show_total_wages():
 		print(main.sum_wages())
 		input('Hit Enter key, please:')
 	def show_existing_days():
 		print(main.get_existing_days())
 		input('Hit Enter key, please:')
+	def run_ocr():
+		patt_list = ["t.*.png", "Screenshot_*.png"]
+		selected = SelectionMenu.get_selection(patt_list)
+		txt_lines = main.add_image_files_as_txt_lines(pattern=patt_list[selected])
+		txt_lines_len = len(txt_lines) if txt_lines else 0
+		input(f'{txt_lines_len} file(s) is / are OCRed. Hit Enter key to return to the main menu:')
 	function_items = [
 		FunctionItem("Show the total wages", show_total_wages),
 		FunctionItem("Show existing days", show_existing_days),# ["Enter"]),
@@ -203,4 +261,9 @@ if __name__ == '__main__':
 	menu = ConsoleMenu("Menu", "-- OCR DB --")
 	for f_it in function_items:
 		menu.append_item(f_it)
+	submenu = ConsoleMenu("SubMenu", "-- Run OCR --")
+	submenu.append_item(FunctionItem("Run OCR with file name patterns:", run_ocr))
+	submenu_item = SubmenuItem("SubMenu", submenu=submenu, menu=menu)
+	menu.append_item(submenu_item)
+	
 	menu.show()
