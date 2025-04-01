@@ -6,6 +6,7 @@ from collections import namedtuple
 from pprint import pp
 from pathlib import Path
 import os
+from dataclasses import dataclass
 from dotenv import load_dotenv
 load_dotenv()
 from PIL import Image, ImageDraw
@@ -17,7 +18,10 @@ from pyocr.builders import LineBox
 '''[<module 'pyocr.tesseract' from '/home/yasukazu/github/screen/.venv/lib/python3.13/site-packages/pyocr/tesseract.py'>,
  <module 'pyocr.libtesseract' from '/home/yasukazu/github/screen/.venv/lib/python3.13/site-packages/pyocr/libtesseract/__init__.py'>]# '''
 
-Date = namedtuple('Date', ['month', 'day'])
+@dataclass
+class Date:
+	month: int
+	day: int
 
 def get_date(line_box: pyocr.builders.LineBox):
 	content = line_box.content.split()
@@ -261,12 +265,29 @@ class Main:
 				self.con.commit()
 				ocr_done.append((app_type, date))
 		return ocr_done
+	def add_image_file_without_content_into_db(self, app_type: AppType, stem: str, date: Date, wages=None, title=None, pkl=None):
+		cur = self.con.cursor()
+		cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app_type.value, date.day, wages, title, stem, pkl))
+		self.con.commit()
+
 
 if __name__ == '__main__':
 	import sys
-	month = int(sys.argv[1])
-	app = int(sys.argv[2])
+	app = int(sys.argv[1])
+	month = int(sys.argv[2])
 	main = Main(month=month, app=app)
+	if len(sys.argv) > 4:
+		day = int(sys.argv[3])
+		stem = sys.argv[4]
+		match app:
+			case 1:
+				app_type = AppType.T
+			case 2:
+				app_type = AppType.M
+			case _:
+				raise ValueError('Unsupported app type!')
+		main.add_image_file_without_content_into_db(app_type, stem, Date(month=month, day=day))
+		sys.exit(0)
 	from consolemenu import ConsoleMenu, SelectionMenu
 	from consolemenu.items import FunctionItem, SubmenuItem
 	import consolemenu.items
