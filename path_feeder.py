@@ -1,9 +1,12 @@
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+dotenv = load_dotenv()
 
 home_dir = os.path.expanduser('~')
 home_path = Path(home_dir)
-input_dir = home_path / 'Documents' / 'screen' # / '202501'
+input_dir = Path(os.environ['SCREEN_BASE_DIR'])
+
 assert input_dir.exists()
 
 def path_pair_feeder(from_=1, to=31, input_ext='.png', output_ext='.tact'): #rng=range(0, 31)):
@@ -73,6 +76,11 @@ def get_input_path(year=0, month=0)-> Path:
 
 from typing import Generator, Iterator
 class PathFeeder:
+	env_dict = None
+	@classmethod
+	def load_env(cls):
+		if not cls.env_dict:
+			cls.env_dict = load_dotenv()
 	def __init__(self, year=0, month=0, from_=1, to=-1, input_type:FileExt=FileExt.PNG, input_dir=input_dir, type_dir=True):
 		last_date = get_year_month(year=year, month=month)
 		self.year = last_date.year

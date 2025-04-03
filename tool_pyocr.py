@@ -1,3 +1,4 @@
+from contextlib import closing
 from enum import IntEnum
 from types import MappingProxyType
 import re
@@ -60,9 +61,10 @@ APP_TYPE_TO_STEM_END = MappingProxyType({
 })
 
 class MyOcr:
+	from path_feeder import input_dir
 	tools = pyocr.get_available_tools()
 	tool = tools[0]
-	input_dir = Path(os.environ['SCREEN_BASE_DIR'])
+	#input_dir = input_dir # Path(os.environ['SCREEN_BASE_DIR'])
 	delim = ' '
 
 	@classmethod
@@ -202,7 +204,7 @@ import sqlite3
 
 class Main:
 	sqlite_name = 'txt_lines.sqlite'
-	def __init__(self, month=0, app=1):
+	def __init__(self, month=0, app=AppType.NUL):
 		self.month = month
 		self.my_ocr = MyOcr(month=month)
 		self.img_dir = self.my_ocr.path_feeder.dir
@@ -216,23 +218,23 @@ class Main:
 		self.con = sqlite3.connect(str(sqlite_fullpath), check_same_thread=check_same_thread)
 		self.tbl_name = f"text_lines-{self.month:02}"
 		create_tbl_sql = f"CREATE TABLE if not exists `{self.tbl_name}` (app INTEGER, day INTEGER, wages INTEGER, title TEXT, stem TEXT, txt_lines BLOB, PRIMARY KEY (app, day))"
-		cur = self.con.cursor()
-		cur.execute(create_tbl_sql)
+		with closing(self.con.cursor()) as cur:
+			cur.execute(create_tbl_sql)
 
 	def sum_wages(self):
-		cur = self.con.cursor()
-		sum_q = f"SELECT SUM(wages) from `{self.tbl_name}`"
-		result = cur.execute(sum_q)
-		if result:
-			return [r[0] for r in result][0]
+		with closing(self.con.cursor()) as cur:
+			sum_q = f"SELECT SUM(wages) from `{self.tbl_name}`"
+			result = cur.execute(sum_q)
+			if result:
+				return [r[0] for r in result][0]
 
 	def get_existing_days(self, app_type: AppType):
 		qry = f"SELECT day from `{self.tbl_name}` where app = ?;"
 		prm = (app_type.value, ) # date.day)
-		cur = self.con.cursor()
-		result = cur.execute(qry, prm)
-		if result:
-			return [r[0]	for r in result]
+		with closing(self.con.cursor()) as cur:
+			result = cur.execute(qry, prm)
+			if result:
+				return [r[0]	for r in result]
 
 	def add_image_files_as_txt_lines(self, app_type: AppType, ext='.png'):
 		if app_type == AppType.NUL:
@@ -258,16 +260,16 @@ class Main:
 				wages = self.my_ocr.get_wages(app_type=app_type, txt_lines=txt_lines)
 				title = self.my_ocr.get_title(app_type, txt_lines, n)
 				pkl = pickle.dumps(txt_lines)
-				cur = self.con.cursor()
-				cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app_type.value, date.day, wages, title, stem, pkl))
+				with closing(self.con.cursor()) as cur:
+					cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app_type.value, date.day, wages, title, stem, pkl))
 				for line in txt_lines:
 					pp(line.content)
 				self.con.commit()
 				ocr_done.append((app_type, date))
 		return ocr_done
 	def add_image_file_without_content_into_db(self, app_type: AppType, stem: str, date: Date, wages=None, title=None, pkl=None):
-		cur = self.con.cursor()
-		cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app_type.value, date.day, wages, title, stem, pkl))
+		with closing(self.con.cursor()) as cur:
+			cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app_type.value, date.day, wages, title, stem, pkl))
 		self.con.commit()
 
 
