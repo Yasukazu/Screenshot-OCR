@@ -42,7 +42,7 @@ def conv_to_pdf(app: AppType, main: Main):
 	convert_to_pdf(output_fullpath=fullpath, stems=names)
 
 from typing import TextIO
-def iter_md_page(reader: TextIO):
+def iter_md_page(reader: TextIO, valid: Sequence[int]):
 	pages = {}
 	page = []
 	block = []
@@ -50,9 +50,13 @@ def iter_md_page(reader: TextIO):
 	lines = reader.readlines()
 	for line in lines:
 		ln = line.strip() 
-		if ln == '\u2120':
-			pages[pg] = page
+		if ln == '<br />':#'\u2120':
+			if len(block) > 0:
+				page.append(block)
+			if pg in valid:
+				pages[pg] = page
 			page = []
+			block = []
 			pg += 1
 			continue
 		if len(ln) > 0:
@@ -61,15 +65,19 @@ def iter_md_page(reader: TextIO):
 			if len(block) > 0:
 				page.append(block)
 				block = []
+	if len(page) > 0 and pg in valid:
+		if len(block) > 0:
+			page.append(block)
+		pages[pg] = page
 	return pages
 
 import re
-date_patt = re.compile(r"(%d+)月(%d+)日")
+date_patt = re.compile(r"(\d+)月(\d+)日")
 
 def get_day_from_page(page: Sequence[Sequence[str]]):
 	for block in page:
 		for line in block:
-			mt = re.match(date_patt, line)
+			mt = date_patt.search(line)
 			if mt:
 				return Date(int(mt[1]), int(mt[2]))
 
@@ -81,42 +89,53 @@ def get_wages_from_page(page: Sequence[Sequence[str]]):
 				nums = [n for n in num_line if n in '0123456789']
 				return int(''.join(nums))
 
-def fill_wages_in_db(app: AppType, main: Main):
+def fill_wages_in_db(app: AppType, main: Main, day=0):
 	lacking_wages_q = f"SELECT `day` from `{main.tbl_name}` WHERE `app` = ? AND `wages` IS NULL ORDER BY `day`;"
-	days = []
+	days = [day]
 	main.app = app
-	with closing(main.con.cursor()) as cur:
-		result = cur.execute(lacking_wages_q, (app.value,))
-		if not result:
-			print("No lacking wages found.")
-			return
-		days = [r[0] for r in result]
+	if not day:
+		with closing(main.con.cursor()) as cur:
+			result = cur.execute(lacking_wages_q, (app.value,))
+			if not result:
+				print("No lacking wages found.")
+				return
+			days = [r[0] for r in result]
 	fullpath = main.img_dir / f'202503_{app.name}.md'
 	reader = fullpath.open()
-	pages = (iter_md_page(reader))
-	for pg, page in iter_md_page(reader):
-		if pg not in [c[0] for c in result]:
-			continue
+	pages = iter_md_page(reader, days)
+	for pg, page in pages.items():
 		dt = get_day_from_page(page)
 		if not dt:
 			raise ValueError(f"No date is found in page {pg}")
 		if dt.day != pg:
 			raise ValueError(f"Mismatch date {dt.day} : page {pg}")
 		wages = get_wages_from_page(page)
-		put_wages_q = f"INSERT INTO `{main.tbl_name}` (`wages`) ?;"
+		title = page[0][0]
+		if not title:
+			raise ValueError("No title in the page!")
+		put_wages_q = f"UPDATE `{main.tbl_name}` SET `wages` = ?, `title` = ? WHERE `app` = {app.value} and `day` = {dt.day};"
 		with closing(main.con.cursor()) as cur:
-			inserted = cur.execute(put_wages_q, (wages,))
-			print(f"Inserted wages:{inserted}")
-
+			inserted = cur.execute(put_wages_q, (wages, title))
+			print(f"Inserted wages:{[i for i in inserted]}")
+		main.con.commit()
+from pprint import pp
+def delete_null_key_rows(main: Main):
+		delete_qry = f"DELETE FROM `{main.tbl_name}` WHERE `app` IS NULL OR `day` IS NULL;"
+		with closing(main.con.cursor()) as cur:
+			r = cur.execute(delete_qry)
+			pp(r)
+		main.con.commit()
 
 
 if __name__ == '__main__':
-	month = int(input('Month?:')) # int(sys.argv[1]) #block
+	month = int(sys.argv[1]) #block
+	day = int(input('Day?:'))
 	main = Main(month=month)
 	from consolemenu import ConsoleMenu
 	from consolemenu.items import FunctionItem
 	menu = ConsoleMenu("Convert PNG files to a PDF.")
 	menu.append_item(FunctionItem('TieMe to PDF', conv_to_pdf, [AppType.T, main]))
 	menu.append_item(FunctionItem('MercHal to PDF', conv_to_pdf, [AppType.M, main]))
-	menu.append_item(FunctionItem('Fill wages into DB(TM)', fill_wages_in_db, [AppType.T, main]))
+	menu.append_item(FunctionItem('Fill wages into DB(TM)', fill_wages_in_db, [AppType.T, main, day]))
+	menu.append_item(FunctionItem('Delete invalid rows in DB', delete_null_key_rows, [main]))
 	menu.show()
