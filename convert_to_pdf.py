@@ -3,6 +3,7 @@ import os, sys
 from enum import Enum
 from pathlib import Path
 from typing import Sequence, Iterator, Generator
+from pprint import pp
 
 from PIL import Image, ImageDraw
 import img2pdf
@@ -118,13 +119,22 @@ def fill_wages_in_db(app: AppType, main: Main, day=0):
 			inserted = cur.execute(put_wages_q, (wages, title))
 			print(f"Inserted wages:{[i for i in inserted]}")
 		main.con.commit()
-from pprint import pp
+
 def delete_null_key_rows(main: Main):
-		delete_qry = f"DELETE FROM `{main.tbl_name}` WHERE `app` IS NULL OR `day` IS NULL;"
-		with closing(main.con.cursor()) as cur:
-			r = cur.execute(delete_qry)
-			pp(r)
-		main.con.commit()
+	delete_qry = f"DELETE FROM `{main.tbl_name}` WHERE `app` IS NULL OR `day` IS NULL;"
+	with closing(main.con.cursor()) as cur:
+		r = cur.execute(delete_qry)
+		pp(r)
+	main.con.commit()
+
+def show_sum_of_wages(main: Main):
+	q = f"SELECT SUM(`wages`) FROM `{main.tbl_name}`;"
+	with closing(main.con.cursor()) as cur:
+		rr = cur.execute(q)
+		if not rr:
+			raise ValueError("No wages!")
+		print([r[0] for r in rr])
+		input('Hit Enter key:')
 
 
 if __name__ == '__main__':
@@ -138,4 +148,5 @@ if __name__ == '__main__':
 	menu.append_item(FunctionItem('MercHal to PDF', conv_to_pdf, [AppType.M, main]))
 	menu.append_item(FunctionItem('Fill wages into DB(TM)', fill_wages_in_db, [AppType.T, main, day]))
 	menu.append_item(FunctionItem('Delete invalid rows in DB', delete_null_key_rows, [main]))
+	menu.append_item(FunctionItem('Show sum of wages', show_sum_of_wages, [main]))
 	menu.show()
