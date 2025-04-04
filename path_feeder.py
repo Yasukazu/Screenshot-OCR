@@ -133,6 +133,12 @@ class PathFeeder:
 			break
 		return self.dir / (stem + self.ext) if stem else None
 
+import sqlite3
+class DbPathFeeder(PathFeeder):
+	txt_lines_db = Path(os.environ['TXT_LINES_DB'])
+	def __init__(self, year=0, month=0, from_=1, to=-1, input_type = FileExt.PNG, input_dir=input_dir, type_dir=True):
+		super().__init__(year, month, from_, to, input_type, input_dir, type_dir)
+
 def path_feeder(year=0, month=0, from_=1, to=-1, input_type:FileExt=FileExt.PNG, padding=True)-> Generator[tuple[Path | None, str, int], None, None]:
 	'''to=0:glob, -1:end of month
 	returns: directory, filename, day'''
