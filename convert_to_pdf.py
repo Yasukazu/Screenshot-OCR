@@ -1,3 +1,4 @@
+import re
 from contextlib import closing
 import os, sys
 from enum import Enum
@@ -43,18 +44,24 @@ def conv_to_pdf(app: AppType, main: Main):
 	convert_to_pdf(output_fullpath=fullpath, stems=names)
 
 from typing import TextIO
-def iter_md_page(reader: TextIO, valid: Sequence[int]):
+def iter_md_page(reader: TextIO, valid: Sequence[int]=[]):
 	pages = {}
 	page = []
 	block = []
 	pg = 1
+	def is_valid(pg):
+		if not valid:
+			return True
+		if pg in valid:
+			return True
+		return False
 	lines = reader.readlines()
 	for line in lines:
 		ln = line.strip() 
 		if ln == '<br />':#'\u2120':
 			if len(block) > 0:
 				page.append(block)
-			if pg in valid:
+			if is_valid(pg):
 				pages[pg] = page
 			page = []
 			block = []
@@ -66,15 +73,14 @@ def iter_md_page(reader: TextIO, valid: Sequence[int]):
 			if len(block) > 0:
 				page.append(block)
 				block = []
-	if len(page) > 0 and pg in valid:
+	if len(page) > 0 and is_valid(pg):
 		if len(block) > 0:
 			page.append(block)
 		pages[pg] = page
 	return pages
 
-import re
-date_patt = re.compile(r"(\d+)月(\d+)日")
 
+date_patt = re.compile(r"(\d+)月(\d+)日")
 def get_day_from_page(page: Sequence[Sequence[str]]):
 	for block in page:
 		for line in block:
@@ -120,6 +126,7 @@ def fill_wages_in_db(app: AppType, main: Main, day=0):
 			print(f"Inserted wages:{[i for i in inserted]}")
 		main.con.commit()
 
+
 def delete_null_key_rows(main: Main):
 	delete_qry = f"DELETE FROM `{main.tbl_name}` WHERE `app` IS NULL OR `day` IS NULL;"
 	with closing(main.con.cursor()) as cur:
@@ -135,6 +142,15 @@ def show_sum_of_wages(main: Main):
 			raise ValueError("No wages!")
 		print([r[0] for r in rr])
 		input('Hit Enter key:')
+
+class MdPage:
+	def __init__(self, input: Path, main: Main):
+		with input.open() as reader:
+			self.page = iter_md_page(reader)
+		self.main = main
+	
+	def get_title(self, pg=0):
+		return self.page[pg][0]
 
 
 if __name__ == '__main__':
