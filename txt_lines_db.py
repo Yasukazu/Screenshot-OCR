@@ -25,12 +25,13 @@ def create_tbl_if_not_exists(tbl_name: str):
 		cur.execute(create_tbl_sql.format(tbl_name))
 	con.commit()
 
+sqlite_fullpath = input_dir_root / str(YEAR) / get_db_name()
+
 _conn: list[sqlite3.Connection] = []
 
 def connect():
 	if _conn:
 		return _conn[0]
-	sqlite_fullpath = input_dir_root / str(YEAR) / get_db_name()
 	if not sqlite_fullpath.exists():
 		raise ValueError(f"sqlite fullpath:`{sqlite_fullpath}` does not exist!")
 	if sqlite3.threadsafety == 3:
@@ -50,8 +51,8 @@ if __name__ == '__main__':
 	with csv_fullpath.open('w') as out_csv:
 		writer = csv.writer(out_csv)
 		writer.writerow(each_field_without_last)
-		_conn = connect()
-		with closing(_conn.cursor()) as cur:
+		conn = connect()
+		with closing(conn.cursor()) as cur:
 			table_name = get_table_name(month)
 			sql = f"SELECT {','.join(each_field_without_last)} FROM `{table_name}` ORDER BY `day`"
 			rr = cur.execute(sql)
