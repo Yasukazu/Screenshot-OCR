@@ -204,25 +204,22 @@ import sqlite3
 
 
 class Main:
+	import txt_lines_db
 	def __init__(self, month=0, app=AppType.NUL):
 		self.my_ocr = MyOcr(month=month)
 		self.img_dir = self.my_ocr.path_feeder.dir
 		month = self.my_ocr.month
-		img_parent_dir = self.img_dir.parent
+		#img_parent_dir = self.img_dir.parent
 		self.app = app # tm
-		txt_lines_db = TxtLinesDB(img_parent_dir=img_parent_dir)
-		self.conn = txt_lines_db.conn
-		create_tbl_sql = f"CREATE TABLE if not exists `{self.tbl_name}` (app INTEGER, day INTEGER, wages INTEGER, title TEXT, stem TEXT, txt_lines BLOB, PRIMARY KEY (app, day))"
-		with closing(self.conn.cursor()) as cur:
-			cur.execute(create_tbl_sql)
-		self.conn.commit()
+		# txt_lines_db = TxtLinesDB(img_parent_dir=img_parent_dir)
+		self.conn = Main.txt_lines_db.conn
+		self.tbl_name = Main.txt_lines_db.get_table_name(month)
+		Main.txt_lines_db.create_tbl_if_not_exists(self.tbl_name)
 
 	@property
 	def month(self):
 		return self.my_ocr.month
-	@property
-	def tbl_name(self):
-		return Main.get_table_name(self.month)
+
 	def sum_wages(self):
 		with closing(self.conn.cursor()) as cur:
 			sum_q = f"SELECT SUM(wages) from `{self.tbl_name}`"
