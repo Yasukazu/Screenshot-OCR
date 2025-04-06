@@ -61,7 +61,7 @@ APP_TYPE_TO_STEM_END = MappingProxyType({
 })
 
 class MyOcr:
-	from path_feeder import input_dir
+	from path_feeder import input_dir_root
 	tools = pyocr.get_available_tools()
 	tool = tools[0]
 	#input_dir = input_dir # Path(os.environ['SCREEN_BASE_DIR'])
@@ -126,7 +126,7 @@ class MyOcr:
 
 	def __init__(self, month=0):
 		self.month = month
-		self.path_feeder = PathFeeder(input_dir=MyOcr.input_dir, type_dir=False, month=month)
+		self.path_feeder = PathFeeder(input_dir=MyOcr.input_dir_root, type_dir=False, month=month)
 		self.txt_lines: Sequence[pyocr.builders.LineBox] | None = None
 		self.image: Image.Image | None = None
 	def each_path_set(self):
@@ -156,7 +156,7 @@ class MyOcr:
 		return self
 	
 	def endswith(self, pattern: str):
-		for file in self.input_dir.iterdir():
+		for file in self.input_dir_root.iterdir():
 			if file.is_file and file.stem.endswith(pattern):
 				yield file
 
@@ -202,27 +202,29 @@ for tx in txt_lines:
 import pickle
 import sqlite3
 
+
 class Main:
-	sqlite_name = 'txt_lines.sqlite'
 	def __init__(self, month=0, app=AppType.NUL):
-		self.month = month
 		self.my_ocr = MyOcr(month=month)
 		self.img_dir = self.my_ocr.path_feeder.dir
+		month = self.my_ocr.month
 		img_parent_dir = self.img_dir.parent
-		sqlite_fullpath = img_parent_dir / Main.sqlite_name
 		self.app = app # tm
-		if sqlite3.threadsafety == 3:
-			check_same_thread = False
-		else:
-			check_same_thread = True
-		self.con = sqlite3.connect(str(sqlite_fullpath), check_same_thread=check_same_thread)
-		self.tbl_name = f"text_lines-{self.month:02}"
+		txt_lines_db = TxtLinesDB(img_parent_dir=img_parent_dir)
+		self.conn = txt_lines_db.conn
 		create_tbl_sql = f"CREATE TABLE if not exists `{self.tbl_name}` (app INTEGER, day INTEGER, wages INTEGER, title TEXT, stem TEXT, txt_lines BLOB, PRIMARY KEY (app, day))"
-		with closing(self.con.cursor()) as cur:
+		with closing(self.conn.cursor()) as cur:
 			cur.execute(create_tbl_sql)
+		self.conn.commit()
 
+	@property
+	def month(self):
+		return self.my_ocr.month
+	@property
+	def tbl_name(self):
+		return Main.get_table_name(self.month)
 	def sum_wages(self):
-		with closing(self.con.cursor()) as cur:
+		with closing(self.conn.cursor()) as cur:
 			sum_q = f"SELECT SUM(wages) from `{self.tbl_name}`"
 			result = cur.execute(sum_q)
 			if result:
@@ -231,7 +233,7 @@ class Main:
 	def get_existing_days(self, app_type: AppType):
 		qry = f"SELECT day from `{self.tbl_name}` where app = ?;"
 		prm = (app_type.value, ) # date.day)
-		with closing(self.con.cursor()) as cur:
+		with closing(self.conn.cursor()) as cur:
 			result = cur.execute(qry, prm)
 			if result:
 				return [r[0]	for r in result]
@@ -260,17 +262,17 @@ class Main:
 				wages = self.my_ocr.get_wages(app_type=app_type, txt_lines=txt_lines)
 				title = self.my_ocr.get_title(app_type, txt_lines, n)
 				pkl = pickle.dumps(txt_lines)
-				with closing(self.con.cursor()) as cur:
+				with closing(self.conn.cursor()) as cur:
 					cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app_type.value, date.day, wages, title, stem, pkl))
 				for line in txt_lines:
 					pp(line.content)
-				self.con.commit()
+				self.conn.commit()
 				ocr_done.append((app_type, date))
 		return ocr_done
 	def add_image_file_without_content_into_db(self, app_type: AppType, stem: str, date: Date, wages=None, title=None, pkl=None):
-		with closing(self.con.cursor()) as cur:
+		with closing(self.conn.cursor()) as cur:
 			cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app_type.value, date.day, wages, title, stem, pkl))
-		self.con.commit()
+		self.conn.commit()
 
 
 if __name__ == '__main__':

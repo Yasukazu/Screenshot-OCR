@@ -27,7 +27,7 @@ def convert_to_pdf(output_fullpath: Path, stems: Sequence[str], layout=PdfLayout
 			f.write(buff)
 
 from tool_pyocr import AppType, Main, Date
-from path_feeder import input_dir
+from path_feeder import input_dir_root
 
 def conv_to_pdf(app: AppType, main: Main):
 	main.app = app
@@ -82,23 +82,29 @@ def update_title_in_db_as_md(md: MdPage, main: Main, day: int):
 		cur.execute(update_title_q, (title,))
 	main.conn.commit()
 
+from simple_term_menu import TerminalMenu
+
+#    options = ["entry 1", "entry 2", "entry 3"]
+#    terminal_menu = TerminalMenu(options)
+#    menu_entry_index = terminal_menu.show()
 def show_title_in_db_then_ask_to_update_with_md(main: Main, app=AppType.T):
-	pages = get_pages_from_md(main=main, app=app)
+	md_pages = get_pages_from_md(main=main, app=app)
 	with closing(main.conn.cursor()) as cur:
-		for day, page in pages.items():
+		for day, page in md_pages.items():
 			get_title_q = f"SELECT `title` FROM `{main.tbl_name}` WHERE `day` = {day} AND `app` = {app.value};"
 			ans = cur.execute(get_title_q)
-			titles = [tt[0] for tt in ans]
-			if len(titles) > 1:
+			db_titles = [tt[0] for tt in ans]
+			if len(db_titles) > 1:
 				raise ValueError("Many titles for (day:{day}, app:{app.name})!")
-			print(f"DB title: {titles[0]}")
-			print(f".md title: {page.title}")
-			a = input(f"Like to update as md one?(Y/N):")
-			try:
-				if a.upper() == 'Y':
-					print("Starting DB update..")
-			except ValueError:
-				print("Invalid answer.")
+			options = [f"DB title: {db_titles[0]}", f".md title: {page.title}"]
+			for i, opt in enumerate(options):
+				print(f"{i}. {opt}")
+			entry = input(f"Input {[r for r in range(len(options))]} to update DB:")
+			if int(entry) > 0:
+				sql = f"UPDATE `{main.tbl_name}` SET `title` = ? WHERE `app` = {app.value} and `day` = {day};"
+				cur.execute(sql, (page.title,))
+				print("A title in MD updated DB.")
+		main.conn.commit()
 
 
 from typing import TextIO
@@ -205,15 +211,15 @@ def show_sum_of_wages(main: Main):
 
 
 if __name__ == '__main__':
-	month = int(sys.argv[1]) #block
-	day = int(input('Day?:'))
+	month = int(sys.argv[1])
+	#month = int(input('Month?:'))
 	main = Main(month=month)
 	from consolemenu import ConsoleMenu
 	from consolemenu.items import FunctionItem
 	menu = ConsoleMenu("Convert PNG files to a PDF.")
 	menu.append_item(FunctionItem('TieMe to PDF', conv_to_pdf, [AppType.T, main]))
 	menu.append_item(FunctionItem('MercHal to PDF', conv_to_pdf, [AppType.M, main]))
-	menu.append_item(FunctionItem('Fill wages into DB(TM)', fill_wages_in_db, [AppType.T, main, day]))
+	menu.append_item(FunctionItem('Fill wages into DB(TM)', fill_wages_in_db, [AppType.T, main]))
 	menu.append_item(FunctionItem('Delete invalid rows in DB', delete_null_key_rows, [main]))
 	menu.append_item(FunctionItem('Show sum of wages', show_sum_of_wages, [main]))
 	menu.append_item(FunctionItem('Update title', show_title_in_db_then_ask_to_update_with_md, [main]))

@@ -1,18 +1,25 @@
 import os
 from pathlib import Path
-from dotenv import load_dotenv
-dotenv = load_dotenv()
 
 home_dir = os.path.expanduser('~')
 home_path = Path(home_dir)
-input_dir = Path(os.environ['SCREEN_BASE_DIR'])
 
-assert input_dir.exists()
+SCREEN_BASE_DIR = 'SCREEN_BASE_DIR'
+from dotenv import load_dotenv
+is_dotenv_loaded = load_dotenv(verbose=True)
+
+try:
+	input_dir_root = Path(os.environ['SCREEN_BASE_DIR'])
+except KeyError:
+	raise ValueError(f"{SCREEN_BASE_DIR} is not set.")
+
+if not input_dir_root.exists():
+	raise ValueError(f"`{input_dir_root}` for {SCREEN_BASE_DIR} does not exist!")
 
 def path_pair_feeder(from_=1, to=31, input_ext='.png', output_ext='.tact'): #rng=range(0, 31)):
 	for day in range(from_, to + 1):
 		input_filename = f'2025-01-{day:02}{input_ext}'
-		input_fullpath = input_dir / input_filename
+		input_fullpath = input_dir_root / input_filename
 		if not input_fullpath.exists():
 			continue
 		input_path_noext, _ext = os.path.splitext(input_fullpath)
@@ -43,7 +50,7 @@ YearMonth = namedtuple('YearMonth', ['year', 'month'] )
 YEAR_FORMAT = "{:04}"
 MONTH_FORMAT = "{:02}"
 
-def get_last_month_path(dir: Path=input_dir, year=0, month=0)-> Path:
+def get_last_month_path(dir: Path=input_dir_root, year=0, month=0)-> Path:
 	last_month = get_last_month()
 	if not year:
 		year = last_month.year
@@ -72,16 +79,11 @@ def get_ymstr(year=0, month=0, sep=False)-> str:
 
 def get_input_path(year=0, month=0)-> Path:
 	ymstr = get_ymstr(year=year, month=month)
-	return input_dir / ymstr
+	return input_dir_root / ymstr
 
 from typing import Generator, Iterator
 class PathFeeder:
-	env_dict = None
-	@classmethod
-	def load_env(cls):
-		if not cls.env_dict:
-			cls.env_dict = load_dotenv()
-	def __init__(self, year=0, month=0, from_=1, to=-1, input_type:FileExt=FileExt.PNG, input_dir=input_dir, type_dir=True):
+	def __init__(self, year=0, month=0, from_=1, to=-1, input_type:FileExt=FileExt.PNG, input_dir=input_dir_root, type_dir=True):
 		last_date = get_year_month(year=year, month=month)
 		self.year = last_date.year
 		self.month = last_date.month
@@ -135,9 +137,15 @@ class PathFeeder:
 
 import sqlite3
 class DbPathFeeder(PathFeeder):
-	txt_lines_db = Path(os.environ['TXT_LINES_DB'])
-	def __init__(self, year=0, month=0, from_=1, to=-1, input_type = FileExt.PNG, input_dir=input_dir, type_dir=True):
+	img_file_ext = '.png'
+	from tool_pyocr import Main
+	def __init__(self, year=0, month=0, from_=1, to=-1, input_type = FileExt.PNG, input_dir=input_dir_root, type_dir=True):
 		super().__init__(year, month, from_, to, input_type, input_dir, type_dir)
+		from tool_pyocr import Main
+		
+
+		
+
 
 def path_feeder(year=0, month=0, from_=1, to=-1, input_type:FileExt=FileExt.PNG, padding=True)-> Generator[tuple[Path | None, str, int], None, None]:
 	'''to=0:glob, -1:end of month
@@ -145,7 +153,7 @@ def path_feeder(year=0, month=0, from_=1, to=-1, input_type:FileExt=FileExt.PNG,
 	last_date = get_year_month(year=year, month=month) # f"{year}{month:02}"
 	year = last_date.year
 	month = last_date.month
-	input_path = input_dir / int(year) / ("%02d" % month) / input_type.value.dir
+	input_path = input_dir_root / int(year) / ("%02d" % month) / input_type.value.dir
 	#if direc: input_path = input_path / direc
 	if to < 0:
 		to = monthrange(year, month)[1]
@@ -191,7 +199,7 @@ def get_imgnum_sfx(n):
 
 def get_tiff_fullpath(year=0, month=0)-> Path:
 	ym_str = get_ymstr(year=year, month=month, sep=True)
-	return input_dir / ''.join([ym_str, get_imgnum_sfx(32), TIFF_EXT])
+	return input_dir_root / ''.join([ym_str, get_imgnum_sfx(32), TIFF_EXT])
 
 if __name__ == '__main__':
 	path_feeder = PathFeeder()
