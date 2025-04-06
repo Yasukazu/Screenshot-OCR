@@ -114,7 +114,7 @@ class MyOcr:
 					mt2 = MyOcr.M_DATE_PATT_2.match(cntnt)
 					if mt and mt2:
 						grps = mt.groups()
-						date = Date(grps[1], grps[2])
+						date = Date(int(grps[1]), int(grps[2]))
 						return n, date
 				raise ValueError("Unmatch AppType.M txt_lines!")				
 			case AppType.T:
@@ -212,7 +212,7 @@ class Main:
 		#img_parent_dir = self.img_dir.parent
 		self.app = app # tm
 		# txt_lines_db = TxtLinesDB(img_parent_dir=img_parent_dir)
-		self.conn = Main.txt_lines_db.conn
+		self.conn = Main.txt_lines_db.connect()
 		self.tbl_name = Main.txt_lines_db.get_table_name(month)
 		Main.txt_lines_db.create_tbl_if_not_exists(self.tbl_name)
 
@@ -274,7 +274,7 @@ class Main:
 
 if __name__ == '__main__':
 	import sys
-	app = int(sys.argv[1])
+	app = AppType.T if int(sys.argv[1]) == 1 else AppType.M
 	month = int(sys.argv[2])
 	main = Main(month=month, app=app)
 	if len(sys.argv) > 4:
