@@ -135,13 +135,32 @@ class PathFeeder:
 			break
 		return self.dir / (stem + self.ext) if stem else None
 
+from contextlib import closing
 import sqlite3
+import txt_lines_db
+
 class DbPathFeeder(PathFeeder):
 	img_file_ext = '.png'
-	from tool_pyocr import Main
 	def __init__(self, year=0, month=0, from_=1, to=-1, input_type = FileExt.PNG, input_dir=input_dir_root, type_dir=True):
 		super().__init__(year, month, from_, to, input_type, input_dir, type_dir)
-		from tool_pyocr import Main
+	def feed(self, padding=True, delim='') -> Iterator[str]:
+			tbl_name = txt_lines_db.get_table_name(self.month)
+			sql = f"SELECT `day`, `stem` FROM `{tbl_name}`" + (f"WHERE day >= {self.from_} AND `day` < {self.to}"	if self.to > self.from_  else "") + " ORDER BY `day`;"
+			with closing(txt_lines_db.connect().cursor()) as cur:
+				rr = cur.execute(sql)
+				day_to_stem = {r[0]: r[1] for r in rr}
+				for day in day_to_stem:
+					stem = day_to_stem[day]
+					input_fullpath = self.input_path / (''.join([s for s in stem if s!= delim]) + self.input_type.value.ext)
+					if not padding:
+						if input_fullpath.exists():
+							yield stem
+					else:
+						yield stem if input_fullpath.exists() else ''
+		else:
+			stems = [f.stem for f in self.input_path.glob("??" + self.input_type.value.ext)]
+			yield from sorted(stems)
+
 		
 
 		
