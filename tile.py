@@ -44,7 +44,7 @@ def paged_png_feeder(layout=PdfLayout.a4pt):
 			for p in range(4):
 				fullpath = img_dir / f"{year}-{month:02}-{p + 1}.png"
 				if not fullpath.exists():
-					ValueError(f"{fullpath} does not exist!")
+					raise ValueError(f"{fullpath} does not exist!")
 				names.append(fullpath)
 			return names
 		case PdfLayout.a3lp:
@@ -53,7 +53,7 @@ def paged_png_feeder(layout=PdfLayout.a4pt):
 				fullpath_r = img_dir / f"{year}-{month:02}-{2 * p + 2}.png"
 				for fullpath in (fullpath_l, fullpath_r):
 					if not fullpath.exists():
-						ValueError(f"{fullpath} does not exist!")
+						raise ValueError(f"{fullpath} does not exist!")
 				sub_ext_list = ('L', 'R')
 				outpath = img_dir / f"{year}-{month:02}-{sub_ext_list[p]}.png"
 				l_image = Image.open(fullpath_l)
