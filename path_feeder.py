@@ -156,25 +156,22 @@ import txt_lines_db
 class DbPathFeeder(PathFeeder):
 	img_file_ext = '.png'
 
-	def __init__(self, year=0, month=0, from_=1, to=-1, input_type = FileExt.PNG, input_dir=input_dir_root, type_dir=True):
-		super().__init__(year, month, from_, to, input_type, input_dir, type_dir)
+	def __init__(self, year=0, month=0, from_to=-1, input_type = FileExt.PNG, input_dir=input_dir_root, type_dir=True):
+		super().__init__(year, month, from_to, input_type, input_dir, type_dir)
 
 	def feed(self, padding=True, delim='') -> Iterator[str]:
-		for dy in range(monthrange(self.year, self.month)[1]):
 			tbl_name = txt_lines_db.get_table_name(self.month)
 			day_list = f"({','.join([str(d) for d in self.days])})"
 			sql = f"SELECT `day`, `stem` FROM `{tbl_name}`" + (f"WHERE day in {day_list}") + " ORDER BY `day`;"
 			with closing(txt_lines_db.connect().cursor()) as cur:
 				rr = cur.execute(sql)
 				day_to_stem = {r[0]: r[1] for r in rr}
-				for day in day_to_stem:
-					stem = day_to_stem[day]
-					input_fullpath = self.input_path / (''.join([s for s in stem if s!= delim]) + self.input_type.value.ext)
-					if not padding:
-						if input_fullpath.exists():
-							yield stem
-					else:
-						yield stem if input_fullpath.exists() else ''
+			if padding:
+				for dy in range(monthrange(self.year, self.month)[1]):
+					yield (day_to_stem[dy] + self.input_type.value.ext) if dy in day_to_stem else ''
+			else:
+				for dy in day_to_stem:
+					yield (day_to_stem[dy] + self.input_type.value.ext)
 
 
 def path_feeder(year=0, month=0, from_=1, to=-1, input_type:FileExt=FileExt.PNG, padding=True)-> Generator[tuple[Path | None, str, int], None, None]:
@@ -183,7 +180,7 @@ def path_feeder(year=0, month=0, from_=1, to=-1, input_type:FileExt=FileExt.PNG,
 	last_date = get_year_month(year=year, month=month) # f"{year}{month:02}"
 	year = last_date.year
 	month = last_date.month
-	input_path = input_dir_root / int(year) / ("%02d" % month) / input_type.value.dir
+	input_path = input_dir_root / str(year) / ("%02d" % month) / input_type.value.dir
 	#if direc: input_path = input_path / direc
 	if to < 0:
 		to = monthrange(year, month)[1]
