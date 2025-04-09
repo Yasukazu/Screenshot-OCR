@@ -83,7 +83,7 @@ def get_input_path(year=0, month=0)-> Path:
 
 from typing import Generator, Iterator, Sequence
 class PathFeeder:
-	def __init__(self, year=0, month=0, days: Sequence[int] | range | int=-1, input_type:FileExt=FileExt.PNG, input_dir=input_dir_root, type_dir=True):
+	def __init__(self, year=0, month=0, days: Sequence[int] | range | int=-1, input_type:FileExt=FileExt.PNG, input_dir=input_dir_root, type_dir=False):
 		last_date = get_year_month(year=year, month=month)
 		self.year = last_date.year
 		self.month = last_date.month
@@ -156,8 +156,8 @@ import txt_lines_db
 class DbPathFeeder(PathFeeder):
 	img_file_ext = '.png'
 
-	def __init__(self, year=0, month=0, from_to=-1, input_type = FileExt.PNG, input_dir=input_dir_root, type_dir=True):
-		super().__init__(year, month, from_to, input_type, input_dir, type_dir)
+	def __init__(self, year=0, month=0, days=-1, input_type = FileExt.PNG, input_dir=input_dir_root, type_dir=True):
+		super().__init__(year, month, days, input_type, input_dir, type_dir)
 
 	def feed(self, padding=True, delim='') -> Iterator[str]:
 			tbl_name = txt_lines_db.get_table_name(self.month)
@@ -229,5 +229,6 @@ def get_tiff_fullpath(year=0, month=0)-> Path:
 	return input_dir_root / ''.join([ym_str, get_imgnum_sfx(32), TIFF_EXT])
 
 if __name__ == '__main__':
-	path_feeder = PathFeeder()
-	print ( path_feeder.first_fullpath)
+	path_feeder = DbPathFeeder()
+	#input_path = path_feeder
+
