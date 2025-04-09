@@ -152,26 +152,26 @@ class PathFeeder:
 from contextlib import closing
 import sqlite3
 import txt_lines_db
-
+from tool_pyocr import AppType
 class DbPathFeeder(PathFeeder):
 	img_file_ext = '.png'
 
-	def __init__(self, year=0, month=0, days=-1, input_type = FileExt.PNG, input_dir=input_dir_root, type_dir=True):
+	def __init__(self, year=0, month=0, days=-1, input_type = FileExt.PNG, input_dir=input_dir_root, type_dir=False):
 		super().__init__(year, month, days, input_type, input_dir, type_dir)
 
-	def feed(self, padding=True, delim='') -> Iterator[str]:
+	def feed(self, padding=False, delim='', app_type=AppType.T) -> Iterator[tuple[int, str]]:
 			tbl_name = txt_lines_db.get_table_name(self.month)
-			day_list = f"({','.join([str(d) for d in self.days])})"
-			sql = f"SELECT `day`, `stem` FROM `{tbl_name}`" + (f"WHERE day in {day_list}") + " ORDER BY `day`;"
+			day_list = f"({','.join([str(d + 1) for d in self.days])})"
+			sql = f"SELECT `day`, `stem` FROM `{tbl_name}`" + (f"WHERE day IN {day_list} AND app = {str(app_type.value)}") + " ORDER BY `day`;"
 			with closing(txt_lines_db.connect().cursor()) as cur:
 				rr = cur.execute(sql)
 				day_to_stem = {r[0]: r[1] for r in rr}
 			if padding:
-				for dy in range(monthrange(self.year, self.month)[1]):
-					yield (day_to_stem[dy] + self.input_type.value.ext) if dy in day_to_stem else ''
+				for dy in range(1, monthrange(self.year, self.month)[1] + 1):
+					yield dy, (day_to_stem[dy] + self.input_type.value.ext) if dy in day_to_stem else ''
 			else:
 				for dy in day_to_stem:
-					yield (day_to_stem[dy] + self.input_type.value.ext)
+					yield dy, (day_to_stem[dy] + self.input_type.value.ext)
 
 
 def path_feeder(year=0, month=0, from_=1, to=-1, input_type:FileExt=FileExt.PNG, padding=True)-> Generator[tuple[Path | None, str, int], None, None]:
@@ -229,6 +229,7 @@ def get_tiff_fullpath(year=0, month=0)-> Path:
 	return input_dir_root / ''.join([ym_str, get_imgnum_sfx(32), TIFF_EXT])
 
 if __name__ == '__main__':
-	path_feeder = DbPathFeeder()
-	#input_path = path_feeder
-
+	from pprint import pp
+	feeder = DbPathFeeder()
+	files = [f for f in feeder.feed()]
+	pp(files)
