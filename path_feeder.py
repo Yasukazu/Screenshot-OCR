@@ -81,9 +81,9 @@ def get_input_path(year=0, month=0)-> Path:
 	ymstr = get_ymstr(year=year, month=month)
 	return input_dir_root / ymstr
 
-from typing import Generator, Iterator
+from typing import Generator, Iterator, Sequence
 class PathFeeder:
-	def __init__(self, year=0, month=0, from_=1, to=-1, input_type:FileExt=FileExt.PNG, input_dir=input_dir_root, type_dir=True):
+	def __init__(self, year=0, month=0, days: Sequence[int] | range | int=-1, input_type:FileExt=FileExt.PNG, input_dir=input_dir_root, type_dir=True):
 		last_date = get_year_month(year=year, month=month)
 		self.year = last_date.year
 		self.month = last_date.month
@@ -91,8 +91,17 @@ class PathFeeder:
 		if not input_path.exists():
 			raise ValueError(f"No path: {input_path}")
 		self.input_path = input_path
-		self.to = monthrange(self.year, self.month)[1] if to < 0 else to
-		self.from_ = from_
+		match days:
+			case int():
+				last_day = monthrange(self.year, self.month)[1]
+				if days < 0:
+					self.days = range(0, last_day)
+				elif days < last_day:
+					self.days = [days]
+				else:
+					raise ValueError(f'Last {days=} is over {last_day=}!')
+			case _:
+				self.days = days
 		self.input_type = input_type
 		self.type_dir = type_dir
 	
@@ -107,19 +116,24 @@ class PathFeeder:
 	def glob(self, pattern='*'):
 		for file in self.input_path.glob(pattern=pattern):
 			yield file
+
+	def	stem_gen(self, day: int, delim=''):
+		return f"{day:02}" if self.type_dir else f"{self.month:02}{delim}{day:02}"
+
+
 	def feed(self, padding=True, delim='') -> Iterator[str]:
-		if (self.to + 1) - self.from_ > 0:
-			for day in range(self.from_, self.to + 1):
-				stem = f"{day:02}" if self.type_dir else f"{self.month:02}{delim}{day:02}"
-				input_fullpath = self.input_path / (''.join([s for s in stem if s!= delim]) + self.input_type.value.ext)
-				if not padding:
-					if input_fullpath.exists():
-						yield stem
-				else:
-					yield stem if input_fullpath.exists() else ''
-		else:
+		for dy in range(monthrange(self.year, self.month)[1]):
+			if dy in self.days:
+				stem = self.stem_gen(dy, delim=delim)
+				input_fullpath = self.input_path / (stem + self.input_type.value.ext) # ''.join([s for s in stem if s!= delim])
+				if not padding and not input_fullpath.exists():
+					raise FileNotFoundError(f"{input_fullpath=} does not exist!")
+				yield stem
+			else:
+				yield '' #stem if input_fullpath.exists() else ''
+		'''else:
 			stems = [f.stem for f in self.input_path.glob("??" + self.input_type.value.ext)]
-			yield from sorted(stems)
+			yield from sorted(stems)'''
 
 	@property
 	def first_name(self)-> str:
@@ -141,11 +155,15 @@ import txt_lines_db
 
 class DbPathFeeder(PathFeeder):
 	img_file_ext = '.png'
+
 	def __init__(self, year=0, month=0, from_=1, to=-1, input_type = FileExt.PNG, input_dir=input_dir_root, type_dir=True):
 		super().__init__(year, month, from_, to, input_type, input_dir, type_dir)
+
 	def feed(self, padding=True, delim='') -> Iterator[str]:
+		for dy in range(monthrange(self.year, self.month)[1]):
 			tbl_name = txt_lines_db.get_table_name(self.month)
-			sql = f"SELECT `day`, `stem` FROM `{tbl_name}`" + (f"WHERE day >= {self.from_} AND `day` < {self.to}"	if self.to > self.from_  else "") + " ORDER BY `day`;"
+			day_list = f"({','.join([str(d) for d in self.days])})"
+			sql = f"SELECT `day`, `stem` FROM `{tbl_name}`" + (f"WHERE day in {day_list}") + " ORDER BY `day`;"
 			with closing(txt_lines_db.connect().cursor()) as cur:
 				rr = cur.execute(sql)
 				day_to_stem = {r[0]: r[1] for r in rr}
@@ -157,13 +175,6 @@ class DbPathFeeder(PathFeeder):
 							yield stem
 					else:
 						yield stem if input_fullpath.exists() else ''
-		else:
-			stems = [f.stem for f in self.input_path.glob("??" + self.input_type.value.ext)]
-			yield from sorted(stems)
-
-		
-
-		
 
 
 def path_feeder(year=0, month=0, from_=1, to=-1, input_type:FileExt=FileExt.PNG, padding=True)-> Generator[tuple[Path | None, str, int], None, None]:
