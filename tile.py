@@ -102,21 +102,23 @@ def save_qpng_pages(ext_dir=FileExt.QPNG):
 class ArcFileExt(Enum):
 	TIFF = ('.tif', {'compression':"tiff_deflate"})
 	PDF = ('.pdf', {})
-
-def save_arc_pages(ext: ArcFileExt=ArcFileExt.TIFF):
-		imgs: list[Image.Image] = list(draw_onto_pages())
-		fullpath = img_dir / f"{year}-{month:02}-8x4{ext.value[0]}"
-		imgs[0].save(fullpath, save_all=True, append_images=imgs[1:], **ext.value[1])
+from tool_pyocr import AppType
+def save_arc_pages(ext: ArcFileExt=ArcFileExt.TIFF, app_type=AppType.NUL):
+	from path_feeder import DbPathFeeder
+	feeder = DbPathFeeder(app_type=app_type) if app_type in [AppType.M, AppType.T] else PathFeeder()
+	imgs: list[Image.Image] = list(draw_onto_pages(path_feeder=feeder))
+	fullpath = img_dir / f"{year}-{month:02}-8x4{ext.value[0]}"
+	imgs[0].save(fullpath, save_all=True, append_images=imgs[1:], **ext.value[1])
 
 from typing import Generator
 from path_feeder import path_feeder, FileExt
-def get_png_file_names()-> Generator[tuple[Path, str, int], None, None]:
+'''def get_png_file_names()-> Generator[tuple[Path, str, int], None, None]:
 	for path, stem, m in path_feeder(input_type=FileExt.PNG):
 		yield path, stem, m
 
 def get_quad_png_file_names()-> Generator[tuple[Path, str, int], None, None]:
 	for path, stem, m in path_feeder(input_type=FileExt.QPNG):
-		yield path, stem, m
+		yield path, stem, m'''
 
 DAY_NOMBRE_H = 50
 TXT_OFST = 0 # width-direction / horizontal
@@ -126,7 +128,7 @@ from digit_image import BasicDigitImage
 def draw_onto_pages(div=64, th=H_PAD // 2,
 	path_feeder: PathFeeder=PathFeeder(),
 	v_pad=16, h_pad=8, mode='L', dst_bg=ImageFill.BLACK)-> Iterator[Image.Image]:
-	# name_feeder = path_feeder.feed
+	
 	first_fullpath = path_feeder.first_fullpath
 	if not first_fullpath:
 		raise ValueError(f"No '{path_feeder.ext}' file in {path_feeder.dir}!")
@@ -156,19 +158,22 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 	def month_dots(ct, drw, img_w):
 		ttl.set_pit_len(img_w // 32)
 		ttl.set_org(*(ct[0] + (img_w // 32), ct[1]))
-		for frm, to in ttl.plot(month, ttl.Direc.RT):
+		for frm, to in ttl.plot(month, '>'):#ttl.Direc.RT):
 			drw.line((frm[0], frm[1], to[0], to[1]), fill=ImageFill.invert(dst_bg).value, width=int(th))
 
 	def get_image_blocks():
-		names = list(path_feeder.feed(padding=True))
-		name_blocks: Sequence[list[str]] = [names[:8], names[8:16], names[16:24], names[24:]]
+		day_and_names = list(path_feeder.feed(padding=True))
+		names = [dn[1] for dn in day_and_names]
+		name_blocks: Sequence[Sequence[str]] = [names[:8], names[8:16], names[16:24], names[24:]]
 		pad_size = 8 - len(name_blocks[-1])
 		name_blocks[-1] += [''] * pad_size
 		for i, block in enumerate(name_blocks):
 			yield concat_8_pages(block, number_str=f"{path_feeder.month:02}{(-0xa - i):x}")
 
 	digit_image_param_L = BasicDigitImage.calc_scale_from_height(80)
-	digit_image_feeder_L = BasicDigitImage(digit_image_param_L, bgcolor=ImageFill.BLACK)
+	from seg_node_pair import DigitStrokeFeeder
+	stroke_feeder = DigitStrokeFeeder(scale=digit_image_param_L.scale, offset=digit_image_param_L.padding)
+	digit_image_feeder_L = BasicDigitImage(stroke_feeder=stroke_feeder, param=digit_image_param_L, bgcolor=ImageFill.BLACK)
 	# digit_image_param_L = BASIC_DIGIT_IMAGE_PARAM_LIST[1]
 	from put_number import put_number
 	
@@ -308,6 +313,14 @@ def get_concat_v(imim_len: int, img_size: tuple[int, int], imim: Sequence[Image.
 	return dst
 
 if __name__ == '__main__':
-	#save_pages()
-	convert_to_pdf(layout=PdfLayout.a3lp)
-	#save_arc_pages()
+	from consolemenu import ConsoleMenu
+	from consolemenu.items import FunctionItem, SubmenuItem
+	menu = ConsoleMenu("Tile Menu")
+	submenu = ConsoleMenu("Save images as TIFF")
+	for fi in [FunctionItem('save TM screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.T}),
+			FunctionItem('save MH screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.M}),
+			]:
+		submenu.append_item(fi)
+	menu.append_item(SubmenuItem('Save as TIFF submenu', submenu))
+	menu.append_item(FunctionItem('convert_to_pdf', convert_to_pdf, kwargs={'layout':PdfLayout.a3lp}))
+	menu.show()

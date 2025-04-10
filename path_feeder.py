@@ -121,16 +121,16 @@ class PathFeeder:
 		return f"{day:02}" if self.type_dir else f"{self.month:02}{delim}{day:02}"
 
 
-	def feed(self, padding=True, delim='') -> Iterator[str]:
+	def feed(self, padding=True, delim='') -> Iterator[tuple[int, str]]:
 		for dy in range(monthrange(self.year, self.month)[1]):
 			if dy in self.days:
 				stem = self.stem_gen(dy, delim=delim)
 				input_fullpath = self.input_path / (stem + self.input_type.value.ext) # ''.join([s for s in stem if s!= delim])
 				if not padding and not input_fullpath.exists():
 					raise FileNotFoundError(f"{input_fullpath=} does not exist!")
-				yield stem
+				yield dy, stem
 			else:
-				yield '' #stem if input_fullpath.exists() else ''
+				yield dy, '' #stem if input_fullpath.exists() else ''
 		'''else:
 			stems = [f.stem for f in self.input_path.glob("??" + self.input_type.value.ext)]
 			yield from sorted(stems)'''
@@ -156,13 +156,14 @@ from tool_pyocr import AppType
 class DbPathFeeder(PathFeeder):
 	img_file_ext = '.png'
 
-	def __init__(self, year=0, month=0, days=-1, input_type = FileExt.PNG, input_dir=input_dir_root, type_dir=False):
+	def __init__(self, year=0, month=0, days=-1, input_type = FileExt.PNG, input_dir=input_dir_root, type_dir=False, app_type=AppType.T):
 		super().__init__(year, month, days, input_type, input_dir, type_dir)
+		self.app_type = app_type
 
-	def feed(self, padding=False, delim='', app_type=AppType.T) -> Iterator[tuple[int, str]]:
+	def feed(self, padding=False, delim='') -> Iterator[tuple[int, str]]:
 			tbl_name = txt_lines_db.get_table_name(self.month)
 			day_list = f"({','.join([str(d + 1) for d in self.days])})"
-			sql = f"SELECT `day`, `stem` FROM `{tbl_name}`" + (f"WHERE day IN {day_list} AND app = {str(app_type.value)}") + " ORDER BY `day`;"
+			sql = f"SELECT `day`, `stem` FROM `{tbl_name}`" + (f"WHERE day IN {day_list} AND app = {str(self.app_type.value)}") + " ORDER BY `day`;"
 			with closing(txt_lines_db.connect().cursor()) as cur:
 				rr = cur.execute(sql)
 				day_to_stem = {r[0]: r[1] for r in rr}
