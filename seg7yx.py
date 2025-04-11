@@ -69,21 +69,21 @@ class Seg7yx:
 	@classmethod
 	def slant_ratio_by_y(cls, y: int)-> float:
 		return 1 - y / 2
-
+type seq_i_i = Sequence[tuple[int, int]]
 class Seg7Node6:
 	def __init__(self, slant=0.0): # node6: Sequence[Sequence[float]]):
 		self.node6 = Seg7yx(slant=slant).to_list()
 	#def scale_offset(self, scale: int, offset: Sequence[int]):		return self._offset(offset, self._scale(scale, self))
 
 	@classmethod
-	def scale_offset(cls, scale: int, offset: Sequence[int], seg7node6: 'Seg7Node6'):
-		return tuple(cls._offset(offset, cls._scale(scale, seg7node6)))
+	def scale_offset(cls, scale: int, offset: Sequence[int], nodes: seq_i_i):#'Seg7Node6'):
+		return tuple(cls._offset(offset, cls._scale(scale, nodes)))
 	@classmethod
-	def _offset(cls, offset: Sequence[int], nodes: Sequence[tuple[float, float]]):
-		return (tuple([x + offset[0], y + offset[1]]) for (x, y) in nodes)
+	def _offset(cls, offset: Sequence[int], nodes: seq_i_i):#node6):#Sequence[tuple[float, float]]):
+		return [(x + offset[0], y + offset[1]) for (x, y) in nodes]
 	@classmethod
-	def _scale(cls, scale: int, seg7node6: 'Seg7Node6'):
-		return (tuple([xx[0] * scale, xx[1] * scale]) for xx in seg7node6.node6)
+	def _scale(cls, scale: int, nodes: seq_i_i):#Sequence[tuple[int, int]]):#'Seg7Node6'):
+		return [(xx[0] * scale, xx[1] * scale) for xx in nodes]#.node6))
 
 class Seg7yxSlant(Enum):
 	SLANT00 = Seg7yx().to_node6() # [[0, 0], [1, 0], [1, 1], [1, 2], [0, 2], [0, 1]]
