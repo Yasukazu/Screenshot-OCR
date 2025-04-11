@@ -12,12 +12,16 @@ font_dir = Path(screen_base_dir_name) / 'font'
 if not font_dir.exists():
 	raise ValueError(f"`{font_dir=}` does not exists!")
 arc_font_file_name = 'misaki_gothic-digit.tif'
-def get_misaki_digit_images():
+FONT_SIZE = (8, 10)
+def get_misaki_digit_images(scale=1):
+	re_size = (np.array(FONT_SIZE, dtype=np.int64) * scale).tolist() if scale > 1 else None
 	arc_font_fullpath = font_dir / arc_font_file_name
 	image_list = {}
 	if arc_font_fullpath.exists():
 		page = Image.open(str(arc_font_fullpath))
 		for n, page in enumerate(ImageSequence.Iterator(page)):
+			if re_size:
+				page = page.resize(re_size)
 			image_list[n]=(page)
 		return image_list
 	font_file_name = 'misaki_gothic.png'
@@ -41,7 +45,7 @@ def get_misaki_digit_images():
 	return {n: img for (n, img) in enumerate(image_list)}
 
 if __name__ == '__main__':
-	images = get_misaki_digit_images()
+	images = get_misaki_digit_images(8)
 	for n, image in (images).items():
 		print(n)
 		image.show()
