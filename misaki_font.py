@@ -13,6 +13,8 @@ if not font_dir.exists():
 	raise ValueError(f"`{font_dir=}` does not exists!")
 arc_font_file_name = 'misaki_gothic-digit.tif'
 FONT_SIZE = (8, 10)
+def array(seq):
+	return np.array(seq, np.int)
 def get_misaki_digit_images(scale=1):
 	re_size = (np.array(FONT_SIZE, dtype=np.int64) * scale).tolist() if scale > 1 else None
 	arc_font_fullpath = font_dir / arc_font_file_name
@@ -29,9 +31,13 @@ def get_misaki_digit_images(scale=1):
 	if not font_fullpath.exists():
 		raise ValueError(f"`{font_fullpath=}` does not exists!")
 	full_image = Image.open(str(font_fullpath))
-	ku_ten = np.array([16, 3], dtype=np.int64)
-	end_point = ku_ten * 8
-	offset = end_point - np.array([8, 10])
+	num_ku_ten = (3, 16)
+	def kuten_to_xy(*kuten: int):
+		return kuten[1] - 1, kuten[0] - 1
+	num_pos = kuten_to_xy(3, 16)
+	num_addr = np.array(num_pos, dtype=np.int64)
+	offset = (num_addr * 8) - np.array([0, 2], dtype=np.int64)
+	end_point = offset + np.array(FONT_SIZE)
 	area = np.array([offset, end_point])
 	image_list = []
 	for i in range(10):
