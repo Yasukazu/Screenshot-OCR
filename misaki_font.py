@@ -60,6 +60,10 @@ def get_misaki_digit_images(scale=1):
 
 if __name__ == '__main__':
 	images = get_misaki_digit_images(8)
+	a_img = images[0xa]
+	f_img = images[0xf]
+	m_img = images[0xf + 1]
+	p_img = images[0xf + 2]
 	for n, image in (images).items():
 		print(n)
-		image.show()
+		#image.show()
