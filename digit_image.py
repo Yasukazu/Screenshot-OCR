@@ -8,11 +8,11 @@ from PIL import ImageDraw, Image
 import numpy as np
 from strok7 import STRK_DICT_STEM, StrokeSlant, i_i_tpl
 from format_num import FormatNum, HexFormatNum, conv_num_to_bin, formatnums_to_bytearray
-from num_strokes import SEGPOINTS_MAX, DigitStrokes, BasicDigitStrokes
+from num_strokes import SEGPOINTS_MAX #, DigitStrokes, BasicDigitStrokes
 from segment_strokes import hex_to_bit8, SegmentStrokes
 from seg_node_pair import DigitStrokeFeeder, encode_str_to_seg7bit8
 from seg7bit8 import Seg7Bit8
-
+from digit_strokes import DigitStrokes
 class ImageFill(Enum): # single element tuple for ImageDraw color
 	BLACK = (0,)
 	WHITE = (0xff,)
@@ -61,14 +61,14 @@ class DigitImage:
 		width = scale + 2 * padding + line_width
 		return DigitImageParam(width=width, scale=scale, padding=(padding, padding), line_width=line_width)
 
-	def __init__(self, stroke_feeder: DigitStrokeFeeder, bgcolor=ImageFill.WHITE, line_width=STANDARD_LINE_WIDTH): # slant: StrokeSlant=StrokeSlant.SLANT00, scale: int=MIN_SCALE,  offset=(STANDARD_PADDING, STANDARD_PADDING)#=BasicDigitStrokes()
+	def __init__(self, stroke_feeder: DigitStrokes, bgcolor=ImageFill.WHITE, line_width=STANDARD_LINE_WIDTH): # slant: StrokeSlant=StrokeSlant.SLANT00, scale: int=MIN_SCALE,  offset=(STANDARD_PADDING, STANDARD_PADDING)#=BasicDigitStrokes()
 		self.stroke_feeder = stroke_feeder
 		self.slant = stroke_feeder.slant
 		self.scale = stroke_feeder.scale
 		self.offset = stroke_feeder.offset
 		self.line_width = line_width
 		self.bgcolor = bgcolor
-		self.get: Callable[[Seg7Bit8], Image.Image] = lru_cache(maxsize=SEGPOINTS_MAX)(self._get)
+		self.get: Callable[[int], Image.Image] = lru_cache(maxsize=SEGPOINTS_MAX)(self._get)
 
 	@classmethod
 	def calc_font_scale(cls, scale: int=MIN_SCALE, line_width_ratio: float=STANDARD_LINE_WIDTH_RATIO, padding_ratio: float=STANDARD_PADDING_RATIO)-> DigitImageCalcResult:
@@ -85,12 +85,14 @@ class DigitImage:
 		img_h = 2 * self.stroke_feeder.scale + 2 * self.stroke_feeder.offset[1]
 		return img_w, img_h
 
-	def _get(self, sb: Seg7Bit8)-> Image.Image:
+	def _get(self, sb: int)-> Image.Image: # Seg7Bit8
 		img = Image.new('L', self.size, color=self.bgcolor.value)
 		drw = ImageDraw.Draw(img)
-		strokes = self.stroke_feeder.get_digit(sb)
-		for stroke in strokes:
-			drw.line(stroke, width=self.line_width, fill=ImageFill.invert(self.bgcolor).value, joint='curve')
+		strokes = self.stroke_feeder.get(sb)
+		for st in strokes:
+			if st[0] and st[1]:
+				ft = st[0], st[1]
+				drw.line(ft, width=self.line_width, fill=ImageFill.invert(self.bgcolor).value, joint='curve')
 		return img
 
 
@@ -188,12 +190,17 @@ if __name__ == '__main__':
 	from pprint import pp
 	height = 40
 	bdi_param = BasicDigitImage.calc_scale_from_height(height)
-	stroke_feeder = DigitStrokeFeeder(scale=bdi_param.scale, offset=bdi_param.padding)
+	digit_strokes = DigitStrokes(scale=bdi_param.scale, offset=bdi_param.padding)
+	stroke_feeder = DigitStrokeFeeder(digit_strokes=digit_strokes, scale=bdi_param.scale, offset=bdi_param.padding)
 	num = 1.23
 	num_str = "%.2f" % num
 	digits = list(encode_str_to_seg7bit8(num_str))
-	bdi = DigitImage(stroke_feeder=stroke_feeder, line_width=bdi_param.line_width)
-	for digit in digits:
+	bdi = DigitImage(stroke_feeder=digit_strokes, line_width=bdi_param.line_width)
+	zero_to_9 = [c for c in '0123456789']
+	c_to_int = {c:n for (n, c) in enumerate(zero_to_9)}
+	c_to_int['.'] = 16
+	for c in num_str:
+		digit = c_to_int[c]
 		digit_image = bdi.get(digit)
 		digit_image.show()
 

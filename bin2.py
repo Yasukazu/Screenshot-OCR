@@ -1,3 +1,4 @@
+from seg7bit8 import Seg7Bit8, SEG7BIT8_ARRAY
 class Bin2(int):
 	'''LSB is dot'''
 	@property
@@ -12,8 +13,7 @@ class Bin2(int):
 	def dot(self)-> bool:
 		return bool(self & 1)
 
-	def to_bit8(self)-> 'Seg7Bit8':
-		from seg7bit8 import Seg7Bit8, SEG7BIT8_ARRAY
+	def to_bit8(self)-> Seg7Bit8 | None:
 		of_int = self.of_int
 		if not of_int:
 			return Seg7Bit8.H if self.dot else None

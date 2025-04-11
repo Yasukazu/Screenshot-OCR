@@ -3,7 +3,7 @@ from typing import Sequence, Callable
 from functools import lru_cache
 import csv
 import numpy as np
-from seg7yx import Seg7yxSlant
+from seg7yx import SlantedNode6
 
 type ii_ii = tuple[tuple[int, int], tuple[int, int]]
 type i_i_tpl_tpl = dict[str, ii_ii]
@@ -58,13 +58,10 @@ class Sp:
 	def slanted(self, slant: StrokeSlant=NO_SLANT)-> f_i_tpl:
 		return self.slanted_x(slant), self.y
 
-	def scale_offset(self, slant: Seg7yxSlant=Seg7yxSlant.SLANT02, scale: int=1, offset: tuple[int, int]=(0, 0))-> i_i_tpl:
-		'''also slant'''
-		slant_map = slant.value
+	def scale_offset(self, node6: SlantedNode6=SlantedNode6.SLANT02, scale: int=1, offset: tuple[int, int]=(0, 0))-> i_i_tpl:
+		slant_map = node6.value
 		slanted_x = slant_map[self.y][self.x]
 		return round(scale * slanted_x) + offset[0], scale * self.y + offset[1]
-
-
 
 class MySp(Sp):
 	def __init__(self, x: int, y: int, slant_enum=StrokeSlant.SLANT00, scale_value=1, offset_value=(0, 0)):
@@ -74,7 +71,7 @@ class MySp(Sp):
 		self.offset_value = offset_value
 	
 	def scale_offset(self, slant = StrokeSlant.SLANT00, scale = 1, offset = (0, 0)):
-		return super().scale_offset(slant=self.slant_enum, scale=self.scale_value, offset=self.offset_value)
+		return super().scale_offset(node6=self.slant_enum, scale=self.scale_value, offset=self.offset_value)
 
 class Sp0(Sp):
 	def __init__(self, x: int):

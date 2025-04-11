@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Sequence, Iterator, Callable
 from types import MappingProxyType
 import numpy as np
-from seg7yx import Seg7yx, Seg7yxSlant, Seg7Node6, node6
+from seg7yx import Seg7yx, SlantedNode6, Seg7Node6, node6
 from seg_7_digits import Seg7Bit8, SEG7_DIGIT_ARRAY
 from seg7bit8 import SEG7BIT8_ARRAY
 NODE6_ARRAY = (
@@ -44,7 +44,7 @@ class Seg7Node6Pair:
 			assert len(rr) == 0'''
 
 	@classmethod
-	def slant_scale_offset(cls, slant=Seg7yxSlant.SLANT02, scale=1, offset=(0, 0), *spsp: 'Seg7Node6Pair'):
+	def slant_scale_offset(cls, slant=SlantedNode6.SLANT02, scale=1, offset=(0, 0), *spsp: 'Seg7Node6Pair'):
 		arr = np.array(slant.value) #seg7yx.Seg7yx(.to_list())
 		if not isinstance(offset, np.ndarray):
 			offset = np.array(offset)
@@ -143,23 +143,28 @@ def convert_str_to_seg7elems(n_s: str)-> Iterator[Sequence[Seg7Elem]]:
 		seg7elems = expand_seg7bit8_to_seg7elems(digital_bits)
 		yield seg7elems
 		i += 1
-
+from digit_strokes import DigitStrokes
 class DigitStrokeFeeder:
 	'''Feeds strokes from Seg7Bit8'''
 	max_size = 20
-	def __init__(self, scale: int=1, offset: Sequence[int]=(0, 0), slant=0.2, padding=(0.2, 0.2), dot_shift=3):
+	def __init__(self, digit_strokes: DigitStrokes, scale: int=1, offset: Sequence[int]=(0, 0), padding=(0.2, 0.2), dot_shift=3):#slant=0.2, 
+		self.digit_strokes = digit_strokes
 		self.scale = scale
 		self.offset = offset
 		self.slant = slant
 		seg7node6 = Seg7Node6(slant=slant)
-		self.slant_scale_offset_map6 = Seg7Node6.scale_offset(scale=scale, offset=offset, seg7node6=seg7node6)
-		max_x = max(*[x for (x, y) in self.slant_scale_offset_map6])
-		max_y = max(*[y for (x, y) in self.slant_scale_offset_map6])
-		self.size = (round(max_x * (1 + padding[0])), round(max_y * (1 + padding[1])))
+		self.slant_scale_offset_map6 = Seg7Node6.scale_offset(scale=scale, offset=offset, nodes=seg7node6.node6)
+		self.max_x = max(*[x for (x, y) in self.slant_scale_offset_map6])
+		self.max_y = max(*[y for (x, y) in self.slant_scale_offset_map6])
 		self.dot_shift = dot_shift
 		self.get_elem: Callable[[Seg7Elem], Sequence[Sequence[float]]]= lru_cache(maxsize=20)(self._feed_elem)
 		self.get_digit: Callable[[Seg7Bit8], list[list[list[int]]]]= lru_cache(maxsize=20)(self._feed_digit)
-	
+		self.padding = padding
+
+	@property
+	def size(self):
+		return (round(self.max_x * (1 + self.padding[0])), round(self.max_y * (1 + self.padding[1])))
+
 	def _feed_elem(self, elem: Seg7Elem, merge=False):
 		'''convert_seg7bit8_to_strokes'''
 		seg7node6pair = elem.value
@@ -207,7 +212,7 @@ if __name__ == '__main__':
 	img.show()
 	sys.exit(0)
 	seg7node6 = Seg7Node6(slant=0.2)#.to_list()
-	slant_scale_offset_map = Seg7Node6.scale_offset(scale=scale, offset=offset, seg7node6=seg7node6)
+	slant_scale_offset_map = Seg7Node6.scale_offset(scale=scale, offset=offset, nodes=seg7node6)
 	max_x = max(*[x for (x, y) in slant_scale_offset_map])
 	max_y = max(*[y for (x, y) in slant_scale_offset_map])
 	size = (round(max_x * 1.2), round(max_y * 1.2))

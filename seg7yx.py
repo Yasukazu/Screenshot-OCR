@@ -2,10 +2,14 @@ from typing import Sequence, Iterator
 from enum import Enum
 from dataclasses import dataclass
 type _f_f_ = tuple[float, float]
-type node6 = tuple[_f_f_, _f_f_, _f_f_, _f_f_, _f_f_, _f_f_]
+#type node6 = tuple[_f_f_, _f_f_, _f_f_, _f_f_, _f_f_, _f_f_]
+
 @dataclass
 class Node6:
-	xy6: node6
+	_nodes: Sequence[_f_f_]
+	def __post_init__(self):
+		if len(self._nodes) != 6:
+			raise ValueError(f"Sequence length({len(self._nodes)=}) is not 6!")
 class Seg7yx:
 	'''3-row 2-column float array'''
 	node_dict = {
@@ -19,34 +23,34 @@ class Seg7yx:
 			(0, 1),
 		], slant=0.0):
 		self.yx = yx
-		if slant > 0:
-			self._slant(slant)
+		self.slant = slant
+		#if slant > 0:			self._slant(slant)
 		# self.node_list = [scale * Seg7yx.node_dict[x] for x in range(6)]
 		# self.scale = scale
 
-	def to_list(self)-> node6: #list[list[float]]:
+	def _to_list(self)-> list[tuple[float, float]]:
 		r = []
 		for y, xx in enumerate(self.yx):
-			r += tuple([(x, y) for x in xx])
-		return tuple(r)
+			r.append(tuple([(x, y) for x in xx]))
+		return (r)
 	
-	def to_node6(self)-> node6:
+	def to_node6(self):
 		'''dst[2] = src[3]
 		dst[3] = src[5]
 		dst[5] = src[2]'''
-		src = self.to_list()
-		return (src[0], src[1], src[3], src[5], src[4], src[2])
+		src = self._to_list()
+		return src[0], src[1], src[3], src[5], src[4], src[2]
 
-	def slanted_node6(self, slant_r: float)-> Node6:
-		slanted = [self.slanted_xx(slant_r, xx, y) for y, xx in enumerate(self.yx)]
+	def slanted_node6(self):#, slant_r=0.0):#-> Node6:
+		slanted = [self.slanted_xx(slant=self.slant, xx=xx, y=y) for y, xx in enumerate(self.yx)]
 		src = []
 		for y, xx in enumerate(slanted):
-			src += [(x, y) for x in xx]
+			src.append(tuple([(x, y) for x in xx]))
 		dst = src.copy()
 		dst[2] = src[3]
 		dst[3] = src[5]
 		dst[5] = src[2]
-		return Node6(dst)
+		return tuple(dst)
 
 	def to_tuple(self)-> Sequence[Sequence[float]]:
 		r = []
@@ -54,8 +58,7 @@ class Seg7yx:
 			r += [(x, y) for x in xx]
 		return tuple(r)
 
-	def _slant(self, slant_r: float):
-		self.yx = [self.slanted_xx(slant_r, xx, y) for y, xx in enumerate(self.yx)]
+	#def _slant(self, slant_r: float):		self.yx = [self.slanted_xx(slant_r, xx, y) for y, xx in enumerate(self.yx)]
 
 	@classmethod
 	def slanted_new(cls, slant_r: float, yx: 'Seg7yx')-> 'Seg7yx':
@@ -69,32 +72,33 @@ class Seg7yx:
 	@classmethod
 	def slant_ratio_by_y(cls, y: int)-> float:
 		return 1 - y / 2
-type seq_i_i = Sequence[tuple[int, int]]
+type seq_f_f = Sequence[tuple[float, float]]
 class Seg7Node6:
-	def __init__(self, slant=0.0): # node6: Sequence[Sequence[float]]):
-		self.node6 = Seg7yx(slant=slant).to_list()
-	#def scale_offset(self, scale: int, offset: Sequence[int]):		return self._offset(offset, self._scale(scale, self))
-
+	def __init__(self, slant=0.0):
+		self.slant = slant
+	@property
+	def node6(self):#, slant_r=0.0):
+		return Seg7yx(slant=self.slant).slanted_node6()
 	@classmethod
-	def scale_offset(cls, scale: int, offset: Sequence[int], nodes: seq_i_i):#'Seg7Node6'):
-		return tuple(cls._offset(offset, cls._scale(scale, nodes)))
+	def scale_offset(cls, scale: int, offset: Sequence[int], nodes: seq_f_f):
+		return cls._offset(offset, cls._scale(scale, nodes))
 	@classmethod
-	def _offset(cls, offset: Sequence[int], nodes: seq_i_i):#node6):#Sequence[tuple[float, float]]):
+	def _offset(cls, offset: Sequence[int], nodes: seq_f_f):
 		return [(x + offset[0], y + offset[1]) for (x, y) in nodes]
 	@classmethod
-	def _scale(cls, scale: int, nodes: seq_i_i):#Sequence[tuple[int, int]]):#'Seg7Node6'):
-		return [(xx[0] * scale, xx[1] * scale) for xx in nodes]#.node6))
+	def _scale(cls, scale: int, nodes: seq_f_f):
+		return [(xx[0] * scale, xx[1] * scale) for xx in nodes]
 
-class Seg7yxSlant(Enum):
+class SlantedNode6(Enum):
 	SLANT00 = Seg7yx().to_node6() # [[0, 0], [1, 0], [1, 1], [1, 2], [0, 2], [0, 1]]
-	SLANT02 = Seg7yx().slanted_node6(0.2) # [[0.2, 0], [1.2, 0], [1.1, 1], [1.0, 2], [0.0, 2], [0.1, 1]]
+	SLANT02 = Seg7yx(slant=0.2).slanted_node6() # [[0.2, 0], [1.2, 0], [1.1, 1], [1.0, 2], [0.0, 2], [0.1, 1]]
 
 if __name__ == '__main__':
 	from pprint import pp
 	# s7yx = Seg7yx() s7yx.slanted_seg7
 	seg7node6 = Seg7Node6(slant=0.2)
-	scale10_offset100x200_seg7node6 = Seg7Node6.scale_offset(10, (100, 200), seg7node6)
-	scale20_offset200x300_seg7node6 = Seg7Node6.scale_offset(20, (200, 300), seg7node6)
+	scale10_offset100x200_seg7node6 = Seg7Node6.scale_offset(10, (100, 200), seg7node6.node6)
+	scale20_offset200x300_seg7node6 = Seg7Node6.scale_offset(20, (200, 300), seg7node6.node6)
 	print()
 	#offset_scaled = Seg7yx.offset_scaled((100,200), 10, s7yx.slanted_seg7(0.2))
 	#s7yx.slant_scale_offset(0.2, 10, (100, 200))
