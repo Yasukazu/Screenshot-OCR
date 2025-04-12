@@ -1,25 +1,38 @@
 # Misaki font
 import numpy as np
+import cv2
 from PIL import Image, ImageSequence
 from dotenv import load_dotenv
 load_dotenv()
 import sys,os
 from pathlib import Path
+
 screen_base_dir_name = os.getenv('SCREEN_BASE_DIR')
+
 if not screen_base_dir_name:
 	raise ValueError(f"{screen_base_dir_name=} is not set in env.!")
+
+screen_dir = Path(screen_base_dir_name)
 font_dir = Path(screen_base_dir_name) / 'font'
+
 if not font_dir.exists():
 	raise ValueError(f"`{font_dir=}` does not exists!")
+
 arc_font_file_name = 'misaki_gothic-digit.tif'
+
 FONT_SIZE = (8, 8)
+
 type ku = tuple[tuple[int, int], int]
+
 DIGIT_KU: ku = (3, 16),10
 HEX_KU: ku = (3, 33),6
 TEN_KU: ku = (1, 4),2
+
 def array(seq):
 	return np.array(seq, np.int64)
+
 font_size_array = array(FONT_SIZE)
+
 def get_misaki_digit_images(scale=1):
 	re_size = (array(FONT_SIZE) * scale).tolist() if scale > 1 else None
 	arc_font_fullpath = font_dir / arc_font_file_name
@@ -58,25 +71,62 @@ def get_misaki_digit_images(scale=1):
 	image_list[0].save(str(arc_font_fullpath),
 		save_all=True, append_images=image_list[1:]) # compression='tiff_lzw'
 	return {n: img for (n, img) in enumerate(image_list)}
+
 class MisakiFontimage:
 	def __init__(self, scale=1):
 		self.fonts = get_misaki_digit_images(scale=scale)
 		self.scale = scale
 	def get_number_image(self, num_array: bytearray):
 		scaled = font_size_array * self.scale
-		image_size = self.fonts[0] * len(num_array), scaled[1]
+		image_size = scaled[0] * len(num_array), scaled[1]
 		image = Image.new('L', image_size)
 		w = 8
+		image_list = [pil2cv(self.fonts[b]) for b in num_array]
+		n_img = cv2.hconcat(image_list)
+		n_img[n_img == 1] = 255
+		pil_number_image = cv2pil(n_img)
+		return pil_number_image
+	'''
+		image_fullpath = screen_dir / 'number_image.png'
+		cv2.imwrite(str(image_fullpath), n_img)
 		for n, b in enumerate(num_array):
-			image.paste(self.fonts[b], (w * n, 0))
-		return image
+			font_img = pil2cv(self.fonts[b])
+			cv2.namedWindow("image", cv2.WINDOW_NORMAL)
+			cv2.imshow("image", font_img)
+			image.paste(self.fonts[b], (w * n, 0))'''
 
 
+def pil2cv(image):
+    ''' PIL型 -> OpenCV型 '''
+    new_image = np.array(image, dtype=np.uint8)
+    if new_image.ndim == 2:  # モノクロ
+        pass
+    elif new_image.shape[2] == 3:  # カラー
+        new_image = cv2.cvtColor(new_image, cv2.COLOR_RGB2BGR)
+    elif new_image.shape[2] == 4:  # 透過
+        new_image = cv2.cvtColor(new_image, cv2.COLOR_RGBA2BGRA)
+    return new_image
+
+
+def cv2pil(image):
+    ''' OpenCV型 -> PIL型 '''
+    new_image = image.copy()
+    if new_image.ndim == 2:  # モノクロ
+        new_image[new_image == 1] = 255
+    elif new_image.shape[2] == 3:  # カラー
+        new_image = cv2.cvtColor(new_image, cv2.COLOR_BGR2RGB)
+    elif new_image.shape[2] == 4:  # 透過
+        new_image = cv2.cvtColor(new_image, cv2.COLOR_BGRA2RGBA)
+    new_image = Image.fromarray(new_image)
+    return new_image
 
 if __name__ == '__main__':
 	from format_num import formatnums_to_bytearray, FloatFormatNum
 	mfi = MisakiFontimage(8)
-	ni = mfi.get_number_image(bytearray([0]))
+	fn = [FloatFormatNum(3.14)]
+	ba = formatnums_to_bytearray(fn, conv_to_bin2=False)
+	ni = mfi.get_number_image(ba)
+	ni.show()
 	images = get_misaki_digit_images(8)
 	a_img = images[0xa]
 	f_img = images[0xf]
