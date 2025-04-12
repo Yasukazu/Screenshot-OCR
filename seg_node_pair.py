@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Sequence, Iterator, Callable
 from types import MappingProxyType
 import numpy as np
-from seg7yx import Seg7yx, SlantedNode6, Seg7Node6, node6
+from seg7yx import node6, SlantedNode6, Seg7Node6
 from seg_7_digits import Seg7Bit8, SEG7_DIGIT_ARRAY
 from seg7bit8 import SEG7BIT8_ARRAY
 NODE6_ARRAY = (

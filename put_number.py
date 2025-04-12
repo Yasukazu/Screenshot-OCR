@@ -13,7 +13,7 @@ from typing import Any
 from misaki_font import MisakiFontimage
 NUMBER_STR = 'number_str'
 NUMBER = 'number'
-def put_number(pos: PutPos=PutPos.L, digit_image_feeder=MisakiFontimage):#SegmentImage(BasicDigitImage.calc_scale_from_height())):
+def put_number(digit_image_feeder: MisakiFontimage, pos: PutPos=PutPos.L):#SegmentImage(BasicDigitImage.calc_scale_from_height())):
 	'''prefix "0x" for hexadecimal'''
 	from format_num import formatnums_to_bytearray
 	def _embed_number(func):

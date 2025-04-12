@@ -1,13 +1,13 @@
 from enum import Enum
-from typing import Sequence, Iterator, Generator
-import numpy as np
+from typing import Sequence, Iterator
+
 from PIL import Image, ImageDraw
 import img2pdf
 import os.path, calendar
 import ttl
 from pathlib import Path
 home_dir = Path(os.path.expanduser('~'))
-import path_feeder
+
 from path_feeder import PathFeeder, get_last_month #, YearMonth
 from digit_image import ImageFill
 from put_number import PutPos, put_number
@@ -110,8 +110,8 @@ def save_arc_pages(ext: ArcFileExt=ArcFileExt.TIFF, app_type=AppType.NUL):
 	fullpath = img_dir / f"{year}-{month:02}-8x4{ext.value[0]}"
 	imgs[0].save(fullpath, save_all=True, append_images=imgs[1:], **ext.value[1])
 
-from typing import Generator
-from path_feeder import path_feeder, FileExt
+
+from path_feeder import FileExt
 '''def get_png_file_names()-> Generator[tuple[Path, str, int], None, None]:
 	for path, stem, m in path_feeder(input_type=FileExt.PNG):
 		yield path, stem, m
@@ -123,12 +123,12 @@ def get_quad_png_file_names()-> Generator[tuple[Path, str, int], None, None]:
 DAY_NOMBRE_H = 50
 TXT_OFST = 0 # width-direction / horizontal
 
-from digit_image import BasicDigitImage
 
+from path_feeder import DbPathFeeder
 def draw_onto_pages(div=64, th=H_PAD // 2,
-	path_feeder: PathFeeder=PathFeeder(),
+	path_feeder: PathFeeder=DbPathFeeder(),
 	v_pad=16, h_pad=8, mode='L', dst_bg=ImageFill.BLACK)-> Iterator[Image.Image]:
-	
+	from tool_pyocr import Date
 	first_fullpath = path_feeder.first_fullpath
 	if not first_fullpath:
 		raise ValueError(f"No '{path_feeder.ext}' file in {path_feeder.dir}!")
@@ -168,17 +168,20 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		pad_size = 8 - len(name_blocks[-1])
 		name_blocks[-1] += [''] * pad_size
 		for i, block in enumerate(name_blocks):
-			yield concat_8_pages(block, number_str=f"{path_feeder.month:02}{(-0xa - i):x}")
+			date = Date(month, i + 1)
+			yield concat_8_pages(block, date.to_float()) # number_str=f"{path_feeder.month:02}{(-0xa - i):x}")
 
-	digit_image_param_L = BasicDigitImage.calc_scale_from_height(80)
+
+	'''digit_image_param_L = BasicDigitImage.calc_scale_from_height(80)
 	from seg_node_pair import DigitStrokeFeeder
 	stroke_feeder = DigitStrokeFeeder(scale=digit_image_param_L.scale, offset=digit_image_param_L.padding)
-	digit_image_feeder_L = BasicDigitImage(stroke_feeder=stroke_feeder, param=digit_image_param_L, bgcolor=ImageFill.BLACK)
+	digit_image_feeder_L = BasicDigitImage(stroke_feeder=stroke_feeder, param=digit_image_param_L, bgcolor=ImageFill.BLACK)'''
 	# digit_image_param_L = BASIC_DIGIT_IMAGE_PARAM_LIST[1]
+	from misaki_font import MisakiFontimage
+	digit_image_feeder_L = MisakiFontimage(12)
 	from put_number import put_number
-	
 	@put_number(pos=PutPos.R, digit_image_feeder=digit_image_feeder_L)
-	def concat_8_pages(names: list[str], number_str: str)-> Image.Image:
+	def concat_8_pages(names: list[str], number: float)-> Image.Image:
 
 		names_1 = list(names[:4])
 		names_2 = list(names[4:])
@@ -190,7 +193,7 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 	img_size = Image.open(str(path_feeder.first_fullpath)).size
 	def concat_h(names: list[str], pad=h_pad)-> Image.Image:
 		imim_len = len(names)
-		imim = [get_numbered_img(n, number_str=n) for n in names]
+		imim = [get_numbered_img(nm, Date(month, i + 1).to_float()) for i, nm in enumerate(names)]
 		max_height = img_size[1]
 		im_width = img_size[0]
 		width_sum = imim_len * img_size[0]
@@ -210,10 +213,10 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		dst.paste(im2, (0, im1.height + pad))
 		return dst
 
-	digit_image_param_S = BasicDigitImage.calc_scale_from_height(50)
-	digit_image_feeder_S = BasicDigitImage(digit_image_param_S) # scale=24, line_width=6, padding=(4, 4))
+	# digit_image_param_S = BasicDigitImage.calc_scale_from_height(50)
+	digit_image_feeder_S = MisakiFontimage(6) # BasicDigitImage(digit_image_param_S) # scale=24, line_width=6, padding=(4, 4))
 	@put_number(pos=PutPos.L, digit_image_feeder=digit_image_feeder_S) #, line_width=digit_image_param_S.line_width))
-	def get_numbered_img(fn: str, number_str: str)-> Image.Image | None:
+	def get_numbered_img(fn: str, number: float)-> Image.Image | None:
 		fullpath = path_feeder.dir / (fn + path_feeder.ext)
 		if fullpath.exists():
 			img = Image.open(fullpath)
@@ -313,14 +316,19 @@ def get_concat_v(imim_len: int, img_size: tuple[int, int], imim: Sequence[Image.
 	return dst
 
 if __name__ == '__main__':
+	import sys
+	draw_onto_pages()
+	sys.exit(0)
 	from consolemenu import ConsoleMenu
 	from consolemenu.items import FunctionItem, SubmenuItem
 	menu = ConsoleMenu("Tile Menu")
 	submenu = ConsoleMenu("Save images as TIFF")
-	for fi in [FunctionItem('save TM screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.T}),
+	for fi in [
+			FunctionItem('save TM screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.T}),
 			FunctionItem('save MH screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.M}),
 			]:
 		submenu.append_item(fi)
+	menu.append_item(FunctionItem('Draw onto pages', draw_onto_pages))
 	menu.append_item(SubmenuItem('Save as TIFF submenu', submenu))
 	menu.append_item(FunctionItem('convert_to_pdf', convert_to_pdf, kwargs={'layout':PdfLayout.a3lp}))
 	menu.show()

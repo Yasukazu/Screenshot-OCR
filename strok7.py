@@ -225,12 +225,12 @@ class SegLine(Enum):
 
 class SegFlag(Flag): # same as Seg7
 	G = 2
-	F = auto()
-	E = auto()
-	D = auto()
-	C = auto()
-	B = auto()
-	A = auto()
+	F = 4
+	E = 8
+	D = 16
+	C = 32
+	B = 64
+	A = 128
 	
 	@classmethod
 	def get(cls, c: str, p=0):
