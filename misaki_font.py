@@ -19,6 +19,7 @@ HEX_KU: ku = (3, 33),6
 TEN_KU: ku = (1, 4),2
 def array(seq):
 	return np.array(seq, np.int64)
+font_size_array = array(FONT_SIZE)
 def get_misaki_digit_images(scale=1):
 	re_size = (array(FONT_SIZE) * scale).tolist() if scale > 1 else None
 	arc_font_fullpath = font_dir / arc_font_file_name
@@ -57,8 +58,25 @@ def get_misaki_digit_images(scale=1):
 	image_list[0].save(str(arc_font_fullpath),
 		save_all=True, append_images=image_list[1:]) # compression='tiff_lzw'
 	return {n: img for (n, img) in enumerate(image_list)}
+class MisakiFontimage:
+	def __init__(self, scale=1):
+		self.fonts = get_misaki_digit_images(scale=scale)
+		self.scale = scale
+	def get_number_image(self, num_array: bytearray):
+		scaled = font_size_array * self.scale
+		image_size = self.fonts[0] * len(num_array), scaled[1]
+		image = Image.new('L', image_size)
+		w = 8
+		for n, b in enumerate(num_array):
+			image.paste(self.fonts[b], (w * n, 0))
+		return image
+
+
 
 if __name__ == '__main__':
+	from format_num import formatnums_to_bytearray, FloatFormatNum
+	mfi = MisakiFontimage(8)
+	ni = mfi.get_number_image(bytearray([0]))
 	images = get_misaki_digit_images(8)
 	a_img = images[0xa]
 	f_img = images[0xf]
