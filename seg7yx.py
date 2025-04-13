@@ -2,7 +2,7 @@ from typing import Sequence, Iterator
 from enum import Enum
 from dataclasses import dataclass
 type _f_f_ = tuple[float, float]
-#type node6 = tuple[_f_f_, _f_f_, _f_f_, _f_f_, _f_f_, _f_f_]
+type node6 = tuple[_f_f_, _f_f_, _f_f_, _f_f_, _f_f_, _f_f_]
 
 @dataclass
 class Node6:
@@ -31,7 +31,8 @@ class Seg7yx:
 	def _to_list(self)-> list[tuple[float, float]]:
 		r = []
 		for y, xx in enumerate(self.yx):
-			r.append(tuple([(x, y) for x in xx]))
+			for x in xx:
+				r.append((x, y))
 		return (r)
 	
 	def to_node6(self):
@@ -45,7 +46,8 @@ class Seg7yx:
 		slanted = [self.slanted_xx(slant=self.slant, xx=xx, y=y) for y, xx in enumerate(self.yx)]
 		src = []
 		for y, xx in enumerate(slanted):
-			src.append(tuple([(x, y) for x in xx]))
+			for x in xx:
+				src.append((x, y))
 		dst = src.copy()
 		dst[2] = src[3]
 		dst[3] = src[5]

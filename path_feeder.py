@@ -87,7 +87,7 @@ class PathFeeder:
 		last_date = get_year_month(year=year, month=month)
 		self.year = last_date.year
 		self.month = last_date.month
-		input_path = input_dir / str(self.year) / ("%02d" % self.month) / input_type.value.dir if type_dir else input_dir / str(self.year) / ("%02d" % self.month) # / "%02d%02d" % (self.month, sel
+		input_path = (input_dir / str(self.year) / ("%02d" % self.month) / input_type.value.dir) if type_dir else input_dir / str(self.year) / ("%02d" % self.month) # / "%02d%02d" % (self.month, sel
 		if not input_path.exists():
 			raise ValueError(f"No path: {input_path}")
 		self.input_path = input_path
@@ -145,7 +145,7 @@ class PathFeeder:
 	@property
 	def first_fullpath(self)-> Path | None:
 		stem = None
-		for stem in self.feed(padding=False):
+		for day, stem in self.feed(padding=False):
 			break
 		return self.dir / (stem + self.ext) if stem else None
 
@@ -169,10 +169,10 @@ class DbPathFeeder(PathFeeder):
 				day_to_stem = {r[0]: r[1] for r in rr}
 			if padding:
 				for dy in range(1, monthrange(self.year, self.month)[1] + 1):
-					yield dy, (day_to_stem[dy] + self.input_type.value.ext) if dy in day_to_stem else ''
+					yield dy, day_to_stem[dy] if dy in day_to_stem else ''
 			else:
 				for dy in day_to_stem:
-					yield dy, (day_to_stem[dy] + self.input_type.value.ext)
+					yield dy, day_to_stem[dy]
 
 
 def path_feeder(year=0, month=0, from_=1, to=-1, input_type:FileExt=FileExt.PNG, padding=True)-> Generator[tuple[Path | None, str, int], None, None]:

@@ -23,9 +23,9 @@ from pyocr.builders import LineBox
 class Date:
 	month: int
 	day: int
-	@classmethod
-	def to_float(cls):
-		return float(f"{cls.month}.{cls.day: 02}")
+	@property
+	def as_float(self):
+		return float(f"{self.month}.{self.day:02}")
 
 
 def get_date(line_box: pyocr.builders.LineBox):

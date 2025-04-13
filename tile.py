@@ -11,6 +11,8 @@ home_dir = Path(os.path.expanduser('~'))
 from path_feeder import PathFeeder, get_last_month #, YearMonth
 from digit_image import ImageFill
 from put_number import PutPos, put_number
+from tool_pyocr import AppType
+
 last_month_date = get_last_month()
 year = last_month_date.year
 month = last_month_date.month
@@ -33,8 +35,9 @@ class PdfLayout(Enum):
 def convert_tiff_to_png_files():
 	cmd = 'convert 2025-02-8x4.tif -format png -scene 1 2025-02-%d.png'
 from path_feeder import FileExt
-def paged_png_feeder(layout=PdfLayout.a4pt):
-	feeder=PathFeeder(input_type=FileExt.QPNG)
+
+def paged_png_feeder(layout=PdfLayout.a3lp, app_type=AppType.T):
+	feeder=PathFeeder(input_type=FileExt.QPNG, type_dir=True)
 	img_dir = feeder.dir
 	year = feeder.year
 	month = feeder.month
@@ -48,34 +51,48 @@ def paged_png_feeder(layout=PdfLayout.a4pt):
 				names.append(fullpath)
 			return names
 		case PdfLayout.a3lp:
+			sub_ext_list = ('L', 'R')
+			sub_ext = 'LR'
 			for p in range(2):
-				fullpath_l = img_dir / f"{year}-{month:02}-{2 * p + 1}.png"
-				fullpath_r = img_dir / f"{year}-{month:02}-{2 * p + 2}.png"
+				def name(lr):
+					return f"{app_type.name}-{2 * p + (sub_ext.index(lr) + 1)}.png" # {year}-{month:02}
+				fullpath_l = img_dir / name('L')
+				fullpath_r = img_dir / name('R')
 				for fullpath in (fullpath_l, fullpath_r):
 					if not fullpath.exists():
 						raise ValueError(f"{fullpath} does not exist!")
-				sub_ext_list = ('L', 'R')
 				outpath = img_dir / f"{year}-{month:02}-{sub_ext_list[p]}.png"
-				l_image = Image.open(fullpath_l)
+				h_image = Image.open(fullpath_l)
 				padding = 100
 				margin = 200
-				image = Image.new('L', (l_image.width * 2 + padding + 2 * margin, l_image.height))
-				margin_img = Image.new('L', (margin, l_image.height), (0xff,))
+				image = Image.new('L', (h_image.width * 2 + padding + 2 * margin, h_image.height))
+				margin_img = Image.new('L', (margin, h_image.height), (0xff,))
 				pos = 0
 				image.paste(margin_img, (0, 0))
 				pos += margin_img.width
-				image.paste(l_image, (pos, 0))
-				pos += l_image.width + padding
-				l_image = Image.open(fullpath_r)
-				image.paste(l_image, (pos, 0))
-				pos += l_image.width
+				image.paste(h_image, (pos, 0))
+				pos += h_image.width + padding
+				h_image = Image.open(fullpath_r)
+				image.paste(h_image, (pos, 0))
+				pos += h_image.width
 				image.paste(margin_img, (pos, 0))
 				save_path = (outpath)
 				image.save(save_path)
 				names.append(save_path)
 			return names
 
-def convert_to_pdf(layout=PdfLayout.a4pt):
+def convert_to_pdf(app_type: AppType, layout=PdfLayout.a3lp):
+	names = paged_png_feeder(app_type=app_type, layout=layout)
+	parent_dir = names[0].parent
+	fullpath = parent_dir / f"{year}-{month:02}-{app_type.name}.pdf"
+	layout_fun = img2pdf.get_layout_fun(layout.value)
+	with open(fullpath,"wb") as f:
+		for name in names:
+			assert name.exists()
+		name_list = [str(n) for n in names]
+		f.write(img2pdf.convert(layout_fun=layout_fun, *name_list, rotation=img2pdf.Rotation.ifvalid))
+
+def save_into_pdf(layout=PdfLayout.a3lp):
 	names = paged_png_feeder(layout=layout)
 	parent_dir = names[0].parent
 	fullpath = parent_dir / f"{year}-{month:02}.pdf"
@@ -91,12 +108,19 @@ def save_pages_as_pdf(): #fullpath=PathFeeder().first_fullpath):
 	fullpath = img_dir / f"{year_month_name}.pdf"
 	imges = list(draw_onto_pages())
 	imges[0].save(fullpath, "PDF" ,resolution=200, save_all=True, append_imges=imges[1:])
-
+def save_pages_as_tiff():
+	fullpath = img_dir / f"{year_month_name}.tif"
+	imges = list(draw_onto_pages())
+	imges[0].save(fullpath, save_all=True, append_imges=imges[1:])
 from path_feeder import ext_to_dir, FileExt, ExtDir
-def save_qpng_pages(ext_dir=FileExt.QPNG):
+def save_qpng_pages(app_type=AppType.T, ext_dir=FileExt.QPNG):
 	save_dir = img_dir / ext_dir.value.dir
-	for pg, img in enumerate(draw_onto_pages()):
-		fullpath = save_dir / f"8-img-{pg + 1}{ext_dir.value.ext}"
+	if not save_dir.exists():
+		save_dir.mkdir()
+	path_feeder = DbPathFeeder(app_type=app_type)
+	hdr = app_type.name
+	for pg, img in enumerate(draw_onto_pages(path_feeder=path_feeder, app_type=app_type)):
+		fullpath = save_dir / f"{hdr}-{pg + 1}{ext_dir.value.ext}"
 		img.save(fullpath) #, 'PNG')
 
 class ArcFileExt(Enum):
@@ -127,12 +151,12 @@ TXT_OFST = 0 # width-direction / horizontal
 from path_feeder import DbPathFeeder
 def draw_onto_pages(div=64, th=H_PAD // 2,
 	path_feeder: PathFeeder=DbPathFeeder(),
-	v_pad=16, h_pad=8, mode='L', dst_bg=ImageFill.BLACK)-> Iterator[Image.Image]:
+	v_pad=16, h_pad=8, mode='L', dst_bg=ImageFill.BLACK, app_type=AppType.T)-> Iterator[Image.Image]:
 	from tool_pyocr import Date
 	first_fullpath = path_feeder.first_fullpath
 	if not first_fullpath:
 		raise ValueError(f"No '{path_feeder.ext}' file in {path_feeder.dir}!")
-	first_img_size = Image.open(first_fullpath).size
+	# first_img_size = Image.open(first_fullpath).size
 
 	drc_tbl = [(0, -1), (1, 0), (0, 1), (-1, 0)]
 	ll_ww = [0, 0]
@@ -163,13 +187,13 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 
 	def get_image_blocks():
 		day_and_names = list(path_feeder.feed(padding=True))
-		names = [dn[1] for dn in day_and_names]
-		name_blocks: Sequence[Sequence[str]] = [names[:8], names[8:16], names[16:24], names[24:]]
+		name_blocks = [day_and_names[:8], day_and_names[8:16], day_and_names[16:24], day_and_names[24:]]
 		pad_size = 8 - len(name_blocks[-1])
-		name_blocks[-1] += [''] * pad_size
+		if pad_size > 0:
+			name_blocks[-1] += [(0, '')] * pad_size
 		for i, block in enumerate(name_blocks):
-			date = Date(month, i + 1)
-			yield concat_8_pages(block, date.to_float()) # number_str=f"{path_feeder.month:02}{(-0xa - i):x}")
+			number = year * 1 if app_type == AppType.T else -1 # + month / 100)
+			yield concat_8_pages(block, number=number) # number_str=f"{path_feeder.month:02}{(-0xa - i):x}")
 
 
 	'''digit_image_param_L = BasicDigitImage.calc_scale_from_height(80)
@@ -181,19 +205,19 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 	digit_image_feeder_L = MisakiFontimage(12)
 	from put_number import put_number
 	@put_number(pos=PutPos.R, digit_image_feeder=digit_image_feeder_L)
-	def concat_8_pages(names: list[str], number: float)-> Image.Image:
+	def concat_8_pages(day_stem_list: list[tuple[int, str]], number: float)-> Image.Image:
 
-		names_1 = list(names[:4])
-		names_2 = list(names[4:])
+		day_stem_list_1 = day_stem_list[:4]
+		day_stem_list_2 = day_stem_list[4:]
 
-		himg1 = concat_h(names_1)
-		himg2 = concat_h(names_2)
+		himg1 = concat_h(day_stem_list_1)
+		himg2 = concat_h(day_stem_list_2)
 		return concat_v(himg1, himg2)
 
 	img_size = Image.open(str(path_feeder.first_fullpath)).size
-	def concat_h(names: list[str], pad=h_pad)-> Image.Image:
-		imim_len = len(names)
-		imim = [get_numbered_img(nm, Date(month, i + 1).to_float()) for i, nm in enumerate(names)]
+	def concat_h(day_stem_list: list[tuple[int, str]], pad=h_pad)-> Image.Image:
+		imim_len = len(day_stem_list)
+		imim = [get_numbered_img(s, number=Date(month, d).as_float) for d, s in day_stem_list]
 		max_height = img_size[1]
 		im_width = img_size[0]
 		width_sum = imim_len * img_size[0]
@@ -216,10 +240,10 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 	# digit_image_param_S = BasicDigitImage.calc_scale_from_height(50)
 	digit_image_feeder_S = MisakiFontimage(6) # BasicDigitImage(digit_image_param_S) # scale=24, line_width=6, padding=(4, 4))
 	@put_number(pos=PutPos.L, digit_image_feeder=digit_image_feeder_S) #, line_width=digit_image_param_S.line_width))
-	def get_numbered_img(fn: str, number: float)-> Image.Image | None:
-		fullpath = path_feeder.dir / (fn + path_feeder.ext)
+	def get_numbered_img(stem: str, number: float)-> Image.Image | None:
+		fullpath = path_feeder.dir / (stem + path_feeder.ext)
 		if fullpath.exists():
-			img = Image.open(fullpath)
+			img = Image.open(fullpath).convert('L')
 			return img
 			'''number_image, margin = get_number_image(size=number_size, nn=[int(c) for c in fn])
 			offset = [s for s in (np.array(margin) + np.array(number_offset))]
@@ -317,8 +341,6 @@ def get_concat_v(imim_len: int, img_size: tuple[int, int], imim: Sequence[Image.
 
 if __name__ == '__main__':
 	import sys
-	draw_onto_pages()
-	sys.exit(0)
 	from consolemenu import ConsoleMenu
 	from consolemenu.items import FunctionItem, SubmenuItem
 	menu = ConsoleMenu("Tile Menu")
@@ -328,7 +350,11 @@ if __name__ == '__main__':
 			FunctionItem('save MH screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.M}),
 			]:
 		submenu.append_item(fi)
-	menu.append_item(FunctionItem('Draw onto pages', draw_onto_pages))
+	menu.append_item(FunctionItem('T save_pages_as_4 png files into qpng dir.', save_qpng_pages))
+	menu.append_item(FunctionItem('M save_pages_as_4 png files into qpng dir.', save_qpng_pages, kwargs={'app_type': AppType.M}))
+	menu.append_item(FunctionItem('Mercari-Halo save_pages_as_4 png files into qpng dir.', save_qpng_pages, kwargs={'app_type': AppType.M}))
+	menu.append_item(FunctionItem('save_pages_as_TIFF', save_pages_as_tiff))
 	menu.append_item(SubmenuItem('Save as TIFF submenu', submenu))
-	menu.append_item(FunctionItem('convert_to_pdf', convert_to_pdf, kwargs={'layout':PdfLayout.a3lp}))
+	menu.append_item(FunctionItem('T convert_to_pdf', convert_to_pdf, kwargs={'layout':PdfLayout.a3lp, 'app_type': AppType.T}))
+	menu.append_item(FunctionItem('M convert_to_pdf', convert_to_pdf, kwargs={'layout':PdfLayout.a3lp, 'app_type': AppType.M}))
 	menu.show()
