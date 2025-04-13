@@ -62,9 +62,11 @@ class FloatFormatNum(FormatNum):
 	def conv_to_bin2(self):
 		return conv_to_bin2(self.num, fmt=self.FORMAT)
 from math import isnan
-def  formatnums_to_bytearray(nn: Sequence[FormatNum | int] | float, conv_to_bin2=True)-> bytearray: # , fmt=None
-	if isinstance(nn, (float, int)):
-		nn = [HexFormatNum(nn) if isinstance(nn, int) else FloatFormatNum(nn)] if not isnan(nn) else []
+def  formatnums_to_bytearray(nn: Sequence[FormatNum | int] | float | int, conv_to_bin2=True)-> bytearray: # , fmt=None
+	if isinstance(nn, float):
+		nn = [FloatFormatNum(nn)] if not isnan(nn) else []
+	elif isinstance(nn, int):
+		nn = [FormatNum(nn)]
 	bb = bytearray() #len(nn))
 	for c in nn:
 		match c:

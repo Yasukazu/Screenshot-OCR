@@ -192,7 +192,7 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 		if pad_size > 0:
 			name_blocks[-1] += [(0, '')] * pad_size
 		for i, block in enumerate(name_blocks):
-			number = year * 1 if app_type == AppType.T else -1 # + month / 100)
+			number = year * (1 if app_type == AppType.T else -1) # + month / 100)
 			yield concat_8_pages(block, number=number) # number_str=f"{path_feeder.month:02}{(-0xa - i):x}")
 
 
