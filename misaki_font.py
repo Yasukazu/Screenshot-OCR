@@ -1,4 +1,5 @@
 # Misaki font
+from enum import Enum
 import numpy as np
 import cv2
 from PIL import Image, ImageSequence
@@ -18,9 +19,9 @@ font_dir = Path(screen_base_dir_name) / 'font'
 if not font_dir.exists():
 	raise ValueError(f"`{font_dir=}` does not exists!")
 
-arc_font_file_name = 'misaki_gothic-digit.tif'
 
 FONT_SIZE = (8, 8)
+HALF_FONT_SIZE = (4, 8)
 
 type ku = tuple[tuple[int, int], int]
 
@@ -32,6 +33,58 @@ def array(seq):
 	return np.array(seq, np.int64)
 
 font_size_array = array(FONT_SIZE)
+font_file_name = 'misaki_gothic.png'
+
+PNG_EXT = '.png'
+
+class Byte(int):
+	@property
+	def h(self):
+		return self >> 4
+	@property
+	def l(self):
+		return self & 0xf
+
+class MisakiFont(Enum):
+	HALF_NAME = 'misaki_4x8'
+	HALF_SIZE = (64, 128)
+	FULL_NAME = 'misaki_mincho'
+	FULL_SIZE = (752, 752)
+
+	@classmethod
+	def get_half_font_image(cls, c: int, font_dict: dict[int, Image.Image]={}):
+		if c > 255 or c < 0:
+			raise ValueError('Must be an unsigned byte(0 to 255)!')
+		if c in font_dict:
+			return font_dict[c]
+		font_file_name = MisakiFont.HALF_NAME.value + PNG_EXT
+		font_fullpath = font_dir / font_file_name
+		if not font_fullpath.exists():
+			raise ValueError(f"`{font_fullpath=}` does not exists!")
+		full_image = Image.open(str(font_fullpath))
+
+		def byte_to_xy(byte: int):
+			b = Byte(byte)
+			return b.l, b.h
+			
+		image_list = []
+		def append_fonts(ku: int): 
+			x_pos, y_pos = byte_to_xy(ku)
+			x_offset = x_pos * 4
+			y_offset = y_pos * 8
+			offset = array(x_offset, y_offset)
+			end_point = offset + np.array(HALF_FONT_SIZE)
+			area = array([offset, end_point])
+			img_area = area.ravel().tolist()
+			font_part = full_image.crop(img_area)
+			return font_part
+		return {n: img for (n, img) in enumerate(image_list)}
+
+class SecondMisakiFont(Enum):
+	HALF_NAME = 'misaki_gothic_2nd_4x8'
+	FULL_NAME = 'misaki_gothic_2nd'
+
+arc_font_file_name = 'misaki_gothic-digit.tif'
 
 def get_misaki_digit_images(scale=1):
 	re_size = (array(FONT_SIZE) * scale).tolist() if scale > 1 else None
@@ -44,8 +97,7 @@ def get_misaki_digit_images(scale=1):
 				page = page.resize(re_size)
 			image_list[n]=(page)
 		return image_list
-	font_file_name = 'misaki_gothic.png'
-	font_fullpath =  font_dir / font_file_name
+	font_fullpath = font_dir / font_file_name
 	if not font_fullpath.exists():
 		raise ValueError(f"`{font_fullpath=}` does not exists!")
 	full_image = Image.open(str(font_fullpath))
@@ -72,16 +124,13 @@ def get_misaki_digit_images(scale=1):
 		save_all=True, append_images=image_list[1:]) # compression='tiff_lzw'
 	return {n: img for (n, img) in enumerate(image_list)}
 
-class MisakiFontimage:
+class MisakiFontImage:
 	def __init__(self, scale=1):
-		self.fonts = get_misaki_digit_images(scale=scale)
+		self.digit_fonts = get_misaki_digit_images(scale=scale)
 		self.scale = scale
 	def get_number_image(self, num_array: bytearray):
 		scaled = font_size_array * self.scale
-		image_size = scaled[0] * len(num_array), scaled[1]
-		image = Image.new('L', image_size)
-		w = 8
-		image_list = [pil2cv(self.fonts[b]) for b in num_array]
+		image_list = [pil2cv(self.digit_fonts[b]) for b in num_array]
 		n_img = cv2.hconcat(image_list)
 		n_img[n_img == 1] = 255
 		pil_number_image = cv2pil(n_img)
@@ -123,7 +172,7 @@ def cv2pil(image):
 
 if __name__ == '__main__':
 	from format_num import formatnums_to_bytearray, FloatFormatNum
-	mfi = MisakiFontimage(8)
+	mfi = MisakiFontImage(8)
 	fn = [FloatFormatNum(3.14)]
 	ba = formatnums_to_bytearray(fn, conv_to_bin2=False)
 	ni = mfi.get_number_image(ba)
