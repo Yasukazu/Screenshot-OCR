@@ -1,4 +1,5 @@
 # Misaki font
+from dataclasses import dataclass
 from enum import Enum
 import numpy as np
 from PIL import Image, ImageSequence
@@ -44,11 +45,30 @@ class Byte(int):
 	def l(self):
 		return self & 0xf
 
+def byte_to_xy(byte: int):
+	b = Byte(byte)
+	return b.l, b.h
+
+class FontNameSize(Enum):
+	misaki_4x8 = (64, 128)
+	misaki_mincho = (752, 752)
+
 class MisakiFont(Enum):
-	HALF_NAME = 'misaki_4x8'
-	HALF_SIZE = (64, 128)
-	FULL_NAME = 'misaki_mincho'
-	FULL_SIZE = (752, 752)
+	half_font = FontNameSize.misaki_4x8
+	HALF_NAME = half_font.name
+	HALF_SIZE = half_font.value
+	full_font = FontNameSize.misaki_mincho
+	FULL_NAME = full_font.name
+	FULL_SIZE = full_font.value
+
+	@classmethod
+	def get_font_base_image(cls, font=FontNameSize.misaki_4x8)-> Image.Image:
+		font_file_name = font.name + PNG_EXT
+		font_fullpath = font_dir / font_file_name
+		if not font_fullpath.exists():
+			raise ValueError(f"`{font_fullpath=}` does not exists!")
+		base_image = Image.open(str(font_fullpath))
+		return base_image
 
 	@classmethod
 	def get_half_font_image(cls, c: int, font_dict: dict[int, Image.Image]={}):
@@ -61,10 +81,6 @@ class MisakiFont(Enum):
 		if not font_fullpath.exists():
 			raise ValueError(f"`{font_fullpath=}` does not exists!")
 		full_image = Image.open(str(font_fullpath))
-
-		def byte_to_xy(byte: int):
-			b = Byte(byte)
-			return b.l, b.h
 			
 		def append_fonts(ku: int): 
 			x_pos, y_pos = byte_to_xy(ku)
@@ -79,6 +95,21 @@ class MisakiFont(Enum):
 		font_image = append_fonts(c)
 		font_dict[c] = font_image
 		return font_image
+
+	@classmethod
+	def get_line_images(cls, font=FontNameSize.misaki_4x8):
+		base_image = cls.get_font_base_image(font)
+		images = []	
+		height = font.value[1]
+		line_image_size = (font.value[0], 8)
+		box = [0, 0, *line_image_size]
+		def shift():
+			box[1] += 8
+			box[3] += 8
+		for n, line in enumerate(range(height / 8)):
+			images.append(base_image.crop(box))
+			shift()
+		return images
 
 class SecondMisakiFont(Enum):
 	HALF_NAME = 'misaki_gothic_2nd_4x8'
