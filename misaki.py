@@ -23,11 +23,11 @@ if not font_dir.exists():
 FONT_SIZE = (8, 8)
 HALF_FONT_SIZE = (4, 8)
 
-type ku = tuple[tuple[int, int], int]
+# type ku = tuple[tuple[int, int], int]
 
-DIGIT_KU: ku = (3, 16),10
-HEX_KU: ku = (3, 33),6
-TEN_KU: ku = (1, 4),2
+DIGIT_KU = (3, 16),10
+HEX_KU = (3, 33),6
+TEN_KU = (1, 4),2
 
 def array(seq):
 	return np.array(seq, np.int64)
@@ -55,11 +55,21 @@ class FontNameSize(Enum):
 
 class MisakiFont(Enum):
 	half_font = FontNameSize.misaki_4x8
-	HALF_NAME = half_font.name
-	HALF_SIZE = half_font.value
+	HALF_NAME = FontNameSize.misaki_4x8.name
+	HALF_SIZE = FontNameSize.misaki_4x8.value
 	full_font = FontNameSize.misaki_mincho
-	FULL_NAME = full_font.name
-	FULL_SIZE = full_font.value
+	FULL_NAME = FontNameSize.misaki_4x8.name
+	FULL_SIZE = FontNameSize.misaki_4x8.value
+
+	@classmethod
+	def get_font_dir(cls):
+		return font_dir
+
+	@classmethod
+	def get_font_fullpath(cls, font=FontNameSize.misaki_4x8):
+		font_file_name = font.name + PNG_EXT
+		font_fullpath = font_dir / font_file_name
+		return font_fullpath
 
 	@classmethod
 	def get_font_base_image(cls, font=FontNameSize.misaki_4x8)-> Image.Image:
@@ -106,7 +116,7 @@ class MisakiFont(Enum):
 		def shift():
 			box[1] += 8
 			box[3] += 8
-		for n, line in enumerate(range(height / 8)):
+		for n, line in enumerate(range(height // 8)):
 			images.append(base_image.crop(box))
 			shift()
 		return images
@@ -135,7 +145,7 @@ def get_misaki_digit_images(scale=1):
 	def kuten_to_xy(*kuten: int):
 		return kuten[1] - 1, kuten[0] - 1
 	image_list = []
-	def append_fonts(ku: ku): 
+	def append_fonts(ku): 
 		num_ku_ten, num_range = ku
 		num_pos = kuten_to_xy(*num_ku_ten)
 		num_addr = array(num_pos)
@@ -203,6 +213,11 @@ def cv2pil(image):
 
 if __name__ == '__main__':
 	import sys, os
+	font = MisakiFont.half_font.value
+	line_images = MisakiFont.get_line_images(font)
+	arc_fullpath = MisakiFont.get_font_dir() / (font.name + '.tif')
+	sys.exit(0)
+
 	b = sys.argv[1] # b = input('char for the font:')
 	c = ord(b)
 	if c > 255:
