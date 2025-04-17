@@ -53,13 +53,13 @@ class FontNameSize(Enum):
 	misaki_4x8 = (64, 128)
 	misaki_mincho = (752, 752)
 
-class MisakiFont(Enum):
+class MisakiFont:#(Enum):
 	half_font = FontNameSize.misaki_4x8
-	HALF_NAME = FontNameSize.misaki_4x8.name
+	HALF_NAME = half_font.name
 	HALF_SIZE = FontNameSize.misaki_4x8.value
 	full_font = FontNameSize.misaki_mincho
-	FULL_NAME = FontNameSize.misaki_4x8.name
-	FULL_SIZE = FontNameSize.misaki_4x8.value
+	FULL_NAME = full_font.name
+	FULL_SIZE = full_font.value
 
 	@classmethod
 	def get_font_dir(cls):
@@ -109,7 +109,7 @@ class MisakiFont(Enum):
 	@classmethod
 	def get_line_images(cls, font=FontNameSize.misaki_4x8):
 		base_image = cls.get_font_base_image(font)
-		images = []	
+		images: list[Image.Image] = []	
 		height = font.value[1]
 		line_image_size = (font.value[0], 8)
 		box = [0, 0, *line_image_size]
@@ -213,9 +213,10 @@ def cv2pil(image):
 
 if __name__ == '__main__':
 	import sys, os
-	font = MisakiFont.half_font.value
-	line_images = MisakiFont.get_line_images(font)
+	font = MisakiFont.half_font
+	image_list = MisakiFont.get_line_images(font)
 	arc_fullpath = MisakiFont.get_font_dir() / (font.name + '.tif')
+	image_list[0].save(arc_fullpath, save_all=True, append_images=image_list[1:])
 	sys.exit(0)
 
 	b = sys.argv[1] # b = input('char for the font:')
