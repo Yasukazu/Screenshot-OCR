@@ -321,10 +321,11 @@ def load_full():
 @cli.command()
 @click.argument('text', nargs=1)
 @click.option('--scale', type=click.IntRange(1, 100), default=1)
-def font_image(text: str, scale: int):
+def font_image(text: str, scale: int=1, show=False):
     image_feeder = MisakiFontImage(int(scale))
     image = image_feeder.get_str_image(text)
-    image.show()
+    if show:
+        image.show()
     return image
 
 
