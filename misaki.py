@@ -162,10 +162,15 @@ class MisakiFont:#(Enum):
 		with pkl_fullpath.open('wb') as pkl:
 			pickle.dump(char_dict, pkl)
 	@classmethod
-	def load_char_dict(cls, file_stem: str, ext='.pkl') -> dict[int, Image.Image]:
+	def load_char_dict(cls, file_stem: str=FontMap.misaki_4x8.name, ext='.pkl') -> dict[int, Image.Image]:
 		pkl_fullpath = cls.get_font_dir() / (file_stem + ext)
 		with pkl_fullpath.open('rb') as pkl:
 			char_dict = pickle.load(pkl)
+		return char_dict
+	@classmethod
+	def load_char_dicts(cls, file_stem_list: list[str]=[FontMap.misaki_4x8.name, FontMap.misaki_mincho.name], ext='.pkl', char_dict: dict[int, Image.Image] = {}) -> dict[int, Image.Image]:
+		for stem in file_stem_list:
+			char_dict |= cls.load_char_dict(stem)
 		return char_dict
 
 
@@ -211,15 +216,43 @@ def get_misaki_digit_images(scale=1):
 	append_fonts(TEN_KU)
 	image_list[0].save(str(arc_font_fullpath),
 		save_all=True, append_images=image_list[1:]) # compression='tiff_lzw'
-	return {n: img for (n, img) in enumerate(image_list)}
+	return image_list
 
+def iskanji1(c: int):
+	return 0x81 <= c <= 0x9F or 0xE0 <= c <= 0xFC
+def iskanji2(c: int):
+	return 0x40 <= c <= 0x7E or 0x80 <= c <= 0xFC
+def iskanji(c: int):
+	return 0x80 <= c <= 0xFF
+import unicodedata
 class MisakiFontImage:
 	def __init__(self, scale=1):
 		self.digit_fonts = get_misaki_digit_images(scale=scale)
+		self.char_dict = MisakiFont.load_char_dicts()
 		self.scale = scale
+	def get_str_image(self, s: str):
+		ns = unicodedata.normalize('NFKC', s)
+		imgs: list[Image.Image] = []
+		for n in ns:
+			j = n.encode('EUC-JP')
+			if len(j) == 1:
+				code = ord(j)
+				imgs.append(self.char_dict[code])
+			else:
+				ku = j[0] - 0xa0
+				ten = j[1] - 0xa0
+				kuten = ku * 100 + ten
+				img = self.char_dict[kuten]
+				imgs.append(img)
+		image_list = [pil2cv(img) for img in imgs]
+		n_img = cv2.hconcat(image_list)
+		n_img[n_img == 1] = 255
+		pil_image = cv2pil(n_img)
+		return pil_image
+
 	def get_number_image(self, num_array: bytearray):
 		scaled = font_size_array * self.scale
-		image_list = [pil2cv(self.digit_fonts[b]) for b in num_array]
+		image_list = [pil2cv(self.digit_fonts[b]) for b in scaled]
 		n_img = cv2.hconcat(image_list)
 		n_img[n_img == 1] = 255
 		pil_number_image = cv2pil(n_img)
@@ -264,21 +297,33 @@ def pickle_fonts(font=MisakiFont.FULL_FONT):
 	c_to_image = MisakiFont.line_image_to_char_image(image_line_dict)
 	MisakiFont.save_as_pickle(c_to_image, font.name)
 
+from pprint import pp
 import click
+
 @click.group()
 def cli():
 	pass
-@click.command()
+
+@cli.command()
 def save_full():
 	pickle_fonts()
-from pprint import pp
-@click.command()
+
+@cli.command()
 def load_full():
 	file_stem = MisakiFont.FULL_FONT.name
 	full_fonts = MisakiFont.load_char_dict(file_stem=file_stem)
 	pp(full_fonts)
-cli.add_command(save_full)
-cli.add_command(load_full)
+
+@cli.command()
+@click.argument('text')
+def font_image(text: str):
+	image_feeder = MisakiFontImage()
+	images = image_feeder.get_str_image(text)
+	image = pil2cv(images[0])
+	for img in images[1:]:
+		pass
+
+
 if __name__ == '__main__':
 	cli()
 	import sys, os
