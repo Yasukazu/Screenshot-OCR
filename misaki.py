@@ -148,6 +148,13 @@ class MisakiFont:#(Enum):
 		pkl_fullpath = cls.get_font_dir() / (file_stem + ext)
 		with pkl_fullpath.open('wb') as pkl:
 			pickle.dump(char_dict, pkl)
+	@classmethod
+	def load_char_dict(cls, file_stem: str, ext='.pkl') -> dict[int, Image.Image]:
+		pkl_fullpath = cls.get_font_dir() / (file_stem + ext)
+		with pkl_fullpath.open('rb') as pkl:
+			char_dict = pickle.load(pkl)
+		return char_dict
+
 
 class SecondMisakiFont(Enum):
 	HALF_NAME = 'misaki_gothic_2nd_4x8'
@@ -214,7 +221,7 @@ class MisakiFontImage:
 			image.paste(self.fonts[b], (w * n, 0))'''
 
 
-def pil2cv(image: Image):
+def pil2cv(image: Image.Image):
 	''' PIL型 -> OpenCV型 '''
 	new_image = np.array(image, dtype=np.uint8)
 	if new_image.ndim == 2:  # モノクロ
@@ -242,6 +249,16 @@ def cv2pil(image):
 if __name__ == '__main__':
 	import sys, os
 	font = MisakiFont.HALF_FONT
+	char_dict = MisakiFont.load_char_dict(font.name)
+	num_str = "%0.2f ｸﾞﾗﾑ" % -3.14
+	encoded = num_str.encode('shift-jis')
+	# pil_image = (char_dict[encoded[0]]) cv_image = pil2cv(pil_image)
+	pil_images = [char_dict[c] for c in encoded]
+	cv_images = [pil2cv(pil_image) for pil_image in pil_images]
+	h_image = cv2pil(cv2.hconcat(cv_images))
+	h_image.show()
+
+
 	image_line_dict = MisakiFont.get_line_images(font)
 	c_to_image = MisakiFont.line_dict_to_char_dict(image_line_dict)
 	MisakiFont.save_as_pickle(c_to_image, font.name)
