@@ -1,4 +1,5 @@
 # Misaki font
+from collections import namedtuple
 from dataclasses import dataclass
 from enum import Enum
 import numpy as np
@@ -51,15 +52,20 @@ def byte_to_xy(byte: int):
 	b = Byte(byte)
 	return b.l, b.h
 
-class FontNameSize(Enum):
-	misaki_4x8 = (64, 128)
-	misaki_mincho = (752, 752)
+CwLw = namedtuple('Cw_lw', ['cw', 'lw'])
+WidthHeight = namedtuple('WidthHeight', ['width', 'height'])
+class FontMap(Enum):
+	misaki_4x8 = WidthHeight(64, 128)
+	misaki_mincho = WidthHeight(752, 752)
 
 class MisakiFont:#(Enum):
-	HALF_FONT = FontNameSize.misaki_4x8
+	HEIGHT = 8
+	FULL_WIDTH = 8
+	HALF_WIDTH = 4
+	HALF_FONT = FontMap.misaki_4x8
 	HALF_NAME = HALF_FONT.name
-	HALF_SIZE = FontNameSize.misaki_4x8.value
-	FULL_FONT = FontNameSize.misaki_mincho
+	HALF_SIZE = HALF_FONT.value
+	FULL_FONT = FontMap.misaki_mincho
 	FULL_NAME = FULL_FONT.name
 	FULL_SIZE = FULL_FONT.value
 
@@ -68,13 +74,13 @@ class MisakiFont:#(Enum):
 		return font_dir
 
 	@classmethod
-	def get_font_fullpath(cls, font=FontNameSize.misaki_4x8):
+	def get_font_fullpath(cls, font=FontMap.misaki_4x8):
 		font_file_name = font.name + PNG_EXT
 		font_fullpath = font_dir / font_file_name
 		return font_fullpath
 
 	@classmethod
-	def get_font_base_image(cls, font=FontNameSize.misaki_4x8)-> Image.Image:
+	def get_font_base_image(cls, font=FontMap.misaki_4x8)-> Image.Image:
 		font_file_name = font.name + PNG_EXT
 		font_fullpath = font_dir / font_file_name
 		if not font_fullpath.exists():
@@ -109,37 +115,44 @@ class MisakiFont:#(Enum):
 		return font_image
 
 	@classmethod
-	def get_line_images(cls, font=FontNameSize.misaki_4x8, images: list[Image.Image | None] | dict[int, Image.Image]={}):
+	def get_line_images(cls, font_map=FontMap.misaki_4x8, images: list[Image.Image | None] | dict[int, Image.Image]={}):
 		# Return: dict_keys([2, 3, 4, 5, 6, 7, 10, 11, 12, 13])
 		assert isinstance(images, list) or isinstance(images, dict)
-		base_image = cls.get_font_base_image(font)
-		height = font.value[1]
-		line_image_size = (font.value[0], 8)
+		base_image = cls.get_font_base_image(font_map)
+		height = font_map.value.height
+		line_image_size = (font_map.value.width, MisakiFont.HEIGHT)
 		box = [0, 0, *line_image_size]
-		def shift():
-			box[1] += 8
-			box[3] += 8
-		for n in range(height // 8):
+		# font_width = 4 if '4x' in font_map.name else MisakiFont.FULL_WIDTH
+		def down_shift(box):
+			box[1] += MisakiFont.HEIGHT
+			box[3] += MisakiFont.HEIGHT
+		for n in range(height // MisakiFont.HEIGHT):
 			image = base_image.crop(box)
 			if isinstance(images, dict):
 				array = np.array(image)
-				bb = array[array == 0]
+				bb = array[array == 0] # black part
 				if len(bb) > 0:
 					images[n] = image
 			else:
 				images.append(image)
-			shift()
+			down_shift(box)
 		return images
 	
 	@classmethod
-	def line_dict_to_char_dict(cls, line_dict: dict[int, Image.Image]):
-		char_dict: dict[int, Image.Image] = {}
+	def line_image_to_char_image(cls, line_dict: dict[int, Image.Image],
+		char_dict: dict[int, Image.Image] = {}):
 		for k in line_dict.keys():
+			if k in char_dict:
+				continue
 			line_image = line_dict[k]
-			for h in range(16):
-				c = (k << 4) | h
-				p = h * 4
-				box = [p, 0, p + 4, 8]
+			line_width = line_image.size[0]
+			c_w = CwLw(4, line_width) if line_width == 64 else (CwLw(8, line_width) if line_width == 752 else None)
+			assert c_w
+			cs = c_w.lw // c_w.cw
+			for h in range(cs):
+				c = ((k << c_w.cw) | h) if c_w.cw == 4 else ((k + 1) * 100 + (h + 1))
+				p = h * c_w.cw
+				box = [p, 0, p + c_w.cw, 8]
 				char_dict[c] = line_image.crop(box)
 		return char_dict
 
@@ -246,8 +259,30 @@ def cv2pil(image):
 	new_image = Image.fromarray(new_image)
 	return new_image
 
+def pickle_fonts(font=MisakiFont.FULL_FONT):
+	image_line_dict = MisakiFont.get_line_images(font)
+	c_to_image = MisakiFont.line_image_to_char_image(image_line_dict)
+	MisakiFont.save_as_pickle(c_to_image, font.name)
+
+import click
+@click.group()
+def cli():
+	pass
+@click.command()
+def save_full():
+	pickle_fonts()
+from pprint import pp
+@click.command()
+def load_full():
+	file_stem = MisakiFont.FULL_FONT.name
+	full_fonts = MisakiFont.load_char_dict(file_stem=file_stem)
+	pp(full_fonts)
+cli.add_command(save_full)
+cli.add_command(load_full)
 if __name__ == '__main__':
+	cli()
 	import sys, os
+	sys.exit(0)
 	font = MisakiFont.HALF_FONT
 	char_dict = MisakiFont.load_char_dict(font.name)
 	num_str = "%0.2f ｸﾞﾗﾑ" % -3.14
@@ -263,7 +298,7 @@ if __name__ == '__main__':
 
 
 	image_line_dict = MisakiFont.get_line_images(font)
-	c_to_image = MisakiFont.line_dict_to_char_dict(image_line_dict)
+	c_to_image = MisakiFont.line_image_to_char_image(image_line_dict)
 	MisakiFont.save_as_pickle(c_to_image, font.name)
 	arc_fullpath = MisakiFont.get_font_dir() / (font.name + '.tif')
 	#image_list[0].save(arc_fullpath, save_all=True, append_images=image_list[1:])
