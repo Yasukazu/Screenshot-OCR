@@ -255,7 +255,10 @@ if __name__ == '__main__':
 	# pil_image = (char_dict[encoded[0]]) cv_image = pil2cv(pil_image)
 	pil_images = [char_dict[c] for c in encoded]
 	cv_images = [pil2cv(pil_image) for pil_image in pil_images]
-	h_image = cv2pil(cv2.hconcat(cv_images))
+	cv_image = cv2.hconcat(cv_images)
+	cv2.imshow('hconcat image', cv_image)
+	cv2.waitkey()
+	h_image = cv2pil(cv_image)
 	h_image.show()
 
 
