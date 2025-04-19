@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 import sys,os
 from pathlib import Path
+import pickle
 
 screen_base_dir_name = os.getenv('SCREEN_BASE_DIR')
 
@@ -142,6 +143,12 @@ class MisakiFont:#(Enum):
 				char_dict[c] = line_image.crop(box)
 		return char_dict
 
+	@classmethod
+	def save_as_pickle(cls, char_dict: dict[int, Image.Image], file_stem: str, ext='.pkl'):
+		pkl_fullpath = cls.get_font_dir() / (file_stem + ext)
+		with pkl_fullpath.open('wb') as pkl:
+			pickle.dump(char_dict, pkl)
+
 class SecondMisakiFont(Enum):
 	HALF_NAME = 'misaki_gothic_2nd_4x8'
 	FULL_NAME = 'misaki_gothic_2nd'
@@ -237,6 +244,7 @@ if __name__ == '__main__':
 	font = MisakiFont.HALF_FONT
 	image_line_dict = MisakiFont.get_line_images(font)
 	c_to_image = MisakiFont.line_dict_to_char_dict(image_line_dict)
+	MisakiFont.save_as_pickle(c_to_image, font.name)
 	arc_fullpath = MisakiFont.get_font_dir() / (font.name + '.tif')
 	#image_list[0].save(arc_fullpath, save_all=True, append_images=image_list[1:])
 	sys.exit(0)
