@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 from enum import Enum
 import numpy as np
+import cv2
 from PIL import Image, ImageSequence
 from dotenv import load_dotenv
 load_dotenv()
@@ -54,12 +55,12 @@ class FontNameSize(Enum):
 	misaki_mincho = (752, 752)
 
 class MisakiFont:#(Enum):
-	half_font = FontNameSize.misaki_4x8
-	HALF_NAME = half_font.name
+	HALF_FONT = FontNameSize.misaki_4x8
+	HALF_NAME = HALF_FONT.name
 	HALF_SIZE = FontNameSize.misaki_4x8.value
-	full_font = FontNameSize.misaki_mincho
-	FULL_NAME = full_font.name
-	FULL_SIZE = full_font.value
+	FULL_FONT = FontNameSize.misaki_mincho
+	FULL_NAME = FULL_FONT.name
+	FULL_SIZE = FULL_FONT.value
 
 	@classmethod
 	def get_font_dir(cls):
@@ -86,7 +87,7 @@ class MisakiFont:#(Enum):
 			raise ValueError('Must be an unsigned byte(0 to 255)!')
 		if c in font_dict:
 			return font_dict[c]
-		font_file_name = MisakiFont.HALF_NAME.value + PNG_EXT
+		font_file_name = MisakiFont.HALF_NAME + PNG_EXT
 		font_fullpath = font_dir / font_file_name
 		if not font_fullpath.exists():
 			raise ValueError(f"`{font_fullpath=}` does not exists!")
@@ -107,19 +108,39 @@ class MisakiFont:#(Enum):
 		return font_image
 
 	@classmethod
-	def get_line_images(cls, font=FontNameSize.misaki_4x8):
+	def get_line_images(cls, font=FontNameSize.misaki_4x8, images: list[Image.Image | None] | dict[int, Image.Image]={}):
+		# Return: dict_keys([2, 3, 4, 5, 6, 7, 10, 11, 12, 13])
+		assert isinstance(images, list) or isinstance(images, dict)
 		base_image = cls.get_font_base_image(font)
-		images: list[Image.Image] = []	
 		height = font.value[1]
 		line_image_size = (font.value[0], 8)
 		box = [0, 0, *line_image_size]
 		def shift():
 			box[1] += 8
 			box[3] += 8
-		for n, line in enumerate(range(height // 8)):
-			images.append(base_image.crop(box))
+		for n in range(height // 8):
+			image = base_image.crop(box)
+			if isinstance(images, dict):
+				array = np.array(image)
+				bb = array[array == 0]
+				if len(bb) > 0:
+					images[n] = image
+			else:
+				images.append(image)
 			shift()
 		return images
+	
+	@classmethod
+	def line_dict_to_char_dict(cls, line_dict: dict[int, Image.Image]):
+		char_dict: dict[int, Image.Image] = {}
+		for k in line_dict.keys():
+			line_image = line_dict[k]
+			for h in range(16):
+				c = (k << 4) | h
+				p = h * 4
+				box = [p, 0, p + 4, 8]
+				char_dict[c] = line_image.crop(box)
+		return char_dict
 
 class SecondMisakiFont(Enum):
 	HALF_NAME = 'misaki_gothic_2nd_4x8'
@@ -213,10 +234,11 @@ def cv2pil(image):
 
 if __name__ == '__main__':
 	import sys, os
-	font = MisakiFont.half_font
-	image_list = MisakiFont.get_line_images(font)
+	font = MisakiFont.HALF_FONT
+	image_line_dict = MisakiFont.get_line_images(font)
+	c_to_image = MisakiFont.line_dict_to_char_dict(image_line_dict)
 	arc_fullpath = MisakiFont.get_font_dir() / (font.name + '.tif')
-	image_list[0].save(arc_fullpath, save_all=True, append_images=image_list[1:])
+	#image_list[0].save(arc_fullpath, save_all=True, append_images=image_list[1:])
 	sys.exit(0)
 
 	b = sys.argv[1] # b = input('char for the font:')
