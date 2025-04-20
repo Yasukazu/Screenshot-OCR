@@ -50,8 +50,21 @@ def clear_txt_lines_of(month: int):
         cur.execute(clear_txt_lines_sql)
     conn.commit()
 
+import click
+
+@click.group()
+def cli():
+    pass
+@cli.command()
+@click.argument('month')
+def clear_txt_lines(month: str):
+    m = int(month)
+    clear_txt_lines_of(m)
+    
 if __name__ == '__main__':
     import csv, re, sys, os
+    cli()
+    sys.exit(0)
     month = int(sys.argv[1])
     each_field_patt = re.compile(r"`(\w+)`")
     each_field = each_field_patt.findall(create_tbl_sql)
