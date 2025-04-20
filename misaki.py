@@ -230,7 +230,7 @@ class MisakiFontImage:
         self.digit_fonts = get_misaki_digit_images(scale=scale)
         self.char_dict = MisakiFont.load_char_dicts()
         self.scale = scale
-    def get_str_image(self, s: str):
+    def get_str_image(self, s: str, image_type='P'):
         ns = unicodedata.normalize('NFKC', s)
         imgs: list[Image.Image] = []
         for n in ns:
@@ -251,8 +251,9 @@ class MisakiFontImage:
         x *= self.scale
         y *= self.scale
         r_img = cv2.resize(n_img, (x, y), interpolation=cv2.INTER_AREA) #, fx=self.scale, fy=self.scale)
-        pil_image = cv2pil(r_img)
-        return pil_image
+        if image_type[0].upper() == 'P':
+            r_img = cv2pil(r_img)
+        return r_img
 
     def get_number_image(self, num_array: bytearray):
         scaled = font_size_array * self.scale
