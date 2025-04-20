@@ -35,5 +35,5 @@ bb = bytearray([b for b in range(ord('A'),ord('Z')+1)]).decode()
 for n, txt_line in enumerate(txt_lines):
     pos = txt_line.position[0]
     draw.text([pos[0]-24, pos[1]], bb[n], 0xff, font=font)
-# B:tilte,F:date,Q:wages
+# B1:tilte,F5:date,Q-1:wages
     
