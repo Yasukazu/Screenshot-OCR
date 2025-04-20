@@ -22,12 +22,13 @@ class Date:
     def as_float(self):
         return float(f"{self.month}.{self.day:02}")
 
-
-def get_date(line_box: pyocr.builders.LineBox):
+from typing import Union
+def get_date(line_box: pyocr.builders.LineBox)-> Union[Date, None]:
     content = line_box.content.split()
-    if (content[1] != '月') or (content[3] != '日'):
-        raise ValueError("Not 月日!")
-    return Date(month=int(content[0]), day=int(content[2]))
+    if len(content) > 3:
+        if (content[1] == '月') and (content[3] == '日'):
+        #raise ValueError("Not 月日!")
+            return Date(month=int(content[0]), day=int(content[2]))
 
 def next_gyoumu(txt_lines: Sequence[pyocr.builders.LineBox]):
     assert len(txt_lines) > 1
@@ -117,8 +118,15 @@ class MyOcr:
                         return n, date
                 raise ValueError("Unmatch AppType.M txt_lines!")                
             case AppType.T:
+                breakpoint()
                 n_gyoumu = next_gyoumu(txt_lines)
-                date = get_date(txt_lines[ n_gyoumu])
+                date = None
+                for txt_line in txt_lines:
+                    date = get_date(txt_line)
+                    if date:
+                        break
+                if not date:
+                    raise ValueError("No date found in T!")
                 return n_gyoumu, date
             case _:
                 raise ValueError("Undefined AppType!")
@@ -141,7 +149,7 @@ class MyOcr:
         self.txt_lines = self.tool.image_to_string(
             self.image,
             lang=lang,
-            buider=builder
+            builder=builder
         )
         return self.txt_lines
     
@@ -165,7 +173,13 @@ class MyOcr:
 
     @classmethod
     def t_title(cls, txt_lines: Sequence[LineBox]):
-        return ''.join(txt_lines[0].content.split())
+        stop = 'この 店 舗 の 募集 状況'.replace(' ', '')
+        lines = []
+        for line in txt_lines:
+            if (content:=''.join(line.content.split())) == stop:
+                break
+            lines.append(content)
+        return ';'.join(lines)
     @classmethod
     def m_title(cls, txt_lines: Sequence[LineBox], n: int):
         return ''.join([txt_lines[i].content.replace(' ', '') for i in range(n - 3, n - 1)])
@@ -269,7 +283,7 @@ class Main:
         t_patt = APP_TYPE_TO_STEM_END[AppType.T]
         m_patt = APP_TYPE_TO_STEM_END[AppType.M]
         with closing(self.conn.cursor()) as cur:
-            for file in self.path_feeder.dir.iterdir():
+            for file in self.my_ocr.path_feeder.dir.iterdir():
                 if file.is_file() and file.suffix == '.png':
                     app_type = AppType.NUL
                     if file.stem.endswith(t_patt):
@@ -279,29 +293,33 @@ class Main:
                     if app_type == AppType.NUL:
                         raise ValueError("Not supported file!")
                     app = app_type.value
-                    path_set = PathSet(self.path_feeder.dir, file.stem, ext=self.path_feeder.ext)
+                    path_set = PathSet(self.my_ocr.path_feeder.dir, file.stem, ext=self.my_ocr.path_feeder.ext)
+                    breakpoint()
                     txt_lines = self.my_ocr.run_ocr(path_set)
                     n, date = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
                     title = self.my_ocr.get_title(app_type, txt_lines, n)
                     pkl = pickle.dumps(txt_lines)
                     breakpoint()
-                    cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app, date.day, None, title, stem, pkl))
-                break
+                    cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app, date.day, None, title, file.stem, pkl))
+                    break
         self.conn.commit()
 
 import click
-def run_ocr():
-    app_type_list = [AppType.T, AppType.M]
-    patt_list = [APP_TYPE_TO_STEM_END[AppType.T], APP_TYPE_TO_STEM_END[AppType.M]]#["t.*.png", "Screenshot_*.png"]
-    selected = SelectionMenu.get_selection([APP_TYPE_TO_STEM_END[at] for at in app_type_list])
-    txt_lines = main.add_image_files_as_txt_lines(
-        app_type_list[selected]
-    )
-    txt_lines_len = len(txt_lines) if txt_lines else 0
-    input(f'{txt_lines_len} file(s) is / are OCRed. Hit Enter key to return to the main menu:')
+@click.group()
+def cli():
+    pass
+@cli.command()
+@click.argument('month')
+def run_ocr(month: str):
+    m = int(month)
+    main = Main(m)
+    breakpoint()
+    main.ocr_result_into_db()
 
 if __name__ == '__main__':
     import sys
+    cli()
+    sys.exit(0)
     app = AppType.T if int(sys.argv[1]) == 1 else AppType.M
     month = int(sys.argv[2])
     main = Main(month=month, app=app)
