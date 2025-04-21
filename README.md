@@ -5,6 +5,9 @@
 ## command / scripts:
 
 - `tool_pyocr.py`: extract text from PNG (screenshot) files using OCR(_Tesseract_)
+  - Commands: 
+    - `run-ocr`: argument: month(1 to 12)
+      - Example: `python3 tool_pyocr.py run-ocr 4`
 - `tile.py`
 
 ## Directory structure:
