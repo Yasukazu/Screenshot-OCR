@@ -60,6 +60,18 @@ APP_TYPE_TO_STEM_END = MappingProxyType({
     AppType.M: ".mercari.work.android"
 })
 
+class TTxtLines:
+    TITLE = 1
+    def __init__(self, txt_lines: Sequence[LineBox]):
+        self.txt_lines = txt_lines
+
+    def title(self, n=0):
+        return self.txt_lines[1].content.replace(' ', '')
+
+class MTxtLines(TTxtLines):
+    def title(self, n: int):
+        return ''.join([self.txt_lines[i].content.replace(' ', '') for i in range(n - 3, n - 1)])
+
 class MyOcr:
     from path_feeder import input_dir_root
     tools = pyocr.get_available_tools()
@@ -118,16 +130,15 @@ class MyOcr:
                         return n, date
                 raise ValueError("Unmatch AppType.M txt_lines!")                
             case AppType.T:
-                breakpoint()
-                n_gyoumu = next_gyoumu(txt_lines)
+                # n_gyoumu = next_gyoumu(txt_lines)
                 date = None
-                for txt_line in txt_lines:
+                for n, txt_line in enumerate(txt_lines):
                     date = get_date(txt_line)
                     if date:
                         break
                 if not date:
                     raise ValueError("No date found in T!")
-                return n_gyoumu, date
+                return n, date
             case _:
                 raise ValueError("Undefined AppType!")
 
@@ -173,13 +184,14 @@ class MyOcr:
 
     @classmethod
     def t_title(cls, txt_lines: Sequence[LineBox]):
-        stop = 'この 店 舗 の 募集 状況'.replace(' ', '')
+        return txt_lines[1].content.replace(' ', '')
+        '''stop = 'この 店 舗 の 募集 状況'.replace(' ', '')
         lines = []
         for line in txt_lines:
             if (content:=''.join(line.content.split())) == stop:
                 break
             lines.append(content)
-        return ';'.join(lines)
+        return ';'.join(lines)'''
     @classmethod
     def m_title(cls, txt_lines: Sequence[LineBox], n: int):
         return ''.join([txt_lines[i].content.replace(' ', '') for i in range(n - 3, n - 1)])
@@ -284,24 +296,27 @@ class Main:
         m_patt = APP_TYPE_TO_STEM_END[AppType.M]
         with closing(self.conn.cursor()) as cur:
             for file in self.my_ocr.path_feeder.dir.iterdir():
-                if file.is_file() and file.suffix == '.png':
-                    app_type = AppType.NUL
-                    if file.stem.endswith(t_patt):
-                        app_type = AppType.T
-                    elif file.stem.endswith(m_patt):
-                        app_type = AppType.M
-                    if app_type == AppType.NUL:
-                        raise ValueError("Not supported file!")
-                    app = app_type.value
-                    path_set = PathSet(self.my_ocr.path_feeder.dir, file.stem, ext=self.my_ocr.path_feeder.ext)
-                    breakpoint()
-                    txt_lines = self.my_ocr.run_ocr(path_set)
-                    n, date = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
-                    title = self.my_ocr.get_title(app_type, txt_lines, n)
+                if not (file.is_file() and file.suffix == '.png'):
+                    continue
+                app_type = AppType.NUL
+                if file.stem.endswith(t_patt):
+                    app_type = AppType.T
+                elif file.stem.endswith(m_patt):
+                    app_type = AppType.M
+                if app_type == AppType.NUL:
+                    raise ValueError("Not supported file!")
+                app = app_type.value
+                path_set = PathSet(self.my_ocr.path_feeder.dir, file.stem, ext=self.my_ocr.path_feeder.ext)
+                txt_lines = self.my_ocr.run_ocr(path_set)
+                n, date = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
+                exists_sql = f"SELECT day, app FROM `{self.tbl_name}` WHERE day = {date.day} AND app = {app};"
+                cur.execute(exists_sql)
+                one = cur.fetchone()
+                if not one:
+                    tm_txt_lines = TTxtLines(txt_lines) if app_type == AppType.T else MTxtLines(txt_lines)
+                    title = tm_txt_lines.title(n)
                     pkl = pickle.dumps(txt_lines)
-                    breakpoint()
                     cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app, date.day, None, title, file.stem, pkl))
-                    break
         self.conn.commit()
 
 import click
@@ -313,7 +328,6 @@ def cli():
 def run_ocr(month: str):
     m = int(month)
     main = Main(m)
-    breakpoint()
     main.ocr_result_into_db()
 
 if __name__ == '__main__':
