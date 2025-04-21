@@ -153,21 +153,24 @@ class PathFeeder:
         return self.dir / (stem + self.ext) if stem else None
 
 from contextlib import closing
-import sqlite3
 import txt_lines_db
-from tool_pyocr import AppType
 class DbPathFeeder(PathFeeder):
+    from tool_pyocr import AppType
     img_file_ext = '.png'
 
     def __init__(self, year=0, month=0, days=-1, input_type = FileExt.PNG, input_dir=input_dir_root, type_dir=False, app_type=AppType.T):
         super().__init__(year, month, days, input_type, input_dir, type_dir)
         self.app_type = app_type
-
+        self.conn = txt_lines_db.connect()
+        
+    @property
+    def table_name(self):
+        return txt_lines_db.get_table_name(self.month)
     def feed(self, padding=False, delim='') -> Iterator[tuple[int, str]]:
             tbl_name = txt_lines_db.get_table_name(self.month)
             day_list = f"({','.join([str(d + 1) for d in self.days])})"
             sql = f"SELECT `day`, `stem` FROM `{tbl_name}`" + (f"WHERE day IN {day_list} AND app = {str(self.app_type.value)}") + " ORDER BY `day`;"
-            with closing(txt_lines_db.connect().cursor()) as cur:
+            with closing(self.conn.cursor()) as cur:
                 rr = cur.execute(sql)
                 day_to_stem = {r[0]: r[1] for r in rr}
             if padding:
