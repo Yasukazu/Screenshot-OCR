@@ -1,12 +1,15 @@
 # Make a 4-page PDF file which contains 1 month every-day screenshots.
 
-## main script
+## Original motivation: to organize screenshots of niche job apps as 「タイミー」 or 「メルカリハロ」
 
+## command / scripts:
+
+- `tool_pyocr.py`: extract text from PNG (screenshot) files using OCR(_Tesseract_)
 - `tile.py`
 
 ## Directory structure:
 
-1. App route: ~/screen/
+1. App route: ~/screen/from contextlib import closing
 2. Year: screen/2025/
 3. Month: screen/2025/01/ : 01 is January.
 
@@ -17,7 +20,9 @@
 ## get_number_image
 
 - ### `DigitImage` class in `digit_image.py`:
+  
   - #### classmethod `calc_font_scale` returns `font_scale` ignores font line width.
+
 - ### `num_to_strokes.py`
   
   ![test image](digi/get_number_image-test.PNG)
