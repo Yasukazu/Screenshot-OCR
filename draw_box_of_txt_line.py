@@ -31,9 +31,12 @@ draw = ImageDraw.Draw(image)
 import path_feeder
 font_fullpath = path_feeder.input_dir_root / 'font' / 'OCRA.ttf'
 font = ImageFont.truetype(str(font_fullpath), 24)
-bb = bytearray([b for b in range(ord('A'),ord('Z')+1)]).decode()
+dd = bytearray([b for b in range(ord('0'),ord('9')+1)])
+bb = bytearray([b for b in range(ord('A'),ord('Z')+1)])
+db = (dd + bb).decode()
 for n, txt_line in enumerate(txt_lines):
     pos = txt_line.position[0]
-    draw.text([pos[0]-24, pos[1]], bb[n], 0xff, font=font)
-# B1:tilte,F5:date,Q-1:wages
+    draw.text([pos[0]-24, pos[1]], db[n], 0xff, font=font)
+image.show()
+# 1: title, 5: date, G: wages
     
