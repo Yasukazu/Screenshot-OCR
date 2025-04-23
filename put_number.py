@@ -10,10 +10,10 @@ class PutPos(IntEnum):
 	C = 0
 	R = 1
 from typing import Any
-from misaki_font import MisakiFontimage
+from misaki import MisakiFontImage
 NUMBER_STR = 'number_str'
 NUMBER = 'number'
-def put_number(digit_image_feeder: MisakiFontimage, pos: PutPos=PutPos.L):#SegmentImage(BasicDigitImage.calc_scale_from_height())):
+def put_number(digit_image_feeder: MisakiFontImage, pos: PutPos=PutPos.L):#SegmentImage(BasicDigitImage.calc_scale_from_height())):
 	'''prefix "0x" for hexadecimal'''
 	from format_num import formatnums_to_bytearray
 	def _embed_number(func):
@@ -46,9 +46,9 @@ def put_number(digit_image_feeder: MisakiFontimage, pos: PutPos=PutPos.L):#Segme
 
 if __name__ == '__main__':
 	from path_feeder import DbPathFeeder
-	from misaki_font import MisakiFontimage
+	from misaki_font import MisakiFontImage
 	#digit_image_param_S = BasicDigitImage.calc_scale_from_height(50)
-	digit_image_feeder_S = MisakiFontimage(8) #SegmentImage(digit_image_param_S)
+	digit_image_feeder_S = MisakiFontImage(8) #SegmentImage(digit_image_param_S)
 	path_feeder = DbPathFeeder()
 	from pathlib import Path
 	@put_number(pos=PutPos.C, digit_image_feeder=digit_image_feeder_S)

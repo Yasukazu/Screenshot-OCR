@@ -1,16 +1,16 @@
 from enum import Enum, StrEnum, Flag, auto
-from typing import Sequence, Callable
+from typing import Sequence, Callable, TypeAlias
 from functools import lru_cache
 import csv
 import numpy as np
 from seg7yx import SlantedNode6
 
-type ii_ii = tuple[tuple[int, int], tuple[int, int]]
-type i_i_tpl_tpl = dict[str, ii_ii]
+ii_ii: TypeAlias = tuple[tuple[int, int], tuple[int, int]]
+i_i_tpl_tpl: TypeAlias = dict[str, ii_ii]
 
-type i_i_tpl = tuple[int, int]
-type f_i_tpl = tuple[float, int]
-type f_f_tpl = tuple[float, float]
+i_i_tpl: TypeAlias = tuple[int, int]
+f_i_tpl: TypeAlias = tuple[float, int]
+f_f_tpl: TypeAlias = tuple[float, float]
 
 class StrokeSlant(Enum):
 	SLANT00 = 0

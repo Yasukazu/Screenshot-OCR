@@ -22,7 +22,7 @@ class Seg7:
 		self.d: bool = conv(d)
 		self.e: bool = conv(e)
 		self.f: bool = conv(f)
-		self.g: bool = conv(g)
+		self.g: bool = conv(g
 		self.h: bool = conv(h)
 
 SEVEN_SEG_STEM = '7-seg'
@@ -30,9 +30,9 @@ PICKLE_EXT = '.pkl'
 
 from strok7 import SegPath, get_segelem_dict, get_segpath_for_c
 # _segelem_array: list[tuple[Seg7]] = [set()] * 16
-
+from typing import TypeAlias
 from seven_seg import SEVEN_SEG_SIZE #, load_7_seg_num_pkl # load_7_seg_num_csv_as_df
-type segpath_dict = dict[str, SegPath]
+segpath_dict: TypeAlias = dict[str, SegPath]
 def load_segpath_array(segelem_dict=get_segelem_dict(), _segpath_array = [None] * SEVEN_SEG_SIZE, df: DataFrame=load_7_seg_num_pkl())-> list[list[segpath_dict]]:
 	'''call "slanted" for each element'''
 	if not _segpath_array[0]:

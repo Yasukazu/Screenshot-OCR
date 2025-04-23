@@ -1,8 +1,8 @@
-from typing import Sequence, Iterator
+from typing import Sequence, Iterator, TypeAlias
 from enum import Enum
 from dataclasses import dataclass
-type _f_f_ = tuple[float, float]
-type node6 = tuple[_f_f_, _f_f_, _f_f_, _f_f_, _f_f_, _f_f_]
+_f_f_: TypeAlias = tuple[float, float]
+node6: TypeAlias = tuple[_f_f_, _f_f_, _f_f_, _f_f_, _f_f_, _f_f_]
 
 @dataclass
 class Node6:
@@ -74,7 +74,7 @@ class Seg7yx:
 	@classmethod
 	def slant_ratio_by_y(cls, y: int)-> float:
 		return 1 - y / 2
-type seq_f_f = Sequence[tuple[float, float]]
+seq_f_f: TypeAlias = Sequence[tuple[float, float]]
 class Seg7Node6:
 	def __init__(self, slant=0.0):
 		self.slant = slant

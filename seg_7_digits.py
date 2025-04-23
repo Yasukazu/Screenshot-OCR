@@ -186,7 +186,8 @@ seg_7_array: Sequence[Sequence[str]] = (
 		('g',),
 )
 
-type seg_7_tuple = tuple[str,str,str,str,str,str,str]
+from typing import TypeAlias
+seg_7_tuple: TypeAlias = tuple[str,str,str,str,str,str,str]
 
 homo_seg_7_array: Sequence[seg_7_tuple] = (
 		('a', 'b', 'c', 'd', 'e', 'f', ''), # 0

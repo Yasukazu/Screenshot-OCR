@@ -22,8 +22,8 @@ if not font_dir.exists():
 
 FONT_SIZE = (8, 8)
 HALF_FONT_SIZE = (4, 8)
-
-type ku = tuple[tuple[int, int], int]
+from typing import TypeAlias
+ku: TypeAlias = tuple[tuple[int, int], int]
 
 DIGIT_KU: ku = (3, 16),10
 HEX_KU: ku = (3, 33),6
@@ -67,7 +67,6 @@ class MisakiFont(Enum):
 			b = Byte(byte)
 			return b.l, b.h
 			
-		image_list = []
 		def append_fonts(ku: int): 
 			x_pos, y_pos = byte_to_xy(ku)
 			x_offset = x_pos * 4
@@ -78,7 +77,9 @@ class MisakiFont(Enum):
 			img_area = area.ravel().tolist()
 			font_part = full_image.crop(img_area)
 			return font_part
-		return {n: img for (n, img) in enumerate(image_list)}
+		font_image = append_fonts(c)
+		font_dict[c] = font_iamge
+		return font_image
 
 class SecondMisakiFont(Enum):
 	HALF_NAME = 'misaki_gothic_2nd_4x8'
@@ -171,6 +172,14 @@ def cv2pil(image):
 	return new_image
 
 if __name__ == '__main__':
+	import sys
+	c = input('char for the font:')
+	if c > 255:
+		raise ValueError(f"{c=} exceeds half font range(255)")
+	font_image = MisakiFont.get_half_font_image(c)
+	if font_image:
+		font_image.show()
+	sys.exit(0)
 	from format_num import formatnums_to_bytearray, FloatFormatNum
 	mfi = MisakiFontImage(8)
 	fn = [FloatFormatNum(3.14)]
