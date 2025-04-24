@@ -2,7 +2,7 @@ from contextlib import closing
 from enum import IntEnum
 from types import MappingProxyType
 import re
-from typing import Sequence
+from typing import Sequence, Callable, Any
 from collections import namedtuple
 from pprint import pp
 from pathlib import Path
@@ -39,7 +39,6 @@ def next_gyoumu(txt_lines: Sequence[pyocr.builders.LineBox]):
     #return txt_lines[n + 1] #.content
 
 
-from path_feeder import PathFeeder
 from collections import namedtuple
 from dataclasses import dataclass
 @dataclass
@@ -73,7 +72,7 @@ class MTxtLines(TTxtLines):
         return ''.join([self.txt_lines[i].content.replace(' ', '') for i in range(n - 3, n - 1)])
 
 class MyOcr:
-    from path_feeder import input_dir_root
+    from path_feeder import input_dir_root, PathFeeder
     tools = pyocr.get_available_tools()
     tool = tools[0]
     #input_dir = input_dir # Path(os.environ['SCREEN_BASE_DIR'])
@@ -229,7 +228,7 @@ class Main:
     def __init__(self, month=0, app=AppType.NUL):
         self.my_ocr = MyOcr(month=month)
         self.img_dir = self.my_ocr.path_feeder.dir
-        month = self.my_ocr.month
+        #month = self.my_ocr.month
         #img_parent_dir = self.img_dir.parent
         self.app = app # tm
         # txt_lines_db = TxtLinesDB(img_parent_dir=img_parent_dir)
@@ -329,7 +328,28 @@ def run_ocr(month: str):
     m = int(month)
     main = Main(m)
     main.ocr_result_into_db()
+class FunctionItem:
+    def __init__(self, title: str, func: Callable | None, kwargs: dict[str, Any]={}):
+        self.title = title
+        self.func = func
+        self.kwargs = kwargs
+    def exec(self):
+        if self.func:
+            self.func(**self.kwargs) #if self.kwargs else self.func()
+def get_options(month=0):
+    main = Main(month)
+    return [
+        FunctionItem('None', None),
+        FunctionItem('save OCR result into DB', main.ocr_result_into_db),
 
+    ]
+def main(options=get_options(int(input("Month?:") or '0'))):
+    for n, option in enumerate(options):
+        print(f"{n}. {option.title}")
+    choice = int(input(f"Choose(0 to {len(options)}):"))
+    breakpoint()
+    if choice:
+        options[choice].exec()
 if __name__ == '__main__':
     import sys
     cli()
