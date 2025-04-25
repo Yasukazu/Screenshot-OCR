@@ -30,13 +30,13 @@ def get_date(line_box: pyocr.builders.LineBox)-> Union[Date, None]:
         #raise ValueError("Not 月日!")
             return Date(month=int(content[0]), day=int(content[2]))
 
-def next_gyoumu(txt_lines: Sequence[pyocr.builders.LineBox]):
-    assert len(txt_lines) > 1
+'''def next_gyoumu(txt_lines: Sequence[pyocr.builders.LineBox]):
+    lines_len = len(txt_lines)
     for n, tx in enumerate(txt_lines):
         joined_tx = ''.join([t.strip() for t in tx.content])
         if joined_tx[0:4] == '業務開始':
-            return n
-    #return txt_lines[n + 1] #.content
+            return n + 1
+    #return txt_lines[n + 1] #.content '''
 
 
 from collections import namedtuple
@@ -70,9 +70,9 @@ class TTxtLines:
 class MTxtLines(TTxtLines):
     def title(self, n: int):
         return ''.join([self.txt_lines[i].content.replace(' ', '') for i in range(n - 3, n - 1)])
-
+from returns.result import Result, Failure, Success, safe
 class MyOcr:
-    from path_feeder import input_dir_root, PathFeeder
+    from path_feeder import input_dir_root, input_ext
     tools = pyocr.get_available_tools()
     tool = tools[0]
     #input_dir = input_dir # Path(os.environ['SCREEN_BASE_DIR'])
@@ -143,25 +143,32 @@ class MyOcr:
 
     def __init__(self, month=0):
         self.month = month
-        self.path_feeder = PathFeeder(input_dir=MyOcr.input_dir_root, type_dir=False, month=month)
+        self.input_dir = MyOcr.input_dir_root
+        from path_feeder import PathFeeder
+        #self.path_feeder = PathFeeder(input_dir=MyOcr.input_dir_root, type_dir=False, month=month)
         self.txt_lines: Sequence[pyocr.builders.LineBox] | None = None
         self.image: Image.Image | None = None
-    def each_path_set(self):
+    '''def each_path_set(self):
         for stem in self.path_feeder.feed(delim=self.delim, padding=False):
-            yield PathSet(self.path_feeder.dir, stem, self.path_feeder.ext)
+            yield PathSet(self.path_feeder.dir, stem, self.path_feeder.ext)'''
+    @safe
     def run_ocr(self, path_set: PathSet, lang='jpn+eng', delim='',
-                builder=pyocr.builders.LineBoxBuilder(tesseract_layout=3)): # Digit
+                builder=pyocr.builders.LineBoxBuilder(tesseract_layout=3))-> Sequence[pyocr.builders.LineBox]:#, Exception]: # Digit
         #stem_without_delim = ''.join([s for s in path_set[1] if s!= self.delim])
         fullpath = path_set.path / (path_set.stem_without_delim(delim) + path_set.ext)
         img = Image.open(fullpath).convert('L')
         enhancer= ImageEnhance.Contrast(img)
         self.image = enhancer.enhance(2.0)
-        self.txt_lines = self.tool.image_to_string(
+        txt_lines = self.tool.image_to_string(
             self.image,
             lang=lang,
             builder=builder
         )
-        return self.txt_lines
+        self.txt_lines = txt_lines
+        assert isinstance(txt_lines[0], pyocr.builders.LineBox)
+        return txt_lines
+        # raise ValueError("PYOCR run failed!")
+        
     
     def draw_boxes(self):
         if not self.txt_lines:
@@ -213,13 +220,13 @@ class MyOcr:
         except ValueError as err:
             raise ValueError(f"Failed to convert into an integer: {content_num}\n{err}")
 
-    def check_date(self, path_set: PathSet):#, txt_lines: Sequence[pyocr.builders.LineBox]):
+    '''def check_date(self, path_set: PathSet):#, txt_lines: Sequence[pyocr.builders.LineBox]):
         if not self.txt_lines:
             raise ValueError('txt_lines is None!')
         n_gyoumu = next_gyoumu(self.txt_lines)
         gyoumu_date = get_date(self.txt_lines[n_gyoumu])
         if gyoumu_date != (int(path_set.stem.split()[0]), int(path_set.stem.split()[1])): # path_feeder.month, 
-            raise ValueError(f"Unmatch {gyoumu_date} : {path_set.stem}!")
+            raise ValueError(f"Unmatch {gyoumu_date} : {path_set.stem}!")'''
 
 import pickle
 
@@ -227,7 +234,7 @@ class Main:
     import txt_lines_db
     def __init__(self, month=0, app=AppType.NUL):
         self.my_ocr = MyOcr(month=month)
-        self.img_dir = self.my_ocr.path_feeder.dir
+        self.img_dir = self.my_ocr.input_dir
         #month = self.my_ocr.month
         #img_parent_dir = self.img_dir.parent
         self.app = app # tm
@@ -254,7 +261,7 @@ class Main:
             result = cur.execute(qry, prm)
             if result:
                 return [r[0]    for r in result]
-
+    from returns.pipeline import is_successful
     def add_image_files_as_txt_lines(self, app_type: AppType, ext='.png'):
         if app_type == AppType.NUL:
             raise ValueError('AppType is NUL!')
@@ -265,11 +272,12 @@ class Main:
             #ext_dot = img_file.name.rfind('.')
             #ext = img_file.name[ext_dot:]
             stem = img_file.stem
-            parent = self.my_ocr.path_feeder.dir
+            parent = self.my_ocr.input_dir
             path_set = PathSet(parent, stem, ext)
-            txt_lines = self.my_ocr.run_ocr(path_set=path_set, delim='')
-            if not txt_lines:
-                raise ValueError(f"Unable to extract from {path_set}")
+            result = self.my_ocr.run_ocr(path_set=path_set, delim='')
+            if not is_successful(result): # type: ignore
+                raise ValueError(f"Failed to run OCR!")#Unable to extract from {path_set}")
+            txt_lines = result.unwrap()
             # app_type = self.my_ocr.get_app_type(txt_lines) if txt_lines else AppType.NUL
             n, date = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
             existing_day_list = self.get_existing_days(app_type=app_type)
@@ -294,7 +302,7 @@ class Main:
         t_patt = APP_TYPE_TO_STEM_END[AppType.T]
         m_patt = APP_TYPE_TO_STEM_END[AppType.M]
         with closing(self.conn.cursor()) as cur:
-            for file in self.my_ocr.path_feeder.dir.iterdir():
+            for file in self.my_ocr.input_dir.iterdir():
                 if not (file.is_file() and file.suffix == '.png'):
                     continue
                 app_type = AppType.NUL
@@ -305,8 +313,11 @@ class Main:
                 if app_type == AppType.NUL:
                     raise ValueError("Not supported file!")
                 app = app_type.value
-                path_set = PathSet(self.my_ocr.path_feeder.dir, file.stem, ext=self.my_ocr.path_feeder.ext)
-                txt_lines = self.my_ocr.run_ocr(path_set)
+                path_set = PathSet(self.my_ocr.input_dir, file.stem, ext=self.my_ocr.input_ext)
+                result = self.my_ocr.run_ocr(path_set)
+                if not is_successful(result): # type: ignore
+                    raise ValueError("OCR failed!")
+                txt_lines = result.unwrap()
                 n, date = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
                 exists_sql = f"SELECT day, app FROM `{self.tbl_name}` WHERE day = {date.day} AND app = {app};"
                 cur.execute(exists_sql)
