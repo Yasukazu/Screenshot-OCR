@@ -354,7 +354,7 @@ def get_options(month=0):
         FunctionItem('save OCR result into DB', main.ocr_result_into_db),
 
     ]
-def main(options=get_options(int(input("Month?:") or '0'))):
+def run_main(options: Sequence[FunctionItem]):#=get_options(int(input("Month?:") or '0'))):
     for n, option in enumerate(options):
         print(f"{n}. {option.title}")
     choice = int(input(f"Choose(0 to {len(options)}):"))
