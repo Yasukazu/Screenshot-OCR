@@ -7,11 +7,11 @@ home_path = Path(home_dir)
 SCREEN_BASE_DIR = 'SCREEN_BASE_DIR'
 from dotenv import load_dotenv
 is_dotenv_loaded = load_dotenv(verbose=True)
-
+input_ext = '.png'
 try:
     input_dir_root = Path(os.environ['SCREEN_BASE_DIR'])
-except KeyError:
-    raise ValueError(f"{SCREEN_BASE_DIR} is not set.")
+except KeyError as exc:
+    raise ValueError(f"{SCREEN_BASE_DIR} is not set.") from exc
 
 if not input_dir_root.exists():
     raise ValueError(f"`{input_dir_root}` for {SCREEN_BASE_DIR} does not exist!")
@@ -139,11 +139,10 @@ class PathFeeder:
             yield from sorted(stems)'''
 
     @property
-    def first_name(self)-> str:
-        stem = ''
-        for stem in self.feed(padding=False):
+    def first_name(self): #-> str:
+        for n, stem in self.feed(padding=False):
             break
-        return stem
+        return stem or ''
 
     @property
     def first_fullpath(self)-> Path | None:
@@ -163,9 +162,23 @@ class DbPathFeeder(PathFeeder):
         self.app_type = app_type
         self.conn = txt_lines_db.connect()
         
-    @property
-    def table_name(self):
-        return txt_lines_db.get_table_name(self.month)
+    @classmethod
+    def table_name(cls, month: int):
+        return txt_lines_db.get_table_name(month)
+    def table_exists(self, month: int=0):
+        if not month:
+            month = self.month
+        sql = """SELECT EXISTS (
+            SELECT 
+                name
+            FROM 
+                sqlite_schema 
+            WHERE 
+                type='table' AND name = '{}'""".format(self.table_name(month))
+        with closing(self.conn.cursor()) as cur:
+            one = cur.execute(sql).fetchone()
+            return bool(one)
+    
     def feed(self, padding=False, delim='') -> Iterator[tuple[int, str]]:
             tbl_name = txt_lines_db.get_table_name(self.month)
             day_list = f"({','.join([str(d + 1) for d in self.days])})"
@@ -184,7 +197,7 @@ class DbPathFeeder(PathFeeder):
 def path_feeder(year=0, month=0, from_=1, to=-1, input_type:FileExt=FileExt.PNG, padding=True)-> Generator[tuple[Path | None, str, int], None, None]:
     '''to=0:glob, -1:end of month
     returns: directory, filename, day'''
-    last_date = get_year_month(year=year, month=month) # f"{year}{month:02}"
+    last_date = get_yearmonth(year=year, month=month) # f"{year}{month:02}"
     year = last_date.year
     month = last_date.month
     input_path = input_dir_root / str(year) / ("%02d" % month) / input_type.value.dir
