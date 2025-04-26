@@ -162,9 +162,9 @@ class DbPathFeeder(PathFeeder):
         self.app_type = app_type
         self.conn = txt_lines_db.connect()
         
-    @classmethod
-    def table_name(cls, month: int):
-        return txt_lines_db.get_table_name(month)
+    @property
+    def table_name(self):#, month: int):
+        return txt_lines_db.get_table_name(self.month)
     def table_exists(self, month: int=0):
         if not month:
             month = self.month
@@ -174,7 +174,7 @@ class DbPathFeeder(PathFeeder):
             FROM 
                 sqlite_schema 
             WHERE 
-                type='table' AND name = '{}'""".format(self.table_name(month))
+                type='table' AND name = '{}');""".format(self.table_name)#month))
         with closing(self.conn.cursor()) as cur:
             one = cur.execute(sql).fetchone()
             return bool(one)
