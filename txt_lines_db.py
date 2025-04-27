@@ -13,16 +13,17 @@ def get_db_name():
     except KeyError:
         return 'txt_lines.sqlite'
 
-
+TABLE_NAME_FORMAT = "text_lines-{:02}"
 def get_table_name(month: int):
-    return "text_lines-%02d" % month #:02}"
+    return TABLE_NAME_FORMAT.format(month)#:02}"
+    #return "text_lines-%02d" % month #:02}"
 
-create_tbl_sql = "CREATE TABLE if not exists `{}` (`app` INTEGER, `day` INTEGER, `wages` INTEGER, `title` TEXT, `stem` TEXT, `txt_lines` BLOB, PRIMARY KEY (app, day))"
+CREATE_TABLE_SQL = "CREATE TABLE if not exists '{}' (`app` INTEGER, `day` INTEGER, `wages` INTEGER, `title` TEXT, `stem` TEXT, `txt_lines` BLOB, PRIMARY KEY (app, day))"
 
 def create_tbl_if_not_exists(tbl_name: str):
     con = connect()
     with closing(con.cursor()) as cur:
-        cur.execute(create_tbl_sql.format(tbl_name))
+        cur.execute(CREATE_TABLE_SQL.format(tbl_name))
     con.commit()
 
 sqlite_fullpath = input_dir_root / str(YEAR) / get_db_name()
@@ -67,7 +68,7 @@ if __name__ == '__main__':
     sys.exit(0)
     month = int(sys.argv[1])
     each_field_patt = re.compile(r"`(\w+)`")
-    each_field = each_field_patt.findall(create_tbl_sql)
+    each_field = each_field_patt.findall(CREATE_TABLE_SQL)
     each_field_without_last = each_field[:-1]
     csv_fullpath = sqlite_fullpath.parent / (sqlite_fullpath.stem + '.csv')
     with csv_fullpath.open('w') as out_csv:

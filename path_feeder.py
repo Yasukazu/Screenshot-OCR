@@ -6,10 +6,12 @@ home_path = Path(home_dir)
 
 SCREEN_BASE_DIR = 'SCREEN_BASE_DIR'
 from dotenv import load_dotenv
-is_dotenv_loaded = load_dotenv(verbose=True)
+is_dotenv_loaded = load_dotenv('.env', verbose=True)
+if is_dotenv_loaded:
+    print('.env is loaded.')
 input_ext = '.png'
 try:
-    input_dir_root = Path(os.environ['SCREEN_BASE_DIR'])
+    input_dir_root = Path(os.environ[SCREEN_BASE_DIR])
 except KeyError as exc:
     raise ValueError(f"{SCREEN_BASE_DIR} is not set.") from exc
 

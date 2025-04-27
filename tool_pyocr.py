@@ -70,6 +70,8 @@ class TTxtLines:
 class MTxtLines(TTxtLines):
     def title(self, n: int):
         return ''.join([self.txt_lines[i].content.replace(' ', '') for i in range(n - 3, n - 1)])
+class OCRError(Exception):
+    pass
 from returns.result import Result, Failure, Success, safe
 class MyOcr:
     from path_feeder import input_dir_root, input_ext
@@ -164,8 +166,9 @@ class MyOcr:
             lang=lang,
             builder=builder
         )
+        if txt_lines:
+            assert isinstance(txt_lines[0], pyocr.builders.LineBox)
         self.txt_lines = txt_lines
-        assert isinstance(txt_lines[0], pyocr.builders.LineBox)
         return txt_lines
         # raise ValueError("PYOCR run failed!")
         
@@ -242,6 +245,13 @@ class Main:
         self.conn = Main.txt_lines_db.connect()
         self.tbl_name = Main.txt_lines_db.get_table_name(month)
         Main.txt_lines_db.create_tbl_if_not_exists(self.tbl_name)
+
+    def db_path_feeder(self, app: AppType, feeder_dict={}):
+        if feeder:=feeder_dict[app]:
+            return feeder
+        from path_feeder import DbPathFeeder
+        feeder_dict[app] = feeder = DbPathFeeder(month=self.month, app_type=app)
+        return feeder
 
     @property
     def month(self):
