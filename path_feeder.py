@@ -181,13 +181,14 @@ class DbPathFeeder(PathFeeder):
             one = cur.execute(sql).fetchone()
             return bool(one)
     
-    def feed(self, padding=False, delim='') -> Iterator[tuple[int, str]]:
+    def feed(self, padding=False, delim='', day_to_stem={}) -> Iterator[tuple[int, str]]:
             tbl_name = txt_lines_db.get_table_name(self.month)
             day_list = f"({','.join([str(d + 1) for d in self.days])})"
             sql = f"SELECT `day`, `stem` FROM `{tbl_name}`" + (f"WHERE day IN {day_list} AND app = {str(self.app_type.value)}") + " ORDER BY `day`;"
             with closing(self.conn.cursor()) as cur:
-                rr = cur.execute(sql)
-                day_to_stem = {r[0]: r[1] for r in rr}
+                for r in cur.execute(sql):
+                    day_to_stem[r[0]] = r[1]
+                # day_to_stem = {r[0]: r[1] for r in rr}
             if padding:
                 for dy in range(1, monthrange(self.year, self.month)[1] + 1):
                     yield dy, day_to_stem[dy] if dy in day_to_stem else ''
