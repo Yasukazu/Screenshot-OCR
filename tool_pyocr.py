@@ -13,6 +13,7 @@ from PIL import Image, ImageDraw, ImageEnhance
 import pyocr
 import pyocr.builders
 from pyocr.builders import LineBox
+from returns.pipeline import is_successful, UnwrapFailedError
 
 @dataclass
 class Date:
@@ -143,13 +144,18 @@ class MyOcr:
             case _:
                 raise ValueError("Undefined AppType!")
 
-    def __init__(self, month=0):
-        self.month = month
-        self.input_dir = MyOcr.input_dir_root
+    def __init__(self, month=0, year=0):
+        from path_feeder import get_year_month
+        self.date = get_year_month(year=year, month=month)
+        #self.month = month
+        #self.input_dir = MyOcr.input_dir_root
         from path_feeder import PathFeeder
         #self.path_feeder = PathFeeder(input_dir=MyOcr.input_dir_root, type_dir=False, month=month)
         self.txt_lines: Sequence[pyocr.builders.LineBox] | None = None
         self.image: Image.Image | None = None
+    @property
+    def input_dir(self):
+        return MyOcr.input_dir_root / str(self.date.year) / f'{self.date.month:02}'
     '''def each_path_set(self):
         for stem in self.path_feeder.feed(delim=self.delim, padding=False):
             yield PathSet(self.path_feeder.dir, stem, self.path_feeder.ext)'''
@@ -235,9 +241,9 @@ import pickle
 
 class Main:
     import txt_lines_db
-    def __init__(self, month=0, app=AppType.NUL):
-        self.my_ocr = MyOcr(month=month)
-        self.img_dir = self.my_ocr.input_dir
+    def __init__(self, month=0, app=AppType.NUL, year=0):
+        self.my_ocr = MyOcr(month=month, year=year)
+        #self.img_dir = self.my_ocr.input_dir
         #month = self.my_ocr.month
         #img_parent_dir = self.img_dir.parent
         self.app = app # tm
@@ -245,6 +251,10 @@ class Main:
         self.conn = Main.txt_lines_db.connect()
         self.tbl_name = Main.txt_lines_db.get_table_name(month)
         Main.txt_lines_db.create_tbl_if_not_exists(self.tbl_name)
+    
+    @property
+    def img_dir(self):
+        return self.my_ocr.input_dir
 
     def db_path_feeder(self, app: AppType, feeder_dict={}):
         if feeder:=feeder_dict[app]:
@@ -292,7 +302,6 @@ class Main:
             result = cur.execute(qry, prm)
             if result:
                 return [r[0]    for r in result]
-    from returns.pipeline import is_successful
     def add_image_files_as_txt_lines(self, app_type: AppType, ext='.png'):
         if app_type == AppType.NUL:
             raise ValueError('AppType is NUL!')
@@ -308,7 +317,8 @@ class Main:
             result = self.my_ocr.run_ocr(path_set=path_set, delim='')
             if not is_successful(result): # type: ignore
                 raise ValueError(f"Failed to run OCR!")#Unable to extract from {path_set}")
-            txt_lines = result.unwrap()
+            
+                txt_lines = result.unwrap()
             # app_type = self.my_ocr.get_app_type(txt_lines) if txt_lines else AppType.NUL
             n, date = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
             existing_day_list = self.get_existing_days(app_type=app_type)
@@ -346,19 +356,23 @@ class Main:
             parent = self.my_ocr.input_dir
             path_set = PathSet(parent, stem, ext)
             result = self.my_ocr.run_ocr(path_set=path_set, delim='')
-            if not is_successful(result): # type: ignore
-                raise ValueError(f"Failed to run OCR!")#Unable to extract from {path_set}")
-            txt_lines = result.unwrap()
+            try:#if not is_successful(result): # type: ignore
+                txt_lines = result.unwrap()
+            except UnwrapFailedError as uwerr:
+                raise ValueError("Failed to run OCR!", path_set) from uwerr
             n, date = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
-            existing_day_list = self.get_existing_days(app_type=app_type)
+            existing_day_list = existing_day_dict[app_type]
             if existing_day_list and (date.day in existing_day_list):
                 print(f"Day {date.day} of App {app_type} exists.")
             else:
                 wages = self.my_ocr.get_wages(app_type=app_type, txt_lines=txt_lines)
                 title = self.my_ocr.get_title(app_type, txt_lines, n)
-                pkl = pickle.dumps(txt_lines)
+                pkl_file_fullpath = self.img_dir / (stem + '.pkl')
+                breakpoint()
+                with pkl_file_fullpath.open('wb') as wf:
+                    pkl = pickle.dump(txt_lines, wf)
                 with closing(self.conn.cursor()) as cur:
-                    cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app_type.value, date.day, wages, title, stem, pkl))
+                    cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app_type.value, date.day, wages, title, stem, None))
                 for line in txt_lines:
                     pp(line.content)
                 self.conn.commit()
@@ -385,8 +399,7 @@ class Main:
                 app = app_type.value
                 path_set = PathSet(self.my_ocr.input_dir, file.stem, ext=self.my_ocr.input_ext)
                 result = self.my_ocr.run_ocr(path_set)
-                if not is_successful(result): # type: ignore
-                    raise ValueError("OCR failed!")
+                #if not is_successful(result): # type: ignore raise ValueError("OCR failed!")
                 txt_lines = result.unwrap()
                 n, date = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
                 exists_sql = f"SELECT day, app FROM `{self.tbl_name}` WHERE day = {date.day} AND app = {app};"
