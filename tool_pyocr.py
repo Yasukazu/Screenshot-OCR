@@ -263,8 +263,29 @@ class Main:
             result = cur.execute(sum_q)
             if result:
                 return [r[0] for r in result][0]
+    def get_OCRed_files(self):
+        qry = f"SELECT stem from `{self.tbl_name}` order by stem;"
+        with closing(self.conn.cursor()) as cur:
+            cur.execute(qry)
+            all = cur.fetchall()
+            if all:
+                return [a[0] for a in all]
 
-    def get_existing_days(self, app_type: AppType):
+    def get_existing_days(self, app_type=AppType.NUL):
+        if not app_type.value:
+            from collections import defaultdict
+            qry = f"SELECT app, day, stem from `{self.tbl_name}` order by app, day;"
+            with closing(self.conn.cursor()) as cur:
+                cur.execute(qry)
+                all = cur.fetchall()
+                if all:
+                    r_dict = defaultdict(dict)
+                    for app, day, stem in all:
+                        app_type = AppType(app)
+                        r_dict[app_type][day] = stem
+                    return r_dict
+                else:
+                    return
         qry = f"SELECT day from `{self.tbl_name}` where app = ?;"
         prm = (app_type.value, ) # date.day)
         with closing(self.conn.cursor()) as cur:
@@ -289,6 +310,45 @@ class Main:
                 raise ValueError(f"Failed to run OCR!")#Unable to extract from {path_set}")
             txt_lines = result.unwrap()
             # app_type = self.my_ocr.get_app_type(txt_lines) if txt_lines else AppType.NUL
+            n, date = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
+            existing_day_list = self.get_existing_days(app_type=app_type)
+            if existing_day_list and (date.day in existing_day_list):
+                print(f"Day {date.day} of App {app_type} exists.")
+            else:
+                wages = self.my_ocr.get_wages(app_type=app_type, txt_lines=txt_lines)
+                title = self.my_ocr.get_title(app_type, txt_lines, n)
+                pkl = pickle.dumps(txt_lines)
+                with closing(self.conn.cursor()) as cur:
+                    cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app_type.value, date.day, wages, title, stem, pkl))
+                for line in txt_lines:
+                    pp(line.content)
+                self.conn.commit()
+                ocr_done.append((app_type, date))
+        return ocr_done
+    from returns.pipeline import is_successful
+    def add_image_files_into_db(self, ext='.png'):
+        existing_day_dict = self.get_existing_days()
+        ocr_done = []
+        ocred_files = self.get_OCRed_files()
+        stemend_to_apptype = {APP_TYPE_TO_STEM_END[app_type]:app_type for app_type in AppType if app_type > 0}
+        def is_screenshot_file(stem: str):
+            for stemend, apptype in stemend_to_apptype.items():
+                if stem.endswith(stemend):
+                    return apptype
+            #return AppType.NUL
+        for img_file in self.img_dir.glob('*' + ext):
+            if ocred_files and (img_file.stem in ocred_files):
+                continue
+            app_type = is_screenshot_file(img_file.stem)
+            if not app_type:#== AppType.NUL:
+                continue
+            stem = img_file.stem
+            parent = self.my_ocr.input_dir
+            path_set = PathSet(parent, stem, ext)
+            result = self.my_ocr.run_ocr(path_set=path_set, delim='')
+            if not is_successful(result): # type: ignore
+                raise ValueError(f"Failed to run OCR!")#Unable to extract from {path_set}")
+            txt_lines = result.unwrap()
             n, date = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
             existing_day_list = self.get_existing_days(app_type=app_type)
             if existing_day_list and (date.day in existing_day_list):
