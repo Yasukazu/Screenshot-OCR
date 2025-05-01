@@ -368,7 +368,6 @@ class Main:
                 wages = self.my_ocr.get_wages(app_type=app_type, txt_lines=txt_lines)
                 title = self.my_ocr.get_title(app_type, txt_lines, n)
                 pkl_file_fullpath = self.img_dir / (stem + '.pkl')
-                breakpoint()
                 with pkl_file_fullpath.open('wb') as wf:
                     pkl = pickle.dump(txt_lines, wf)
                 with closing(self.conn.cursor()) as cur:
@@ -412,6 +411,29 @@ class Main:
                     cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app, date.day, None, title, file.stem, pkl))
         self.conn.commit()
 
+from contextlib import closing
+from pickle import load
+def edit_title(month: int, day: int):
+    from path_feeder import DbPathFeeder
+    feeder = DbPathFeeder(month=month)
+    with closing(feeder.conn.cursor()) as cur:
+        sql = f"SELECT stem, day, title FROM 'text_lines-{month:02}' WHERE day = {day}"
+        cur.execute(sql)
+        rr = cur.fetchone()
+        stem = rr[0]
+        db_day = rr[1]
+        db_title = rr[2]
+    assert day == db_day
+    pkl_fullpath = feeder.dir / (stem + '.pkl')
+    txt_lines = load(pkl_fullpath.open('rb'))
+    title = txt_lines[0].content.replace(' ', '')
+    yn = input(f"Replace '{db_title}' to '{title}'?(y/n):")
+    if yn.lower()[0] == 'y':
+        sql = f"UPDATE 'text_lines-{month:02}' SET title = ? WHERE day = {day}"
+        with closing(feeder.conn.cursor()) as cur:
+            rr = list(cur.execute(sql, (title,)))
+        feeder.conn.commit()
+
 import click
 @click.group()
 def cli():
@@ -441,7 +463,6 @@ def run_main(options: Sequence[FunctionItem]):#=get_options(int(input("Month?:")
     for n, option in enumerate(options):
         print(f"{n}. {option.title}")
     choice = int(input(f"Choose(0 to {len(options)}):"))
-    breakpoint()
     if choice:
         options[choice].exec()
 if __name__ == '__main__':
