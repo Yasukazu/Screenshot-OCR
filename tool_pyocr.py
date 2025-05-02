@@ -444,7 +444,23 @@ def edit_title(month: int, day: int):
         with closing(feeder.conn.cursor()) as cur:
             rr = list(cur.execute(sql, (title,)))
         feeder.conn.commit()
-
+def edit_wages(month: int)#, day: int):
+    from path_feeder import DbPathFeeder
+    feeder = DbPathFeeder(month=month)
+    with closing(feeder.conn.cursor()) as cur:
+        sql = f"SELECT stem, day FROM 'text_lines-{month:02}' WHERE wages IS NULL"
+        stem_day_list = list(cur.execute(sql))
+    if stem_day_list:
+        for stem, day in stem_day_list:
+            pkl_fullpath = feeder.dir / (stem + '.pkl')
+            txt_lines = load(pkl_fullpath.open('rb'))
+            wages = MyOcr.t_wages(txt_lines)
+            yn = input(f"Replace '{day}' in '{stem}' to '{wages}'?(y/n):")
+            if yn.lower()[0] == 'y':
+                sql = f"UPDATE 'text_lines-{month:02}' SET wages = ? WHERE day = {day}"
+                with closing(feeder.conn.cursor()) as cur:
+                    cur.execute(sql, (wages,))
+                feeder.conn.commit()
 
 import click
 @click.group()
