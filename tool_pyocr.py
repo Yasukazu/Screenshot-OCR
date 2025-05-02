@@ -7,6 +7,7 @@ from collections import namedtuple
 from pprint import pp
 from pathlib import Path
 from dataclasses import dataclass
+import pandas
 from dotenv import load_dotenv
 load_dotenv()
 from PIL import Image, ImageDraw, ImageEnhance
@@ -410,6 +411,16 @@ class Main:
                     pkl = pickle.dumps(txt_lines)
                     cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app, date.day, None, title, file.stem, pkl))
         self.conn.commit()
+    def save_as_csv(self):
+        #conn = sqlite3.connect(db_file, isolation_level=None, detect_types=sqlite3.PARSE_COLNAMES)
+        table = f"text_lines-{self.my_ocr.date.month:02}"
+        sql = f"SELECT * FROM `{table}`"
+        db_df = pandas.read_sql_query(sql, self.conn)
+        output_path = self.img_dir# / str(self.my_ocr.date.year) / f"{self.my_ocr.date.month:02}"
+        breakpoint()
+        assert output_path.exists()
+        output_fullpath = output_path / (table + '.csv')
+        db_df.to_csv(str(output_fullpath), index=False)
 
 from contextlib import closing
 from pickle import load
@@ -433,6 +444,7 @@ def edit_title(month: int, day: int):
         with closing(feeder.conn.cursor()) as cur:
             rr = list(cur.execute(sql, (title,)))
         feeder.conn.commit()
+
 
 import click
 @click.group()
