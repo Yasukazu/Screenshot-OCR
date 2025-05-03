@@ -7,6 +7,8 @@ from collections import namedtuple
 from pprint import pp
 from pathlib import Path
 from dataclasses import dataclass
+import pickle
+
 import pandas
 from dotenv import load_dotenv
 load_dotenv()
@@ -61,17 +63,7 @@ APP_TYPE_TO_STEM_END = MappingProxyType({
     AppType.M: ".mercari.work.android"
 })
 
-class TTxtLines:
-    TITLE = 1
-    def __init__(self, txt_lines: Sequence[LineBox]):
-        self.txt_lines = txt_lines
 
-    def title(self, n=0):
-        return self.txt_lines[1].content.replace(' ', '')
-
-class MTxtLines(TTxtLines):
-    def title(self, n: int):
-        return ''.join([self.txt_lines[i].content.replace(' ', '') for i in range(n - 3, n - 1)])
 class OCRError(Exception):
     pass
 from returns.result import Result, Failure, Success, safe
@@ -219,6 +211,21 @@ class MyOcr:
         n_gyoumu = next_gyoumu(self.txt_lines)
         return get_date(n_gyoumu)'''
     @classmethod
+    def m_wages(cls, txt_lines: Sequence[LineBox], n_cc=['%d' % c for c in range(10)]):
+        found = False
+        for ln in txt_lines:
+            if '合計¥' in ln.content.replace(' ', ''):
+                found = True
+                break
+        if not found:
+            raise ValueError("'合計¥' is not found!")
+        content = ln.content
+        nn = []
+        for n in content:
+            if n in n_cc:
+                nn.append(n)
+        return int(''.join(nn))
+    @classmethod
     def t_wages(cls, txt_lines: Sequence[LineBox]):
         content = txt_lines[-1].content
         content_num = ''.join(re.findall(r'\d+', content)) # ''.join([n for n in content if '0123456789'.index(n) >= 0])
@@ -237,8 +244,21 @@ class MyOcr:
         gyoumu_date = get_date(self.txt_lines[n_gyoumu])
         if gyoumu_date != (int(path_set.stem.split()[0]), int(path_set.stem.split()[1])): # path_feeder.month, 
             raise ValueError(f"Unmatch {gyoumu_date} : {path_set.stem}!")'''
+class TTxtLines:
+    TITLE = 1
+    def __init__(self, txt_lines: Sequence[LineBox]):
+        self.txt_lines = txt_lines
 
-import pickle
+    def title(self, n=0):
+        return self.txt_lines[1].content.replace(' ', '')
+    def wages(self):
+        return MyOcr.t_wages(self.txt_lines)
+
+class MTxtLines(TTxtLines):
+    def title(self, n: int):
+        return ''.join([self.txt_lines[i].content.replace(' ', '') for i in range(n - 3, n - 1)])
+    def wages(self):
+        return MyOcr.m_wages(self.txt_lines)
 
 class Main:
     import txt_lines_db
@@ -382,20 +402,16 @@ class Main:
         with closing(self.conn.cursor()) as cur:
             cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app_type.value, date.day, wages, title, stem, pkl))
         self.conn.commit()
-    def ocr_result_into_db(self):
-        t_patt = APP_TYPE_TO_STEM_END[AppType.T]
-        m_patt = APP_TYPE_TO_STEM_END[AppType.M]
+    t_patt = APP_TYPE_TO_STEM_END[AppType.T]
+    m_patt = APP_TYPE_TO_STEM_END[AppType.M]
+    def ocr_result_into_db(self, app_type_list: list[AppType]=[]):
+        if len(app_type_list) == 0:
+            app_type_list += [AppType.T, AppType.M]
         with closing(self.conn.cursor()) as cur:
-            for file in self.my_ocr.input_dir.iterdir():
-                if not (file.is_file() and file.suffix == '.png'):
-                    continue
-                app_type = AppType.NUL
-                if file.stem.endswith(t_patt):
-                    app_type = AppType.T
-                elif file.stem.endswith(m_patt):
-                    app_type = AppType.M
-                if app_type == AppType.NUL:
-                    raise ValueError("Not supported file!")
+          for app_type in app_type_list:
+            stem_end_patt = APP_TYPE_TO_STEM_END[app_type]
+            glob_patt = "*" + stem_end_patt + '.png'
+            for file in self.my_ocr.input_dir.glob(glob_patt):
                 app = app_type.value
                 path_set = PathSet(self.my_ocr.input_dir, file.stem, ext=self.my_ocr.input_ext)
                 result = self.my_ocr.run_ocr(path_set)
@@ -407,9 +423,14 @@ class Main:
                 one = cur.fetchone()
                 if not one:
                     tm_txt_lines = TTxtLines(txt_lines) if app_type == AppType.T else MTxtLines(txt_lines)
+                    wages = tm_txt_lines.wages()
                     title = tm_txt_lines.title(n)
-                    pkl = pickle.dumps(txt_lines)
-                    cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app, date.day, None, title, file.stem, pkl))
+                    pkl_fullpath = file.parent / (file.stem + '.pkl')
+                    with pkl_fullpath.open('wb') as wf:
+                        pickle.dump(txt_lines, wf)
+                    insert_sql = f"INSERT INTO `{self.tbl_name}` VALUES ({app}, {date.day}, ?, ?, ?, ?)" 
+                    breakpoint()
+                    cur.execute(insert_sql, (wages, title, file.stem, None))
         self.conn.commit()
     def save_as_csv(self):
         #conn = sqlite3.connect(db_file, isolation_level=None, detect_types=sqlite3.PARSE_COLNAMES)
@@ -417,7 +438,6 @@ class Main:
         sql = f"SELECT * FROM `{table}`"
         db_df = pandas.read_sql_query(sql, self.conn)
         output_path = self.img_dir# / str(self.my_ocr.date.year) / f"{self.my_ocr.date.month:02}"
-        breakpoint()
         assert output_path.exists()
         output_fullpath = output_path / (table + '.csv')
         db_df.to_csv(str(output_fullpath), index=False)
@@ -444,7 +464,8 @@ def edit_title(month: int, day: int):
         with closing(feeder.conn.cursor()) as cur:
             rr = list(cur.execute(sql, (title,)))
         feeder.conn.commit()
-def edit_wages(month: int)#, day: int):
+def edit_wages(month: int, app=AppType.T):
+    assert app != AppType.NUL
     from path_feeder import DbPathFeeder
     feeder = DbPathFeeder(month=month)
     with closing(feeder.conn.cursor()) as cur:
@@ -454,13 +475,19 @@ def edit_wages(month: int)#, day: int):
         for stem, day in stem_day_list:
             pkl_fullpath = feeder.dir / (stem + '.pkl')
             txt_lines = load(pkl_fullpath.open('rb'))
-            wages = MyOcr.t_wages(txt_lines)
+            wages = MyOcr.t_wages(txt_lines) if app == AppType.T else MyOcr.w_wages(txt_lines)
             yn = input(f"Replace '{day}' in '{stem}' to '{wages}'?(y/n):")
             if yn.lower()[0] == 'y':
-                sql = f"UPDATE 'text_lines-{month:02}' SET wages = ? WHERE day = {day}"
+                table = f'text_lines-{month:02}'
+                update_sql = f"UPDATE `{table}` SET wages = {wages} WHERE day = {day} AND `app` = {app.value}"
                 with closing(feeder.conn.cursor()) as cur:
-                    cur.execute(sql, (wages,))
-                feeder.conn.commit()
+                    cur.execute(update_sql)
+                    check_sql = f"SELECT wages FROM `{table}` where day = {day} AND `app` = {app.value}"
+                    cur.execute(check_sql)
+                    row = cur.fetchone()
+                    assert row[0] == wages
+                    print(f"Wages of {day=} is Updated as {wages=} in table `{table=}`.")
+                    feeder.conn.commit()
 
 import click
 @click.group()
