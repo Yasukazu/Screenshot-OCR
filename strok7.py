@@ -1,13 +1,16 @@
 from enum import Enum, StrEnum, Flag, auto
-from typing import Sequence
+from typing import Sequence, Callable, TypeAlias
+from functools import lru_cache
 import csv
+import numpy as np
+from seg7yx import SlantedNode6
 
-type ii_ii = tuple[tuple[int, int], tuple[int, int]]
-type i_i_tpl_tpl = dict[str, ii_ii]
+ii_ii: TypeAlias = tuple[tuple[int, int], tuple[int, int]]
+i_i_tpl_tpl: TypeAlias = dict[str, ii_ii]
 
-type i_i_tpl = tuple[int, int]
-type f_i_tpl = tuple[float, int]
-type f_f_tpl = tuple[float, float]
+i_i_tpl: TypeAlias = tuple[int, int]
+f_i_tpl: TypeAlias = tuple[float, int]
+f_f_tpl: TypeAlias = tuple[float, float]
 
 class StrokeSlant(Enum):
 	SLANT00 = 0
@@ -21,38 +24,54 @@ class Sp:
 	slant/2 p5 p2
 	p4 p3
 	'''
+	X_MAX = 1 # 2 for dot
+	Y_MAX = 2
+
 	def __init__(self, x: int, y: int):
-		assert x in (0, 1, 2) # 2 for comma
-		assert y in (0, 1, 2)
+		assert 0 <= x <= Sp.X_MAX
+		assert 0 <= x <= Sp.Y_MAX
 		self.x = x
 		self.y = y
-		self._slr = (1, 0.5, 0)[y]
+		# self._slr = (1, 0.5, 0)[y]
 
 	@property
-	def xy(self)-> tuple[float, int]:
+	def _slr(self)-> float:
+		return 1 - self.y / 2 # (1, 0.5, 0)[
+
+	@property
+	def xy(self)-> tuple[int, int]:
 		return self.x, self.y
 
-	def offset(self, offset=(0, 0)):
+	def offset_self(self, offset=(0, 0)):
 		self.x += offset[0]
 		self.y += offset[1]
 
-	def scale(self, n: int=1):
+	def scale_self(self, n: int=1):
 		self.x *= n
 		self.y *= n
 
-	def slant_x(self, slant: StrokeSlant=NO_SLANT)-> float:
+	def slanted_x(self, slant: StrokeSlant=NO_SLANT)-> float:
 		return self.x + slant.value * self._slr
 
-	def slant(self, slant: StrokeSlant=NO_SLANT)-> None:
-		self.x = self.slant_x(slant)
+	#def slant_self(self, slant: StrokeSlant=NO_SLANT)-> None:		self.x = self.slant_x(slant)
 
 	def slanted(self, slant: StrokeSlant=NO_SLANT)-> f_i_tpl:
-		return self.slant_x(slant), self.y
+		return self.slanted_x(slant), self.y
 
-	def scale_offset(self, slant: StrokeSlant=StrokeSlant.SLANT00, scale: int=1, offset: tuple[int, int]=(0, 0))-> i_i_tpl:
-		'''also slant'''
-		slanted_x = self.slant_x(slant) # / (1 + slant.value)
+	def scale_offset(self, node6: SlantedNode6=SlantedNode6.SLANT02, scale: int=1, offset: tuple[int, int]=(0, 0))-> i_i_tpl:
+		slant_map = node6.value
+		slanted_x = slant_map[self.y][self.x]
 		return round(scale * slanted_x) + offset[0], scale * self.y + offset[1]
+
+class MySp(Sp):
+	def __init__(self, x: int, y: int, slant_enum=StrokeSlant.SLANT00, scale_value=1, offset_value=(0, 0)):
+		super().__init__(x, y)
+		self.slant_enum = slant_enum
+		self.scale_value = scale_value
+		self.offset_value = offset_value
+	
+	def scale_offset(self, slant = StrokeSlant.SLANT00, scale = 1, offset = (0, 0)):
+		return super().scale_offset(node6=self.slant_enum, scale=self.scale_value, offset=self.offset_value)
 
 class Sp0(Sp):
 	def __init__(self, x: int):
@@ -76,51 +95,85 @@ abcdef_seg = (
 	(0, 0),
 	)
 
-SEG_POINT_ARRAY = SA = (
+SEG_POINT_ARRAY = _S_A = (
 	Sp(0, 0),
 	Sp(1, 0),
 	Sp(1, 1),
-	Sp(1, 2),
+	Sp(1, 2),# comma
 	Sp(0, 2),
 	Sp(0, 1),
 	)
 
-class SpPair(Enum):
-	A = SA[0], SA[1]
-	B = SA[1], SA[2]
-	C = SA[2], SA[3]
-	D = SA[3], SA[4]
-	E = SA[4], SA[5]
-	F = SA[5], SA[0]
-	G = SA[5], SA[2] # minus / hyphen
-	H = SA[1], SA[4] # per / slash
-	#I = _6, _6 # dot
+class MySegPoints:
+	'''Customized Seg Point array'''
+	def __init__(self, slant: StrokeSlant=StrokeSlant.SLANT00, scale: int=1, offset: tuple[int, int]=(0, 0)):
+		self.points = list(SEG_POINT_ARRAY)
+		self.slant = slant
+		self.scale = scale
+		self.offset = offset
 
+	def get(self, n: int):
+		if not 0 <= n < len(SEG_POINT_ARRAY):
+			raise ValueError(f"Out of range[0: {len(SEG_POINT_ARRAY)}]!")
+		sp = self.points[n]
+		if isinstance(sp, MySp):
+			return sp
+		sp = MySp(sp.x, sp.y, self.slant, self.scale, self.offset)
+		self.points[n] = sp
+		return sp
+
+class SpPair(Enum):
+	A = _S_A[0], _S_A[1]
+	B = _S_A[1], _S_A[2]
+	C = _S_A[2], _S_A[3]
+	D = _S_A[3], _S_A[4]
+	E = _S_A[4], _S_A[5]
+	F = _S_A[5], _S_A[0]
+	G = _S_A[5], _S_A[2] # minus / hyphen
+	H = (_S_A[3],) # period / comma / dot
+	#I = _6, _6 # dot
 	@classmethod
+	def expand_to_xy_list(cls, spp: 'SpPair')-> list[tuple[int, int]]:
+		return [sp.xy for sp in spp.value]
+	"""@classmethod
 	def get(cls, c: str)-> 'SpPair':
 		index = 'ABCDEFGHI'.index(c)
 		return [cls.A, cls.B, cls.C, cls.D, cls.E, cls.F, cls.G, cls.H][index]
 
 	@classmethod
 	def extract(cls, c: str)-> list[tuple[float, int]]:
-		return [sp.xy for sp in cls.get(c).value]
+		return [sp.xy for sp in cls.get(c).value]"""
 
 
 from functools import lru_cache
+from PIL import ImageDraw
 from strok7 import StrokeSlant
 SEGPATH_SLANT = StrokeSlant.SLANT02
+import numpy as np
 
 class SegPath:
-	def __init__(self, *spsp: Sp, max_cache=2): # f_sp: Sp0, t_sp: Sp0):
-		self.path = spsp #[sp for sp in spsp] # self.f = f_sp self.t = t_sp
-		self.slanted = lru_cache(maxsize=max_cache)(self._slanted)
+	def __init__(self, *spsp: Sp): # f_sp: Sp0, t_sp: Sp0):, max_cache=2
+		self.path = np.array([sp.xy for sp in spsp]) #[sp for sp in spsp] # self.f = f_sp self.t = t_sp
+		# self.slanted = lru_cache(maxsize=max_cache)(self._slanted)
 
-	def get_path(self):
-		return list(self.path)
+	def get_path(self)-> list[int]:
+		return self.path.ravel().tolist()
 
-	def _slanted(self, s=SEGPATH_SLANT, scale=1, offset=(0, 0)):
-		return [pt.scale_offset(slant=s, scale=scale, offset=offset) for pt in self.path]
+	def draw(self, drw: ImageDraw.ImageDraw, scale: int, offset: np.ndarray | tuple[int, int], line_width=1, fill=0):
+		if type(offset) != np.typing.NDArray:
+			offset = np.array(offset)
+		path = scale * self.path + offset
+		drw.line(path.ravel().tolist(), fill=fill, width=line_width)
 
+
+	'''def _slanted(self, s=SEGPATH_SLANT, scale=1, offset=(0, 0)):
+		return [pt.scale_offset(slant=s, scale=scale, offset=offset) for pt in self.path]'''
+class CSegPath(SegPath):
+	def draw(self, drw: ImageDraw.ImageDraw, scale=1, offset: np.ndarray | tuple[int, int]=(0, 0), line_width=1, fill=0):
+		if type(offset) != np.typing.NDArray:
+			offset = np.array(offset)
+		path = scale * self.path + offset
+		drw.circle(path.ravel().tolist(), radius=line_width, fill=fill)
 
 class SegElem(Enum):
 	A = SegPath(SEG_POINT_ARRAY[0], SEG_POINT_ARRAY[1])
@@ -130,7 +183,7 @@ class SegElem(Enum):
 	E = SegPath(SEG_POINT_ARRAY[4], SEG_POINT_ARRAY[5])
 	F = SegPath(SEG_POINT_ARRAY[5], SEG_POINT_ARRAY[0])
 	G = SegPath(SEG_POINT_ARRAY[5], SEG_POINT_ARRAY[2])
-	H = SegPath(SEG_POINT_ARRAY[1], SEG_POINT_ARRAY[4]) # comma
+	H = CSegPath(SEG_POINT_ARRAY[3]) # comma / period / dot
 
 
 SEGELEMS = (
@@ -170,19 +223,32 @@ class SegLine(Enum):
 		abcdefg = [cls.a, cls.b, cls.c, cls.d, cls.e, cls.f, cls.g]
 		return abcdefg["abcdefg".index(c)]
 
-class SegFlag(Flag):
+class SegFlag(Flag): # same as Seg7
 	G = 2
-	F = auto()
-	E = auto()
-	D = auto()
-	C = auto()
-	B = auto()
-	A = auto()
+	F = 4
+	E = 8
+	D = 16
+	C = 32
+	B = 64
+	A = 128
 	
 	@classmethod
 	def get(cls, c: str, p=0):
 		abcdefg = [cls.A, cls.B, cls.C, cls.D, cls.E, cls.F, cls.G]
 		return abcdefg["ABCDEFG".index(c[p].upper())]
+	
+'''
+def seg_flag_to_sp_pair(flag: SegFlag, seg_flag_dic={f: f.name for f in [
+	SegFlag.A,
+	SegFlag.B,
+	SegFlag.C,
+	SegFlag.D,
+	SegFlag.E,
+	SegFlag.F,
+	SegFlag.G,
+]})-> SpPair:
+	pass
+'''
 class Segment7:
 	dic = {c: (abcdef_seg[i], abcdef_seg[i + 1]) for i, c in enumerate('abcdef')}
 	dic['g'] = ((0, 1), (1, 1))
@@ -248,6 +314,20 @@ def print_seg_point_enum():
 
 if __name__ == '__main__':
 	import sys
+	from pprint import pp
+	from PIL import Image
+	size = (100, 200)
+	img = Image.new('L', size, 0xff)
+	drw = ImageDraw.Draw(img)
+
+
+	img.show()
+	sys.exit(0)
+
+	se = SegElem.H 	#se_a = SegElem.A
+	sp = se.value
+	sp.draw(drw=drw, scale=50, offset=(20, 20), line_width=4)
+	
 	dic = get_segelem_dict()
 	for c in 'abcdefg':
 		a_path = dic[c].slanted()

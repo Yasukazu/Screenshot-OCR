@@ -8,36 +8,72 @@ def conv_num_to_bin(num: int, fmt="%d")-> bytearray:
 		if c == '-':
 			bb[i] = 16
 		else:
-			bb[i] = int(c)
+			bb[i] = int(c, 16)
+	return bb
+
+def conv_to_bin(num: float, fmt="%d")-> bytearray:
+	INDEX = '0123456789abcdef-.'
+	n_str = fmt % num
+	bb = bytearray(len(n_str))
+	for i, c in enumerate(n_str):
+		bb[i] = INDEX.index(c)
+	return bb
+
+def conv_to_bin2(num: float, fmt="%f")-> bytearray:
+	INDEX = '0123456789abcdef-.'
+	n_str = fmt % num + '\0'
+	bb = bytearray()
+	i = 0
+	while i < len(n_str) - 1:
+		b = INDEX.index(n_str[i]) << 1
+		#if not b: break
+		if n_str[i + 1] == '.':
+			b += 1
+			i += 1
+		bb += bytearray([b])
+		i += 1
 	return bb
 
 class FormatNum:
 	FORMAT = "%d"
 
-	def __init__(self, num: int):
+	def __init__(self, num: float, fmt=None):
 		self.num = num
+		if fmt:
+			self.FORMAT = fmt
 
 	def conv_to_bin(self):
-		return conv_num_to_bin(self.num, fmt=self.FORMAT)
+		return conv_to_bin(self.num, fmt=self.FORMAT)
+	def conv_to_bin2(self):
+		return conv_to_bin2(self.num, fmt=self.FORMAT)
 
 class HexFormatNum(FormatNum):
 	FORMAT = "%x"
-	INDEX = '0123456789abcdef-'
-	def conv_to_bin(self):
-		n_str = self.FORMAT % self.num
-		bb = bytearray(len(n_str))
-		for i, c in enumerate(n_str):
-			bb[i] = self.INDEX.index(c)
-		return bb
 
-def formatnums_to_bytearray(nn: Sequence[FormatNum | int])-> bytearray:
+	def conv_to_bin(self):
+		return conv_to_bin(self.num, fmt=self.FORMAT)
+	def conv_to_bin2(self):
+		return conv_to_bin2(self.num, fmt=self.FORMAT)
+class FloatFormatNum(FormatNum):
+	FORMAT = "%.2f"
+
+	def conv_to_bin(self):
+		return conv_to_bin(self.num, fmt=self.FORMAT)
+	def conv_to_bin2(self):
+		return conv_to_bin2(self.num, fmt=self.FORMAT)
+from math import isnan
+def  formatnums_to_bytearray(nn: Sequence[FormatNum | int] | float | int, conv_to_bin2=True)-> bytearray: # , fmt=None
+	if isinstance(nn, float):
+		nn = [FloatFormatNum(nn)] if not isnan(nn) else []
+	elif isinstance(nn, int):
+		nn = [FormatNum(nn)]
 	bb = bytearray() #len(nn))
 	for c in nn:
 		match c:
 			case FormatNum():
-				bb += c.conv_to_bin()
+				bb += c.conv_to_bin2() if conv_to_bin2 else c.conv_to_bin()
 			case int():
-				bb += c.to_bytes()
+				bb += c.to_bytes(1,'big')
 			case _:
 				raise TypeError("Needs to be int or FormatNum!")
 	return bb
@@ -45,8 +81,17 @@ def formatnums_to_bytearray(nn: Sequence[FormatNum | int])-> bytearray:
 
 
 if __name__ == '__main__':
-	from typing import Sequence
 	from pprint import pp
+	bb = conv_to_bin2(0.1, "%.1f")
+	for b in bb:
+		print(bin(b))
+	ff = [FloatFormatNum(0.1, "%.1f")]
+	bb = formatnums_to_bytearray(ff)
+	pp(bb)
+	bb2 = formatnums_to_bytearray(ff, conv_to_bin2=True)
+	pp(bb2)
+
+	from typing import Sequence
 	from enum import Enum
 
 	class HexNum(Enum):

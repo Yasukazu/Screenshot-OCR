@@ -3,41 +3,41 @@ from types import MappingProxyType
 from functools import lru_cache
 from numpy.typing import NDArray
 from strok7 import SEG_POINT_ARRAY, SEGPATH_SLANT, get_segpath_for_c, Sp, StrokeSlant, i_i_tpl, SpPair
-from seg_7_digits import Seg7, SEG7_ARRAY, seg_7_array, homo_seg_7_array
+from seg_7_digits import Seg7Bit8, SEG7_DIGIT_ARRAY, seg_7_array, homo_seg_7_array
 from seven_seg import SEVEN_SEG_SIZE
 
 SEG7_TO_POINTS = MappingProxyType({
-	Seg7.A: (SEG_POINT_ARRAY[0], SEG_POINT_ARRAY[1]),
-	Seg7.B: (SEG_POINT_ARRAY[1], SEG_POINT_ARRAY[2]),
-	Seg7.C: (SEG_POINT_ARRAY[2], SEG_POINT_ARRAY[3]),
-	Seg7.D: (SEG_POINT_ARRAY[3], SEG_POINT_ARRAY[4]),
-	Seg7.E: (SEG_POINT_ARRAY[4], SEG_POINT_ARRAY[5]),
-	Seg7.F: (SEG_POINT_ARRAY[5], SEG_POINT_ARRAY[0]),
-	Seg7.G: (SEG_POINT_ARRAY[5], SEG_POINT_ARRAY[2]),
+	Seg7Bit8.A: (SEG_POINT_ARRAY[0], SEG_POINT_ARRAY[1]),
+	Seg7Bit8.B: (SEG_POINT_ARRAY[1], SEG_POINT_ARRAY[2]),
+	Seg7Bit8.C: (SEG_POINT_ARRAY[2], SEG_POINT_ARRAY[3]),
+	Seg7Bit8.D: (SEG_POINT_ARRAY[3], SEG_POINT_ARRAY[4]),
+	Seg7Bit8.E: (SEG_POINT_ARRAY[4], SEG_POINT_ARRAY[5]),
+	Seg7Bit8.F: (SEG_POINT_ARRAY[5], SEG_POINT_ARRAY[0]),
+	Seg7Bit8.G: (SEG_POINT_ARRAY[5], SEG_POINT_ARRAY[2]),
 }) # : dict[Seg7, tuple[Sp, Sp]]
 
 NUMSTROKE_SLANT = SEGPATH_SLANT
 
 def get_segpoints_for_n(n: int)-> Sequence[tuple[Sp, Sp]]:
-	seg7s: Sequence[Seg7] = SEG7_ARRAY[n]
+	seg7s: Sequence[Seg7Bit8] = SEG7_DIGIT_ARRAY[n]
 	return [SEG7_TO_POINTS[sp] for sp in seg7s]
 
-SEGPOINTS_MAX = len(SEG7_ARRAY)
+SEGPOINTS_MAX = len(SEG7_DIGIT_ARRAY)
 
 def get_segpoints_max()-> int:
-	return len(SEG7_ARRAY)
+	return len(SEG7_DIGIT_ARRAY)
 
 def get_all_segpoints_len()-> int:
-	return len(SEG7_ARRAY)
+	return len(SEG7_DIGIT_ARRAY)
 
 def get_all_segpoints()-> list[Sequence[tuple[Sp, Sp]]]:
 	lst = []
-	for n in range(len(SEG7_ARRAY)):
+	for n in range(len(SEG7_DIGIT_ARRAY)):
 		lst.append(get_segpoints_for_n(n))
 	return lst
 
 def set_all_segpoints(lst: list[Sequence[tuple[Sp, Sp]]]):
-	for n in range(len(SEG7_ARRAY)):
+	for n in range(len(SEG7_DIGIT_ARRAY)):
 		lst[n] = get_segpoints_for_n(n)
 from strok7 import SegPath
 def get_segpath_for_n(n: int, segpath_list = [None] * len(seg_7_array))-> Sequence[SegPath]:
@@ -102,8 +102,8 @@ class NumStrokes(DigitStrokes):
 		self.strokes: Callable[[int], NDArray] = lru_cache(maxsize=max_cache)(self._strokes)
 
 	def _strokes(self, n: int)-> NDArray:
-		stroke_list = [(p1.slant(s=self.slant, scale=self.scale, offset=self.offset),
-		p2.slant(s=self.slant, scale=self.scale, offset=self.offset)) for (p1, p2) in get_segpoints_for_n(n)]
+		stroke_list = [(p1.slant_self(s=self.slant, scale=self.scale, offset=self.offset),
+		p2.slant_self(s=self.slant, scale=self.scale, offset=self.offset)) for (p1, p2) in get_segpoints_for_n(n)]
 		return stroke_list
 
 if __name__ == '__main__':

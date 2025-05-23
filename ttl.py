@@ -21,7 +21,7 @@ def rot18(ar):
     return (-ar[0], 0)
 def rot27(ar):
     return (0, -ar[0])
-def plot(n, to_direc):
+def plot(n: int, to_direc: str):
     ''' to_direc in ('>', '^', '<', 'v')'''
     assert to_direc in ('>', '^', '<', 'v')
     op_tbl = {'>': rot0, '^': rot9, '<': rot18, 'v': rot27}

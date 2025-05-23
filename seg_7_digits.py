@@ -1,6 +1,8 @@
 from typing import Sequence, Callable
+from types import MappingProxyType
 from enum import Flag, IntEnum
-from strok7 import SpPair
+from strok7 import SpPair, SegElem
+from seg7bit8 import Seg7Bit8
 
 seg_7_digits: Sequence[int] = (
 	# abcdefgh
@@ -23,46 +25,121 @@ seg_7_digits: Sequence[int] = (
 	0b00000010, # 10:2
 )
 
-class Seg7(Flag):
-	'''MSB is A, LSB is for comma'''
-	A = 1 << 7
-	B = 1 << 6
-	C = 1 << 5
-	D = 1 << 4
-	E = 1 << 3
-	F = 1 << 2
-	G = 1 << 1
+from seg7bit8 import SEG7BIT8_ARRAY
+
+SEG7BIT8_TO_SP_PAIR = MappingProxyType({
+	Seg7Bit8.A: SpPair.A,
+	Seg7Bit8.B: SpPair.B,
+	Seg7Bit8.C: SpPair.C,
+	Seg7Bit8.D: SpPair.D,
+	Seg7Bit8.E: SpPair.E,
+	Seg7Bit8.F: SpPair.F,
+	Seg7Bit8.G: SpPair.G,
+	Seg7Bit8.H: SpPair.H, # dot
+})
+
+SEG7BIT8_VALUE_TO_SP_PAIR = {
+	Seg7Bit8.A.value: SpPair.A,
+	Seg7Bit8.B.value: SpPair.B,
+	Seg7Bit8.C.value: SpPair.C,
+	Seg7Bit8.D.value: SpPair.D,
+	Seg7Bit8.E.value: SpPair.E,
+	Seg7Bit8.F.value: SpPair.F,
+	Seg7Bit8.G.value: SpPair.G,
+	Seg7Bit8.H.value: SpPair.H,
+}
+
+
+def str_to_seg_elems(n_s: str)-> list[Sequence[SegElem]]:
+	from bin2 import Bin2
+	INDEX = '0123456789abcdef-'
+	n_str = n_s + '\0'
+	bb = []
+	i = 0
+	while i < len(n_str) - 1:
+		b = INDEX.index(n_str[i]) << 1
+		if n_str[i + 1] == '.':
+			b += 1
+			i += 1
+		b8 = Bin2(b).to_bit8()
+		bb += [expand_bit8_to_seg_elems(b8)]
+		i += 1
+	return bb
+
+def expand_bin_to_seg_elems(bn: int)-> Sequence[SegElem]:
+	return tuple(SEG7BIT8_VALUE_TO_SEG_ELEM[bit] for bit in (Seg7Bit8.A.value, Seg7Bit8.B.value, Seg7Bit8.C.value, Seg7Bit8.D.value, Seg7Bit8.E.value, Seg7Bit8.F.value, Seg7Bit8.G.value, Seg7Bit8.H.value) if bit & bn)
+
+def expand_bit8_to_seg_elems(bits: Seg7Bit8)-> Sequence[SegElem]:
+	# bits = bin2_to_bit8(bn)
+	return tuple(SEG7BIT8_TO_SEG_ELEM[bit] for bit in SEG7BIT8_ARRAY if bit & bits) # (Seg7Bit8.A, Seg7Bit8.B, Seg7Bit8.C, Seg7Bit8.D, Seg7Bit8.E, Seg7Bit8.F, Seg7Bit8.G, Seg7Bit8.H)
+
+def expand_bin2_to_seg_elems(bn: int)-> Sequence[SegElem]:
+	bits = bin2_to_bit8(Bin2(bn))
+	return tuple(SEG7BIT8_VALUE_TO_SEG_ELEM[bit] for bit in (Seg7Bit8.A, Seg7Bit8.B, Seg7Bit8.C, Seg7Bit8.D, Seg7Bit8.E, Seg7Bit8.F, Seg7Bit8.G, Seg7Bit8.H) if bit & bits)
+
+def expand_bin_to_sp_pairs(bn: int)-> Sequence[SpPair]:
+	return tuple(SEG7BIT8_TO_SP_PAIR[bit] for bit in (Seg7Bit8.A.value, Seg7Bit8.B.value, Seg7Bit8.C.value, Seg7Bit8.D.value, Seg7Bit8.E.value, Seg7Bit8.F.value, Seg7Bit8.G.value, Seg7Bit8.H.value) if bit & bn)
+
+def expand_bin_to_xy_list_list(bn: int)-> list[list[tuple[int, int]]]:
+	return [SpPair.expand_to_xy_list(spp) for spp in expand_bin_to_sp_pairs(bn)]
+
+def expand_to_sp_pairs(seg7: Seg7Bit8)-> Sequence[SpPair]:
+	return tuple(SEG7BIT8_TO_SP_PAIR[seg] for seg in (Seg7Bit8.A, Seg7Bit8.B, Seg7Bit8.C, Seg7Bit8.D, Seg7Bit8.E, Seg7Bit8.F, Seg7Bit8.G) if seg7 & seg)
+
+def expand_to_xy_list_list(seg7: Seg7Bit8)-> list[list[tuple[int, int]]]:
+	return [SpPair.expand_to_xy_list(spp) for spp in expand_to_sp_pairs(seg7)]
 
 def c_to_seg_7(c: str, C_TO_SEG7 = {
-		'a': Seg7.A,
-		'b': Seg7.B,
-		'c': Seg7.C,
-		'd': Seg7.D,
-		'e': Seg7.E,
-		'f': Seg7.F,
-		'g': Seg7.G,
-})-> Callable[[str], Seg7]:
+		'a': Seg7Bit8.A,
+		'b': Seg7Bit8.B,
+		'c': Seg7Bit8.C,
+		'd': Seg7Bit8.D,
+		'e': Seg7Bit8.E,
+		'f': Seg7Bit8.F,
+		'g': Seg7Bit8.G,
+})-> Callable[[str], Seg7Bit8]:
 	return C_TO_SEG7[c]
 
-SEG7_ARRAY = (
-	(Seg7.A, Seg7.B, Seg7.C, Seg7.D, Seg7.E, Seg7.F),
-	(Seg7.B, Seg7.C),
-	(Seg7.A, Seg7.B, Seg7.D, Seg7.E, Seg7.G),
-	(Seg7.A, Seg7.B, Seg7.C, Seg7.D, Seg7.G),
-	(Seg7.B, Seg7.C, Seg7.F, Seg7.G),
-	(Seg7.A, Seg7.C, Seg7.D, Seg7.F, Seg7.G),
-	(Seg7.A, Seg7.C, Seg7.D, Seg7.E, Seg7.F, Seg7.G),
-	(Seg7.A, Seg7.B, Seg7.C),
-	(Seg7.A, Seg7.B, Seg7.C, Seg7.D, Seg7.E, Seg7.F, Seg7.G),
-	(Seg7.A, Seg7.B, Seg7.C, Seg7.F, Seg7.G),
-	(Seg7.A, Seg7.B, Seg7.C, Seg7.E, Seg7.F, Seg7.G),
-	(Seg7.C, Seg7.D, Seg7.E, Seg7.F, Seg7.G),
-	(Seg7.D, Seg7.E, Seg7.G),
-	(Seg7.B, Seg7.C, Seg7.D, Seg7.E, Seg7.G),
-	(Seg7.A, Seg7.D, Seg7.E, Seg7.F, Seg7.G),
-	(Seg7.A, Seg7.E, Seg7.F, Seg7.G),
-	(Seg7.G,),
+SEG7_DIGIT_ARRAY = (
+	(Seg7Bit8.A | Seg7Bit8.B | Seg7Bit8.C | Seg7Bit8.D | Seg7Bit8.E | Seg7Bit8.F),
+	(Seg7Bit8.B | Seg7Bit8.C),
+	(Seg7Bit8.A | Seg7Bit8.B | Seg7Bit8.D | Seg7Bit8.E | Seg7Bit8.G),
+	(Seg7Bit8.A | Seg7Bit8.B | Seg7Bit8.C | Seg7Bit8.D | Seg7Bit8.G),
+	(Seg7Bit8.B | Seg7Bit8.C | Seg7Bit8.F | Seg7Bit8.G),
+	(Seg7Bit8.A | Seg7Bit8.C | Seg7Bit8.D | Seg7Bit8.F | Seg7Bit8.G),
+	(Seg7Bit8.A | Seg7Bit8.C | Seg7Bit8.D | Seg7Bit8.E | Seg7Bit8.F | Seg7Bit8.G),
+	(Seg7Bit8.A | Seg7Bit8.B | Seg7Bit8.C),
+	(Seg7Bit8.A | Seg7Bit8.B | Seg7Bit8.C | Seg7Bit8.D | Seg7Bit8.E | Seg7Bit8.F | Seg7Bit8.G),
+	(Seg7Bit8.A | Seg7Bit8.B | Seg7Bit8.C | Seg7Bit8.F | Seg7Bit8.G),
+	(Seg7Bit8.A | Seg7Bit8.B | Seg7Bit8.C | Seg7Bit8.E | Seg7Bit8.F | Seg7Bit8.G),
+	(Seg7Bit8.C | Seg7Bit8.D | Seg7Bit8.E | Seg7Bit8.F | Seg7Bit8.G),
+	(Seg7Bit8.D | Seg7Bit8.E | Seg7Bit8.G),
+	(Seg7Bit8.B | Seg7Bit8.C | Seg7Bit8.D | Seg7Bit8.E | Seg7Bit8.G),
+	(Seg7Bit8.A | Seg7Bit8.D | Seg7Bit8.E | Seg7Bit8.F | Seg7Bit8.G),
+	(Seg7Bit8.A | Seg7Bit8.E | Seg7Bit8.F | Seg7Bit8.G),
+	(Seg7Bit8.G),
+	Seg7Bit8.H
 )
+
+def hex_to_bit8(n: int)-> Seg7Bit8:
+	'''16 for hyphen/minus, 17 for comma/period'''
+	if not (0 <= n < len(SEG7_DIGIT_ARRAY)):
+		raise ValueError("Out of hexadecimal range!")
+	return SEG7_DIGIT_ARRAY[n]
+
+
+def bin_to_bit8(b: int)-> Seg7Bit8:
+	if not 0 < b < 256:
+		raise ValueError("Needs non-nul byte!")
+	seg7_list = [seg for seg in (Seg7Bit8.A, Seg7Bit8.B, Seg7Bit8.C, Seg7Bit8.D, Seg7Bit8.E, Seg7Bit8.F, Seg7Bit8.G, Seg7Bit8.H) if b & seg.value]
+	if len(seg7_list) == 1:
+		return seg7_list[0]
+	s_0 = seg7_list[0]
+	after_0 = seg7_list[1:]
+	for s in after_0:
+		s_0 |= s
+	return s_0
+
 
 SEG_POINT_PAIR_DIGIT_ARRAY = (
 	(SpPair.A, SpPair.B, SpPair.C, SpPair.D, SpPair.E, SpPair.F),
@@ -84,6 +161,11 @@ SEG_POINT_PAIR_DIGIT_ARRAY = (
 	(SpPair.G,)
 )
 
+def digit_to_sp_pair(n: int)-> Sequence[SpPair]:
+	if not (0 <= n < len(SEG_POINT_PAIR_DIGIT_ARRAY)):
+		raise ValueError("Out of digit range!")
+	return SEG_POINT_PAIR_DIGIT_ARRAY[n]
+
 seg_7_array: Sequence[Sequence[str]] = (
 		('a', 'b', 'c', 'd', 'e', 'f'),
 		('b', 'c'),
@@ -104,7 +186,8 @@ seg_7_array: Sequence[Sequence[str]] = (
 		('g',),
 )
 
-type seg_7_tuple = tuple[str,str,str,str,str,str,str]
+from typing import TypeAlias
+seg_7_tuple: TypeAlias = tuple[str,str,str,str,str,str,str]
 
 homo_seg_7_array: Sequence[seg_7_tuple] = (
 		('a', 'b', 'c', 'd', 'e', 'f', ''), # 0
