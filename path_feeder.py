@@ -6,10 +6,8 @@ home_dir = os.path.expanduser('~')
 home_path = Path(home_dir)
 
 SCREEN_BASE_DIR = 'SCREEN_BASE_DIR'
-SCREEN_YEAR_KEY = 'SCREEN_YEAR'
-SCREEN_MONTH_KEY = 'SCREEN_MONTH'
-SCREEN_YEAR = 0
-SCREEN_MONTH = 0
+SCREEN_YEAR = 'SCREEN_YEAR'
+SCREEN_MONTH = 'SCREEN_MONTH'
 
 from dotenv import dotenv_values
 
@@ -22,29 +20,26 @@ def supple_config(key):
 	if not value:
 		value = os.environ.get(key)
 
-for k in [SCREEN_BASE_DIR, SCREEN_YEAR_KEY, SCREEN_MONTH_KEY]:
+for k in [SCREEN_BASE_DIR, SCREEN_YEAR, SCREEN_MONTH]:
 	supple_config(k)
 
-def get_env(key):
+def check_y_m(key):
 	value = config.get(key)
 	if not value:
-		return 0
-	return int(value)
+		config[key] = '0'
+		return
+	if not value.isdigit():
+		logger.error("Value: %s (for %s) must be digit!", value, key)
+		raise ValueError(f"Invalid {value=} for {key=}!")
 
-try:
-	SCREEN_YEAR = get_env(SCREEN_YEAR_KEY)
-	SCREEN_MONTH = get_env(SCREEN_MONTH)
-
-except ValueError as exc:
-	logger.error("ValueError: %s", exc)
-	raise
-
+for key in [SCREEN_YEAR, SCREEN_MONTH]:
+	check_y_m(key)
 
 input_ext = '.png'
 
 try:
-	input_dir_root = Path(os.environ[SCREEN_BASE_DIR])
-except KeyError as exc:
+	input_dir_root = Path(config[SCREEN_BASE_DIR])
+except Exception as exc:
 	raise ValueError(f"{SCREEN_BASE_DIR} is not set.") from exc
 
 if not input_dir_root.exists():
@@ -94,12 +89,11 @@ def get_last_month_path(dir: Path=input_dir_root, year=0, month=0)-> Path:
 	# MONTH_FORMAT.format(month)
 	# ymstr = f"{year}{month:02}"
 from datetime import date
-def get_year_month(year=0, month=0)-> date: # tuple[int, int]:
+def get_year_month(year=0, month=0, config=config)-> date: # tuple[int, int]:
+	year = int(config[SCREEN_YEAR])
+	# if isinstance(SCREEN_MONTH, int) and SCREEN_MONTH > 0:
+	month = int(config[SCREEN_MONTH])
 	last_month = get_last_month()
-	if isinstance(SCREEN_YEAR, int) and SCREEN_YEAR > 0:
-		year = SCREEN_YEAR
-	if isinstance(SCREEN_MONTH, int) and SCREEN_MONTH > 0:
-		month = SCREEN_MONTH
 	if not year:
 		year = last_month.year
 	if not month:
@@ -121,8 +115,8 @@ def get_input_path(year=0, month=0)-> Path:
 
 from typing import Generator, Iterator, Sequence
 class PathFeeder:
-	def __init__(self, year=0, month=0, days: Sequence[int] | range | int=-1, input_type:FileExt=FileExt.PNG, input_dir=input_dir_root, type_dir=False):
-		last_date = get_year_month(year=year, month=month)
+	def __init__(self, year=0, month=0, days: Sequence[int] | range | int=-1, input_type:FileExt=FileExt.PNG, input_dir=input_dir_root, type_dir=True, config=config):
+		last_date = get_year_month(year=year, month=month, config=config)
 		self.year = last_date.year
 		self.month = last_date.month
 		input_path = (input_dir / str(self.year) / ("%02d" % self.month) / input_type.value.dir) if type_dir else input_dir / str(self.year) / ("%02d" % self.month) # / "%02d%02d" % (self.month, sel
@@ -195,26 +189,24 @@ class DbPathFeeder(PathFeeder):
 	from tool_pyocr import AppType
 	img_file_ext = '.png'
 
-	def __init__(self, year=0, month=0, days=-1, input_type = FileExt.PNG, input_dir=input_dir_root, type_dir=False, app_type=AppType.T):
-		super().__init__(year, month, days, input_type, input_dir, type_dir)
+	def __init__(self, year=0, month=0, days=-1, input_type = FileExt.PNG, input_dir=input_dir_root, type_dir=False, app_type=AppType.T, config=config):
+		super().__init__(year, month, days, input_type, input_dir, type_dir, config)
 		self.app_type = app_type
 		self.conn = txt_lines_db.connect()
 		
 	@property
 	def table_name(self):#, month: int):
 		return txt_lines_db.get_table_name(self.month)
-	def table_exists(self, month: int=0):
+
+	def table_exists(self, month: int=0,
+		sql = """SELECT EXISTS (
+			SELECT name
+			FROM sqlite_schema 
+			WHERE type='table' AND name = '?')"""):
 		if not month:
 			month = self.month
-		sql = """SELECT EXISTS (
-			SELECT 
-				name
-			FROM 
-				sqlite_schema 
-			WHERE 
-				type='table' AND name = '{}');""".format(self.table_name)#month))
 		with closing(self.conn.cursor()) as cur:
-			one = cur.execute(sql).fetchone()
+			one = cur.execute(sql, self.table_name).fetchone()
 			return bool(one)
 	
 	def feed(self, padding=False, delim='', day_to_stem={}) -> Iterator[tuple[int, str]]:
