@@ -65,7 +65,12 @@ class OCRError(Exception):
     pass
 
 from returns.result import safe, Result, Failure, Success
+class MDateError(OCRError):
+    def __init__(self, message: str):
+        super().__init__(message)
 
+    def __str__(self):
+        return f"MDateError: {self.args[0]}"
 class MyOcr:
     from path_feeder import input_dir_root, input_ext
     tools = pyocr.get_available_tools()
@@ -109,22 +114,40 @@ class MyOcr:
             case _: # TODO: check for 'TM'
                 raise ValueError("Undefined AppType!")
 
-    M_DATE_PATT_1 = re.compile(r"[^\d]*((\d+)/(\d+))\(")
-    M_DATE_PATT_2 = re.compile(r".*時間$")
-
+    M_DATE_PATT = [re.compile(r"(\d\d:\d\d)"),
+        re.compile(r"(\d+?)/(\d+?)")]
     @classmethod
+    def check_date(cls, app_type: AppType, txt_lines: Sequence[LineBox])->tuple[int, Date|None,tuple[str, str]]:
+        match app_type:
+            case AppType.M:
+                for n in range(len(txt_lines)):
+                    cntnt = txt_lines[n].content.replace(' ', '') # concatenated
+                    if cntnt.endswith('時間') and (hours:=MyOcr.M_DATE_PATT[0].findall(cntnt)):
+                        m_d = MyOcr.M_DATE_PATT[1].match(cntnt)
+                        if m_d:
+                            grps = m_d.groups()
+                            date = Date(int(grps[1]), int(grps[2]))
+                            return n, date, (hours[0].groups()[1], hours[1].groups()[1])
+                        else:
+                            return n, None, (hours[0].groups()[1], hours[1].groups()[1])
+            case AppType.T:
+                raise NotImplementedError("Not implemented yet!")
+    @classmethod
+    @safe
     def get_date(cls, app_type: AppType, txt_lines: Sequence[LineBox]):
         match app_type:
             case AppType.M:
                 for n in range(len(txt_lines)):
-                    cntnt = txt_lines[n].content.replace(' ', '')
-                    mt = MyOcr.M_DATE_PATT_1.match(cntnt)
-                    mt2 = MyOcr.M_DATE_PATT_2.match(cntnt)
-                    if mt and mt2:
-                        grps = mt.groups()
-                        date = Date(int(grps[1]), int(grps[2]))
-                        return n, date
-                raise ValueError("Unmatch AppType.M txt_lines!%s", txt_lines)                
+                    cntnt = txt_lines[n].content.replace(' ', '') # concatenated
+                    if cntnt.endswith('時間') and (hours:=MyOcr.M_DATE_PATT[0].findall(cntnt)):
+                        m_d = MyOcr.M_DATE_PATT[1].match(cntnt)
+                        if m_d:
+                            grps = m_d.groups()
+                            date = Date(int(grps[1]), int(grps[2]))
+                            return n, date, hours
+                        else:
+                            raise MDateError("Could not find month and day: AppType.M txt_lines!%s", txt_lines)                
+                raise MDateError("Could not resolve date! AppType.M txt_lines!%s", txt_lines)                
             case AppType.T:
                 # n_gyoumu = next_gyoumu(txt_lines)
                 date = None
@@ -223,7 +246,7 @@ class MyOcr:
                 found = True
                 break
         if not found:
-            raise ValueError("'合計¥' is not found!%s", txt_lines)    
+            raise ValueError("'合計' is not found!%s", txt_lines)    
         content = ln.content
         nn = []
         for n in content:
@@ -348,7 +371,13 @@ class Main:
                     txt_lines = value # result.unwrap()
                 case Failure(_): # if not is_successful(result): # type: ignore
                     raise ValueError(f"Failed to run OCR!")#Unable to extract from {path_set}")
-            n, date = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
+            result = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
+            match result:
+                case Success(value):
+                    n, date = value # result.unwrap()
+                case Failure(_): # if not is_successful(result): # type: ignore
+                    raise ValueError(f"Failed to run OCR!")#Unable to extract from {path_set}")
+            
             existing_day_list = self.get_existing_days(app_type=app_type)
             if existing_day_list and (date.day in existing_day_list):
                 print(f"Day {date.day} of App {app_type} exists.")
@@ -413,7 +442,7 @@ class Main:
         self.conn.commit()
     t_patt = APP_TYPE_TO_STEM_END[AppType.T]
     m_patt = APP_TYPE_TO_STEM_END[AppType.M]
-    def ocr_result_into_db(self, app_type_list: list[AppType]|None=None, limit=62):
+    def ocr_result_into_db(self, app_type_list: list[AppType]|None=None, limit=62, test=False):
         if not app_type_list:
             app_type_list = [e for e in list(AppType) if e != AppType.NUL]  
         assert limit > 0 
@@ -433,11 +462,30 @@ class Main:
                             txt_lines = value # result.unwrap()
                         case Failure(_):
                             raise ValueError("Failed to run OCR!", path_set)
-                    try:
-                        n, date = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
-                    except ValueError as err:
-                        logger.error("Failed to get date from %s: %s", file, err)
-                        raise ValueError("Failed to get date from %s: %s", file, err)
+                    if app_type == AppType.M:
+                        n, dt, hrs = self.my_ocr.check_date(app_type=app_type, txt_lines=txt_lines)
+                        if dt is None:
+                            logger.error("Failed to get date at %d , box: %s lang=jpn+eng!file: %s", n, txt_lines[n][1], file)
+                            raise ValueError("Failed to get date from file:%s in lang=jpn+eng!", file)
+                    result = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
+                    match result:
+                        case Success(value):
+                            n, date = value # result.unwrap()
+                        case Failure(_): # if not is_successful(result): # type: ignore
+                            logger.info("Failed to get date from %s in lang=jpn+eng, try to run_ocr in lang=jpn..", file)
+                            e_result = self.my_ocr.run_ocr(path_set, lang='eng',)
+                            match e_result:
+                                case Success(value):
+                                    d_result = self.my_ocr.get_date(app_type=app_type, txt_lines=value)
+                                    match d_result:
+                                        case Success(value):
+                                            n, date = value
+                                        case Failure(_):
+                                            logger.error("Failed to get date from txt_lines:%s in lang=eng!", txt_lines)
+                                            raise ValueError("Failed to get date from file:%s in lang=eng!", file)
+                                # if not is_successful(e_result): # type: ignore
+                                case Failure(_):
+                                    raise ValueError("Failed to run OCR in lang=eng!", path_set)
                     exists_sql = f"SELECT day, app FROM `{self.tbl_name}` WHERE day = {date.day} AND app = {app};"
                     cur.execute(exists_sql)
                     one = cur.fetchone()
