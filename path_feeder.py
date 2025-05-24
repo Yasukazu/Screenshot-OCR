@@ -184,10 +184,10 @@ class DbPathFeeder(PathFeeder):
 	from app_type import AppType
 	img_file_ext = '.png'
 
-	def __init__(self, year=0, month=0, days=-1, input_type = FileExt.PNG, input_dir=input_dir_root, type_dir=False, app_type=AppType.T, config=config):
+	def __init__(self, year=0, month=0, days=-1, input_type = FileExt.PNG, input_dir=input_dir_root, type_dir=False, app_type=AppType.T, config=config, db_fullpath=txt_lines_db.sqlite_fullpath()):
 		super().__init__(year, month, days, input_type, input_dir, type_dir, config)
 		self.app_type = app_type
-		self.conn = txt_lines_db.connect()
+		self.conn = txt_lines_db.connect(db_fullpath=db_fullpath)
 		
 	@property
 	def table_name(self):#, month: int):

@@ -240,6 +240,9 @@ class MyOcr:
             return num
         except ValueError as err:
             raise ValueError(f"Failed to convert into an integer: {content_num}\n{err}")
+    @classmethod
+    def w_wages(cls, txt_lines: Sequence[LineBox]):
+        raise NotImplementedError("Not implemented yet!")
 
     '''def check_date(self, path_set: PathSet):#, txt_lines: Sequence[pyocr.builders.LineBox]):
         if not self.txt_lines:
@@ -266,14 +269,14 @@ class MTxtLines(TTxtLines):
 
 class Main:
     import txt_lines_db
-    def __init__(self, month=0, app=AppType.NUL, year=0):
+    def __init__(self, month=0, app=AppType.NUL, year=0, db_fullpath=txt_lines_db.sqlite_fullpath()):
         self.my_ocr = MyOcr(month=month, year=year)
         #self.img_dir = self.my_ocr.input_dir
         #month = self.my_ocr.month
         #img_parent_dir = self.img_dir.parent
         self.app = app # tm
         # txt_lines_db = TxtLinesDB(img_parent_dir=img_parent_dir)
-        self.conn = Main.txt_lines_db.connect()
+        self.conn = Main.txt_lines_db.connect(db_fullpath=db_fullpath)
         self.tbl_name = Main.txt_lines_db.get_table_name(month)
         Main.txt_lines_db.create_tbl_if_not_exists(self.tbl_name)
     
@@ -290,7 +293,7 @@ class Main:
 
     @property
     def month(self):
-        return self.my_ocr.month
+        return self.my_ocr.date.month
 
     def sum_wages(self):
         with closing(self.conn.cursor()) as cur:
@@ -306,18 +309,18 @@ class Main:
             if all:
                 return [a[0] for a in all]
 
-    def get_existing_days(self, app_type=AppType.NUL):
+    def get_existing_days(self, app_type=AppType.NUL)-> dict[AppType, list[int]] | list[int] | None:
         if not app_type.value:
             from collections import defaultdict
-            qry = f"SELECT app, day, stem from `{self.tbl_name}` order by app, day;"
+            qry = f"SELECT app, day from `{self.tbl_name}` order by app, day;"
             with closing(self.conn.cursor()) as cur:
                 cur.execute(qry)
                 all = cur.fetchall()
                 if all:
-                    r_dict = defaultdict(dict)
-                    for app, day, stem in all:
+                    r_dict = defaultdict(list)
+                    for app, day in all:
                         app_type = AppType(app)
-                        r_dict[app_type][day] = stem
+                        r_dict[app_type].append(day)
                     return r_dict
                 else:
                     return
@@ -326,16 +329,16 @@ class Main:
         with closing(self.conn.cursor()) as cur:
             result = cur.execute(qry, prm)
             if result:
-                return [r[0]    for r in result]
+                return [r[0] for r in result]
+
     def add_image_files_as_txt_lines(self, app_type: AppType, ext='.png'):
         if app_type == AppType.NUL:
-            raise ValueError('AppType is NUL!')
+            raise ValueError('Needs not AppType.NUL param.!')
         ocr_done = []
-        for img_file in self.img_dir.glob('*' + ext):
-            if not img_file.stem.endswith(APP_TYPE_TO_STEM_END[app_type]):
-                continue
-            #ext_dot = img_file.name.rfind('.')
-            #ext = img_file.name[ext_dot:]
+        glob_patt = '*' + APP_TYPE_TO_STEM_END[app_type] + ext
+        logger.debug(f"glob_patt: {glob_patt}")
+        breakpoint()
+        for img_file in self.img_dir.glob(glob_patt):
             stem = img_file.stem
             parent = self.my_ocr.input_dir
             path_set = PathSet(parent, stem, ext)
@@ -345,8 +348,6 @@ class Main:
                     txt_lines = value # result.unwrap()
                 case Failure(_): # if not is_successful(result): # type: ignore
                     raise ValueError(f"Failed to run OCR!")#Unable to extract from {path_set}")
-            
-            # app_type = self.my_ocr.get_app_type(txt_lines) if txt_lines else AppType.NUL
             n, date = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
             existing_day_list = self.get_existing_days(app_type=app_type)
             if existing_day_list and (date.day in existing_day_list):
@@ -361,6 +362,7 @@ class Main:
                     pp(line.content)
                 self.conn.commit()
                 ocr_done.append((app_type, date))
+            breakpoint()
         return ocr_done
     from returns.pipeline import is_successful
     def add_image_files_into_db(self, ext='.png'):
@@ -387,11 +389,12 @@ class Main:
                 case Success(value):
                     txt_lines = value # result.unwrap()
                 case Failure(_):
-                    raise ValueError("Failed to run OCR!", path_set)
+                    raise ValueError("Failed to run OCR of %s!", path_set)
             n, date = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
-            existing_day_list = existing_day_dict[app_type]
-            if existing_day_list and (date.day in existing_day_list):
-                print(f"Day {date.day} of App {app_type} exists.")
+            existing_day_list = existing_day_dict[app_type] if (existing_day_dict and app_type in existing_day_dict) else None
+            if existing_day_list:
+                if date.day in existing_day_list:
+                    print(f"Day {date.day} of App {app_type} exists.")
             else:
                 wages = self.my_ocr.get_wages(app_type=app_type, txt_lines=txt_lines)
                 title = self.my_ocr.get_title(app_type, txt_lines, n)
@@ -534,51 +537,3 @@ if __name__ == '__main__':
     import sys
     cli()
     sys.exit(0)
-    app = AppType.T if int(sys.argv[1]) == 1 else AppType.M
-    month = int(sys.argv[2])
-    main = Main(month=month, app=app)
-    if len(sys.argv) > 4:
-        day = int(sys.argv[3])
-        stem = sys.argv[4]
-        match app:
-            case 1:
-                app_type = AppType.T
-            case 2:
-                app_type = AppType.M
-            case _:
-                raise ValueError('Unsupported app type!')
-        main.add_image_file_without_content_into_db(app_type, stem, Date(month=month, day=day))
-        sys.exit(0)
-    from consolemenu import ConsoleMenu, SelectionMenu
-    from consolemenu.items import FunctionItem, SubmenuItem
-    import consolemenu.items
-    def show_total_wages():
-        print(main.sum_wages())
-        input('Hit Enter key, please:')
-    def show_existing_days():
-        app = input("App type: Tm: 1, MH: 2")
-        app_type = [AppType.NUL, AppType.T, AppType.M][int(app)]
-        print(main.get_existing_days(app_type ))
-        input('Hit Enter key, please:')
-    def run_ocr():
-        app_type_list = [AppType.T, AppType.M]
-        patt_list = [APP_TYPE_TO_STEM_END[AppType.T], APP_TYPE_TO_STEM_END[AppType.M]]#["t.*.png", "Screenshot_*.png"]
-        selected = SelectionMenu.get_selection([APP_TYPE_TO_STEM_END[at] for at in app_type_list])
-        txt_lines = main.add_image_files_as_txt_lines(
-            app_type_list[selected]
-        )
-        txt_lines_len = len(txt_lines) if txt_lines else 0
-        input(f'{txt_lines_len} file(s) is / are OCRed. Hit Enter key to return to the main menu:')
-    function_items = [
-        FunctionItem("Show the total wages", show_total_wages),
-        FunctionItem("Show existing days", show_existing_days),# ["Enter"]),
-    ]
-    menu = ConsoleMenu("Menu", "-- OCR DB --")
-    for f_it in function_items:
-        menu.append_item(f_it)
-    submenu = ConsoleMenu("SubMenu", "-- Run OCR --")
-    submenu.append_item(FunctionItem("Run OCR with file name patterns:", run_ocr))
-    submenu_item = SubmenuItem("SubMenu", submenu=submenu, menu=menu)
-    menu.append_item(submenu_item)
-    
-    menu.show()

@@ -64,10 +64,18 @@
   - `pip install opencv-python`
   - `pip install opencv-python-headless`
   - `pip install Pillow`
-  - `pip install numpy`
-  - `pip install matplotlib`
-  - `pip install pdf2image`
-  - `pip install reportlab` 
+  - `pip install pandas`
+0d. install ImageMagick
+  - `sudo apt install imagemagick`
+0e. setup `.env` file
+  - `TXT_LINES_DB=txt_lines.sqlite`
+  - `TESSDATA_PREFIX=/usr/share/tesseract-ocr/4.00/tessdata`
+  - `TESSDATA_DIR=/usr/share/tesseract-ocr/4.00/tessdata`
+  - `PYTHONPATH=/usr/local/lib/python3.8/dist-packages`
+  - `LD_LIBRARY_PATH=/usr/local/lib:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/lib64:/lib:/usr/lib`
+
+
+## In case of failure of OCR or unable to setup tesseract-ocr and Python packages:
 1. convert png files into a pdf file: `convert *.png dest.pdf `
 
 2. upload the pdf file onto Google Drive, then open and open-with-app:Document then download as markdown format.
