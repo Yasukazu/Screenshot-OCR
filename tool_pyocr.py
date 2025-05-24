@@ -1,3 +1,4 @@
+from typing import Sequence
 from contextlib import closing
 from enum import IntEnum
 from types import MappingProxyType
@@ -117,7 +118,7 @@ class MyOcr:
     M_DATE_PATT = [re.compile(r"(\d\d:\d\d)"),
         re.compile(r"(\d+?)/(\d+?)")]
     @classmethod
-    def check_date(cls, app_type: AppType, txt_lines: Sequence[LineBox])->tuple[int, Date|None,tuple[str, str]]:
+    def check_date(cls, app_type: AppType, txt_lines: Sequence[LineBox])->tuple[int, Date|None,Sequence[str]]:
         match app_type:
             case AppType.M:
                 for n in range(len(txt_lines)):
@@ -127,9 +128,9 @@ class MyOcr:
                         if m_d:
                             grps = m_d.groups()
                             date = Date(int(grps[1]), int(grps[2]))
-                            return n, date, (hours[0].groups()[1], hours[1].groups()[1])
+                            return n, date, hours
                         else:
-                            return n, None, (hours[0].groups()[1], hours[1].groups()[1])
+                            return n, None, hours
             case AppType.T:
                 raise NotImplementedError("Not implemented yet!")
     @classmethod
@@ -465,7 +466,16 @@ class Main:
                     if app_type == AppType.M:
                         n, dt, hrs = self.my_ocr.check_date(app_type=app_type, txt_lines=txt_lines)
                         if dt is None:
-                            logger.error("Failed to get date at %d , box: %s lang=jpn+eng!file: %s", n, txt_lines[n][1], file)
+                            box_pos = [*txt_lines[n].position]
+                            box_pos = box_pos[0] + box_pos[1]
+                            box_img = self.my_ocr.image.crop(box_pos) if self.my_ocr.image else None
+                            if box_img:
+                                debug_dir = self.my_ocr.input_dir / 'DEBUG'
+                                debug_dir.mkdir(parents=True, exist_ok=True)
+                                debug_fullpath = debug_dir / (file.stem + '.png') 
+                                box_img.save(debug_fullpath)
+                                logger.info("Saved debug image: %s", debug_fullpath)
+                            logger.error("Failed to get date at %d , txt_box: %s lang=jpn+eng!file: %s", n, txt_lines[n].position, file)
                             raise ValueError("Failed to get date from file:%s in lang=jpn+eng!", file)
                     result = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
                     match result:
