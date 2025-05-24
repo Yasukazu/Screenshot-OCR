@@ -186,7 +186,7 @@ class PathFeeder:
 from contextlib import closing
 import txt_lines_db
 class DbPathFeeder(PathFeeder):
-	from tool_pyocr import AppType
+	from app_type import AppType
 	img_file_ext = '.png'
 
 	def __init__(self, year=0, month=0, days=-1, input_type = FileExt.PNG, input_dir=input_dir_root, type_dir=False, app_type=AppType.T, config=config):

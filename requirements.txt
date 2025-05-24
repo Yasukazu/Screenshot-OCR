@@ -1,3 +1,6 @@
 img2pdf
 numpy
 pillow
+click
+opencv-contrib-python
+python-dotenv

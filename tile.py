@@ -16,7 +16,7 @@ home_dir = Path(os.path.expanduser('~'))
 from path_feeder import PathFeeder, get_last_month #, YearMonth
 from digit_image import ImageFill
 from put_number import PutPos #, put_number
-from tool_pyocr import AppType
+from app_type import AppType
 
 last_month_date = get_last_month()
 year = last_month_date.year

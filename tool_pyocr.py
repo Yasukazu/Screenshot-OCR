@@ -53,10 +53,7 @@ class PathSet:
     def stem_without_delim(self, delim: str):
         return ''.join([s for s in self.stem if s!= delim])
 
-class AppType(IntEnum):
-    NUL = 0
-    T = 1
-    M = 2
+from app_type import AppType
 
 APP_TYPE_TO_STEM_END = MappingProxyType({
     AppType.T: ".co.taimee",

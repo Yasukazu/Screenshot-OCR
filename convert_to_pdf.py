@@ -26,9 +26,9 @@ def convert_to_pdf(output_fullpath: Path, stems: Sequence[str], layout=PdfLayout
 		if buff:
 			f.write(buff)
 
-from tool_pyocr import AppType, Main, Date
+from tool_pyocr import Main, Date
 from path_feeder import input_dir_root
-
+from app_type import AppType
 def conv_to_pdf(app: AppType, main: Main):
 	main.app = app
 	# input_dir = Path(os.environ['SCREEN_BASE_DIR']) / '2025' / '03' 
