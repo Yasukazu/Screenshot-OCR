@@ -4,7 +4,9 @@ import sqlite3
 from dotenv import load_dotenv
 load_dotenv()
 from path_feeder import input_dir_root
+from logging import getLogger
 
+logger = getLogger(__name__)
 YEAR = os.environ['SCREEN_YEAR']
 
 def get_db_name():
@@ -63,6 +65,15 @@ import click
 def cli():
     pass
 @cli.command()
+def init():
+    db_fullpath = sqlite_fullpath()
+    if not db_fullpath.exists():
+        db_fullpath.parent.mkdir(parents=True, exist_ok=True)
+    for month in range(1, 13):
+        tbl_name = get_table_name(month)
+        create_tbl_if_not_exists(tbl_name, db_fullpath=db_fullpath)
+    logger.info("Database initialized at %s", db_fullpath) 
+@cli.command()
 @click.argument('month')
 def clear_txt_lines(month: str):
     m = int(month)
@@ -70,22 +81,3 @@ def clear_txt_lines(month: str):
     
 if __name__ == '__main__':
     cli()
-    '''
-    import csv, re, sys, os
-    month = int(sys.argv[1])
-    each_field_patt = re.compile(r"`(\w+)`")
-    each_field = each_field_patt.findall(CREATE_TABLE_SQL)
-    each_field_without_last = each_field[:-1]
-    csv_fullpath = sqlite_fullpath().parent / (sqlite_fullpath().stem + '.csv')
-    with csv_fullpath.open('w') as out_csv:
-        writer = csv.writer(out_csv)
-        writer.writerow(each_field_without_last)
-        conn = connect()
-        with closing(conn.cursor()) as cur:
-            table_name = get_table_name(month)
-            sql = f"SELECT {','.join(each_field_without_last)} FROM `{table_name}` ORDER BY `day`"
-            rr = cur.execute(sql)
-            for r in rr:
-                writer.writerow(r)'''
-
-        
