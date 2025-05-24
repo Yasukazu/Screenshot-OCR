@@ -269,8 +269,8 @@ class MTxtLines(TTxtLines):
 
 class Main:
     import txt_lines_db
-    def __init__(self, month=0, app=AppType.NUL, year=0, db_fullpath=txt_lines_db.sqlite_fullpath()):
-        self.my_ocr = MyOcr(month=month, year=year)
+    def __init__(self, app=AppType.NUL, db_fullpath=txt_lines_db.sqlite_fullpath(), my_ocr=MyOcr()):  
+        self.my_ocr = my_ocr
         #self.img_dir = self.my_ocr.input_dir
         #month = self.my_ocr.month
         #img_parent_dir = self.img_dir.parent
@@ -359,7 +359,8 @@ class Main:
                 with closing(self.conn.cursor()) as cur:
                     cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app_type.value, date.day, wages, title, stem, pkl))
                 for line in txt_lines:
-                    pp(line.content)
+                    logging.info("txt_lines: %s", line.content)
+                breakpoint()
                 self.conn.commit()
                 ocr_done.append((app_type, date))
             breakpoint()
@@ -414,9 +415,9 @@ class Main:
         self.conn.commit()
     t_patt = APP_TYPE_TO_STEM_END[AppType.T]
     m_patt = APP_TYPE_TO_STEM_END[AppType.M]
-    def ocr_result_into_db(self, app_type_list: list[AppType]=[]):
-        if len(app_type_list) == 0:
-            app_type_list += [AppType.T, AppType.M]
+    def ocr_result_into_db(self, app_type_list: list[AppType]|None=None):
+        if not app_type_list:
+            app_type_list = [e for e in list(AppType) if e != AppType.NUL]  
         with closing(self.conn.cursor()) as cur:
           for app_type in app_type_list:
             stem_end_patt = APP_TYPE_TO_STEM_END[app_type]
@@ -435,10 +436,13 @@ class Main:
                 cur.execute(exists_sql)
                 one = cur.fetchone()
                 if not one:
-                    tm_txt_lines = TTxtLines(txt_lines) if app_type == AppType.T else MTxtLines(txt_lines)
+                    tm_txt_lines = {AppType.T: TTxtLines, AppType.M: MTxtLines}[app_type](txt_lines)
                     wages = tm_txt_lines.wages()
                     title = tm_txt_lines.title(n)
-                    pkl_fullpath = file.parent / (file.stem + '.pkl')
+                    pkl_dir = file.parent.parent / 'pkl'
+                    pkl_dir.mkdir(parents=True, exist_ok=True)
+                    pkl_fullpath = pkl_dir / (file.stem + '.pkl')
+                    breakpoint()
                     with pkl_fullpath.open('wb') as wf:
                         pickle.dump(txt_lines, wf)
                     insert_sql = f"INSERT INTO `{self.tbl_name}` VALUES ({app}, {date.day}, ?, ?, ?, ?)" 
@@ -510,7 +514,8 @@ def cli():
 @click.argument('month')
 def run_ocr(month: str):
     m = int(month)
-    main = Main(m)
+    my_ocr = MyOcr(month=m)
+    main = Main(my_ocr=my_ocr)
     main.ocr_result_into_db()
 class FunctionItem:
     def __init__(self, title: str, func: Callable | None, kwargs: dict[str, Any]={}):
@@ -521,7 +526,8 @@ class FunctionItem:
         if self.func:
             self.func(**self.kwargs) #if self.kwargs else self.func()
 def get_options(month=0):
-    main = Main(month)
+    my_ocr = MyOcr(month=month) 
+    main = Main(my_ocr=my_ocr)
     return [
         FunctionItem('None', None),
         FunctionItem('save OCR result into DB', main.ocr_result_into_db),
