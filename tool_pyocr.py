@@ -472,7 +472,7 @@ class Main:
                             if box_img:
                                 debug_dir = self.my_ocr.input_dir / 'DEBUG'
                                 debug_dir.mkdir(parents=True, exist_ok=True)
-                                debug_fullpath = debug_dir / (file.stem + '.png') 
+                                debug_fullpath = debug_dir / (file.stem + '.dbg.png') 
                                 box_img.save(debug_fullpath)
                                 logger.info("Saved debug image: %s", debug_fullpath)
                             logger.error("Failed to get date at %d , txt_box: %s lang=jpn+eng!file: %s", n, txt_lines[n].position, file)
