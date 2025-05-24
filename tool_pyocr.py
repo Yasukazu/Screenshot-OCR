@@ -116,23 +116,24 @@ class MyOcr:
                 raise ValueError("Undefined AppType!")
 
     M_DATE_PATT = [re.compile(r"(\d\d:\d\d)"),
-        re.compile(r"(\d+?)/(\d+?)")]
+        re.compile(r"(\d+?)/(\d+?)"),
+        re.compile(r"時\s*間$")]
     @classmethod
     def check_date(cls, app_type: AppType, txt_lines: Sequence[LineBox|str])->tuple[int, Date|None,Sequence[str]]:
         match app_type:
             case AppType.M:
                 for n in range(len(txt_lines)):
-                    cntnt = txt_lines[n].content.replace(' ', '') if isinstance(txt_lines[n], LineBox) else txt_lines[n]
-                    #print(f"cntnt: {cntnt}")
-                    if cntnt.endswith('時間') and (hours:=MyOcr.M_DATE_PATT[0].findall(cntnt)):
+                    cntnt = txt_lines[n].content if isinstance(txt_lines[n], LineBox) else txt_lines[n] #.content.replace(' ', '') 
+                    if MyOcr.M_DATE_PATT[-1].search(cntnt):
+                      if (hours:=MyOcr.M_DATE_PATT[0].findall(cntnt)):
                         m_d = MyOcr.M_DATE_PATT[1].match(cntnt)
                         if m_d:
                             grps = m_d.groups()
-                            date = Date(int(grps[1]), int(grps[2]))
+                            date = Date(int(grps[0]), int(grps[1]))
                             return n, date, hours
                         else:
                             return n, None, hours
-                raise MDateError("Could not resolve date! AppType.M txt_lines!%s", txt_lines)   
+                raise MDateError(f"Could not resolve date! AppType.M txt_lines!:{txt_lines}")
             case AppType.T:
                 raise NotImplementedError("Not implemented yet!")
     @classmethod
@@ -149,8 +150,8 @@ class MyOcr:
                             date = Date(int(grps[1]), int(grps[2]))
                             return n, date, hours
                         else:
-                            raise MDateError("Could not find month and day: AppType.M txt_lines!%s", txt_lines)                
-                raise MDateError("Could not resolve date! AppType.M txt_lines!%s", txt_lines)                
+                            raise MDateError(f"Could not find month and day: AppType.M txt_lines!: {txt_lines}")
+                raise MDateError(f"Could not resolve date! AppType.M txt_lines!: {txt_lines}")
             case AppType.T:
                 # n_gyoumu = next_gyoumu(txt_lines)
                 date = None
