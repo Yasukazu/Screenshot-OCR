@@ -3,7 +3,6 @@ from enum import IntEnum
 from types import MappingProxyType
 import re
 from typing import Sequence, Callable, Any
-from collections import namedtuple
 from pprint import pp
 from pathlib import Path
 from dataclasses import dataclass
@@ -17,7 +16,9 @@ import pyocr
 import pyocr.builders
 from pyocr.builders import LineBox
 from returns.pipeline import is_successful, UnwrapFailedError
-
+import logging
+logger = logging.getLogger(__name__)
+from app_type import AppType
 @dataclass
 class Date:
     month: int
@@ -53,8 +54,6 @@ class PathSet:
     def stem_without_delim(self, delim: str):
         return ''.join([s for s in self.stem if s!= delim])
 
-from app_type import AppType
-
 APP_TYPE_TO_STEM_END = MappingProxyType({
     AppType.T: ".co.taimee",
     AppType.M: ".mercari.work.android"
@@ -63,11 +62,15 @@ APP_TYPE_TO_STEM_END = MappingProxyType({
 
 class OCRError(Exception):
     pass
-from returns.result import Result, Failure, Success, safe
+
+from returns.result import safe, Result, Failure, Success
+
 class MyOcr:
     from path_feeder import input_dir_root, input_ext
     tools = pyocr.get_available_tools()
     tool = tools[0]
+    assert tool is not None, "No OCR tool found!"
+
     #input_dir = input_dir # Path(os.environ['SCREEN_BASE_DIR'])
     delim = ' '
 
@@ -139,7 +142,7 @@ class MyOcr:
         self.date = get_year_month(year=year, month=month)
         #self.month = month
         #self.input_dir = MyOcr.input_dir_root
-        from path_feeder import PathFeeder
+        #from path_feeder import PathFeeder
         #self.path_feeder = PathFeeder(input_dir=MyOcr.input_dir_root, type_dir=False, month=month)
         self.txt_lines: Sequence[pyocr.builders.LineBox] | None = None
         self.image: Image.Image | None = None
@@ -150,13 +153,14 @@ class MyOcr:
         for stem in self.path_feeder.feed(delim=self.delim, padding=False):
             yield PathSet(self.path_feeder.dir, stem, self.path_feeder.ext)'''
     @safe
-    def run_ocr(self, path_set: PathSet, lang='jpn+eng', delim='',
+    def run_ocr(self, path_set: Path | PathSet, lang='jpn+eng', delim='',
                 builder=pyocr.builders.LineBoxBuilder(tesseract_layout=3))-> Sequence[pyocr.builders.LineBox]:#, Exception]: # Digit
         #stem_without_delim = ''.join([s for s in path_set[1] if s!= self.delim])
-        fullpath = path_set.path / (path_set.stem_without_delim(delim) + path_set.ext)
+        fullpath = path_set if isinstance(path_set, Path) else path_set.path / (path_set.stem_without_delim(delim) + path_set.ext)
         img = Image.open(fullpath).convert('L')
         enhancer= ImageEnhance.Contrast(img)
         self.image = enhancer.enhance(2.0)
+        logger.info("Start to OCR: file: %s, file-size: %d, image-width: %d, image-height: %d", fullpath, fullpath.stat().st_size, self.image.width, self.image.height)
         txt_lines = self.tool.image_to_string(
             self.image,
             lang=lang,
@@ -164,6 +168,9 @@ class MyOcr:
         )
         if txt_lines:
             assert isinstance(txt_lines[0], pyocr.builders.LineBox)
+            logger.info("OCR result: %d lines", len(txt_lines))
+        else:
+            logger.warning("OCR result is None!")
         self.txt_lines = txt_lines
         return txt_lines
         # raise ValueError("PYOCR run failed!")
@@ -333,10 +340,12 @@ class Main:
             parent = self.my_ocr.input_dir
             path_set = PathSet(parent, stem, ext)
             result = self.my_ocr.run_ocr(path_set=path_set, delim='')
-            if not is_successful(result): # type: ignore
-                raise ValueError(f"Failed to run OCR!")#Unable to extract from {path_set}")
+            match result:
+                case Success(value):
+                    txt_lines = value # result.unwrap()
+                case Failure(_): # if not is_successful(result): # type: ignore
+                    raise ValueError(f"Failed to run OCR!")#Unable to extract from {path_set}")
             
-                txt_lines = result.unwrap()
             # app_type = self.my_ocr.get_app_type(txt_lines) if txt_lines else AppType.NUL
             n, date = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
             existing_day_list = self.get_existing_days(app_type=app_type)
@@ -374,10 +383,11 @@ class Main:
             parent = self.my_ocr.input_dir
             path_set = PathSet(parent, stem, ext)
             result = self.my_ocr.run_ocr(path_set=path_set, delim='')
-            try:#if not is_successful(result): # type: ignore
-                txt_lines = result.unwrap()
-            except UnwrapFailedError as uwerr:
-                raise ValueError("Failed to run OCR!", path_set) from uwerr
+            match result:
+                case Success(value):
+                    txt_lines = value # result.unwrap()
+                case Failure(_):
+                    raise ValueError("Failed to run OCR!", path_set)
             n, date = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
             existing_day_list = existing_day_dict[app_type]
             if existing_day_list and (date.day in existing_day_list):
@@ -412,8 +422,11 @@ class Main:
                 app = app_type.value
                 path_set = PathSet(self.my_ocr.input_dir, file.stem, ext=self.my_ocr.input_ext)
                 result = self.my_ocr.run_ocr(path_set)
-                #if not is_successful(result): # type: ignore raise ValueError("OCR failed!")
-                txt_lines = result.unwrap()
+                match result:
+                    case Success(value):
+                        txt_lines = value # result.unwrap()
+                    case Failure(_):
+                        raise ValueError("Failed to run OCR!", path_set)
                 n, date = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
                 exists_sql = f"SELECT day, app FROM `{self.tbl_name}` WHERE day = {date.day} AND app = {app};"
                 cur.execute(exists_sql)

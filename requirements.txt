@@ -1,6 +1,10 @@
 img2pdf
 numpy
-pillow
+pandas
+Pillow
 click
 opencv-contrib-python
 python-dotenv
+pytesseract
+pyocr
+returns

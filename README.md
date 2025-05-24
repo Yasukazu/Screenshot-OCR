@@ -48,7 +48,26 @@
    D
 
 ## Extract Text from PNG image file:
-
+0. install Tesseract OCR
+  - `sudo apt install tesseract-ocr`
+  - `sudo apt install libtesseract-dev`
+0a. install tesseract-ocr language data
+  - `sudo apt install tesseract-ocr-jpn`
+0b. check tesseract-ocr version and language data
+  - `tesseract --version`
+  - `tesseract --list-langs`
+  - `tesseract --print-parameters`
+  - `tesseract --print-unlv`
+  - `tesseract --print-tuning-params`
+0c. install python packages
+  - `pip install pytesseract`
+  - `pip install opencv-python`
+  - `pip install opencv-python-headless`
+  - `pip install Pillow`
+  - `pip install numpy`
+  - `pip install matplotlib`
+  - `pip install pdf2image`
+  - `pip install reportlab` 
 1. convert png files into a pdf file: `convert *.png dest.pdf `
 
 2. upload the pdf file onto Google Drive, then open and open-with-app:Document then download as markdown format.
