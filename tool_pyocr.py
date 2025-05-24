@@ -118,11 +118,12 @@ class MyOcr:
     M_DATE_PATT = [re.compile(r"(\d\d:\d\d)"),
         re.compile(r"(\d+?)/(\d+?)")]
     @classmethod
-    def check_date(cls, app_type: AppType, txt_lines: Sequence[LineBox])->tuple[int, Date|None,Sequence[str]]:
+    def check_date(cls, app_type: AppType, txt_lines: Sequence[LineBox|str])->tuple[int, Date|None,Sequence[str]]:
         match app_type:
             case AppType.M:
                 for n in range(len(txt_lines)):
-                    cntnt = txt_lines[n].content.replace(' ', '') # concatenated
+                    cntnt = txt_lines[n].content.replace(' ', '') if isinstance(txt_lines[n], LineBox) else txt_lines[n]
+                    #print(f"cntnt: {cntnt}")
                     if cntnt.endswith('時間') and (hours:=MyOcr.M_DATE_PATT[0].findall(cntnt)):
                         m_d = MyOcr.M_DATE_PATT[1].match(cntnt)
                         if m_d:
@@ -131,11 +132,12 @@ class MyOcr:
                             return n, date, hours
                         else:
                             return n, None, hours
+                raise MDateError("Could not resolve date! AppType.M txt_lines!%s", txt_lines)   
             case AppType.T:
                 raise NotImplementedError("Not implemented yet!")
     @classmethod
     @safe
-    def get_date(cls, app_type: AppType, txt_lines: Sequence[LineBox]):
+    def get_date(cls, app_type: AppType, txt_lines: Sequence[LineBox]|str):
         match app_type:
             case AppType.M:
                 for n in range(len(txt_lines)):
@@ -179,21 +181,24 @@ class MyOcr:
             yield PathSet(self.path_feeder.dir, stem, self.path_feeder.ext)'''
     @safe
     def run_ocr(self, path_set: Path | PathSet, lang='eng+jpn', delim='',
-                builder=pyocr.builders.LineBoxBuilder(tesseract_layout=3))-> Sequence[pyocr.builders.LineBox]:#, Exception]: # Digit
+                builder=pyocr.builders.LineBoxBuilder, layout=3, opt_img: Image.Image|None=None)-> Sequence[pyocr.builders.LineBox]|str:#, Exception]: # Digit
         #stem_without_delim = ''.join([s for s in path_set[1] if s!= self.delim])
         fullpath = path_set if isinstance(path_set, Path) else path_set.path / (path_set.stem_without_delim(delim) + path_set.ext)
-        img = Image.open(fullpath).convert('L')
-        enhancer= ImageEnhance.Contrast(img)
-        self.image = enhancer.enhance(2.0)
-        logger.info("Start to OCR: file: %s, file-size: %d, image-width: %d, image-height: %d", fullpath, fullpath.stat().st_size, self.image.width, self.image.height)
+        if not opt_img:
+            img = Image.open(fullpath).convert('L')
+            enhancer= ImageEnhance.Contrast(img)
+            self.image = enhancer.enhance(2.0)
+        logger.info("Start to OCR: file: %s, file-size: %d, image-width: %d, image-height: %d", fullpath, fullpath.stat().st_size, opt_img.width if opt_img else self.image.width, opt_img.height if opt_img else self.image.height)
         txt_lines = self.tool.image_to_string(
-            self.image,
+            opt_img or self.image,
             lang=lang,
-            builder=builder
+            builder=builder(tesseract_layout=layout)
         )
         if txt_lines:
-            assert isinstance(txt_lines[0], pyocr.builders.LineBox)
-            logger.info("OCR result: %d lines", len(txt_lines))
+            if isinstance(builder, pyocr.builders.LineBox):
+                logger.info("OCR result: %d lines", len(txt_lines))
+            elif isinstance(builder, pyocr.builders.TextBuilder):
+                logger.info("OCR result: %s", txt_lines)
         else:
             logger.warning("OCR result is None!")
         self.txt_lines = txt_lines
@@ -269,13 +274,7 @@ class MyOcr:
     def w_wages(cls, txt_lines: Sequence[LineBox]):
         raise NotImplementedError("Not implemented yet!")
 
-    '''def check_date(self, path_set: PathSet):#, txt_lines: Sequence[pyocr.builders.LineBox]):
-        if not self.txt_lines:
-            raise ValueError('txt_lines is None!')
-        n_gyoumu = next_gyoumu(self.txt_lines)
-        gyoumu_date = get_date(self.txt_lines[n_gyoumu])
-        if gyoumu_date != (int(path_set.stem.split()[0]), int(path_set.stem.split()[1])): # path_feeder.month, 
-            raise ValueError(f"Unmatch {gyoumu_date} : {path_set.stem}!")'''
+
 class TTxtLines:
     TITLE = 1
     def __init__(self, txt_lines: Sequence[LineBox]):
@@ -468,34 +467,48 @@ class Main:
                         if dt is None:
                             box_pos = [*txt_lines[n].position]
                             box_pos = box_pos[0] + box_pos[1]
+                            box_pos = [box_pos[0] + box_pos[3] - box_pos[1], box_pos[1], box_pos[2], box_pos[3]]
                             box_img = self.my_ocr.image.crop(box_pos) if self.my_ocr.image else None
-                            if box_img:
+                            if not box_img:
+                                logger.error("Failed to crop box image: %s", box_pos)
+                                raise ValueError("Failed to crop box image: %s", box_pos)
+                            box_result = self.my_ocr.run_ocr(path_set, lang='eng+jpn', builder=pyocr.builders.TextBuilder, layout=7, opt_img=box_img)
+                            match box_result:
+                                case Success(value):
+                                    n, dt, hrs = self.my_ocr.check_date(app_type=app_type, txt_lines=[value])
+                                    if dt is None:
+                                        logger.error("Failed to get date from box image: %s", box_pos)
+                                        raise ValueError("Failed to get date from box image: %s", box_pos)
+                                    logger.info("Date by run_ocr with TextBuilder and cropped image: %s", dt)
+                                case Failure(_):
+                                    logger.error("Failed to run OCR on box image: %s", box_pos)
+                                    raise ValueError("Failed to run OCR on box image: %s", box_pos)
+                            if test:
                                 debug_dir = self.my_ocr.input_dir / 'DEBUG'
                                 debug_dir.mkdir(parents=True, exist_ok=True)
                                 debug_fullpath = debug_dir / (file.stem + '.dbg.png') 
                                 box_img.save(debug_fullpath)
                                 logger.info("Saved debug image: %s", debug_fullpath)
-                            logger.error("Failed to get date at %d , txt_box: %s lang=jpn+eng!file: %s", n, txt_lines[n].position, file)
-                            raise ValueError("Failed to get date from file:%s in lang=jpn+eng!", file)
-                    result = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
-                    match result:
-                        case Success(value):
-                            n, date = value # result.unwrap()
-                        case Failure(_): # if not is_successful(result): # type: ignore
-                            logger.info("Failed to get date from %s in lang=jpn+eng, try to run_ocr in lang=jpn..", file)
-                            e_result = self.my_ocr.run_ocr(path_set, lang='eng',)
-                            match e_result:
-                                case Success(value):
-                                    d_result = self.my_ocr.get_date(app_type=app_type, txt_lines=value)
-                                    match d_result:
-                                        case Success(value):
-                                            n, date = value
-                                        case Failure(_):
-                                            logger.error("Failed to get date from txt_lines:%s in lang=eng!", txt_lines)
-                                            raise ValueError("Failed to get date from file:%s in lang=eng!", file)
-                                # if not is_successful(e_result): # type: ignore
-                                case Failure(_):
-                                    raise ValueError("Failed to run OCR in lang=eng!", path_set)
+                    else:
+                        result = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
+                        match result:
+                            case Success(value):
+                                n, date = value # result.unwrap()
+                            case Failure(_): # if not is_successful(result): # type: ignore
+                                logger.info("Failed to get date from %s in lang=jpn+eng, try to run_ocr in lang=jpn..", file)
+                                e_result = self.my_ocr.run_ocr(path_set, lang='eng',)
+                                match e_result:
+                                    case Success(value):
+                                        d_result = self.my_ocr.get_date(app_type=app_type, txt_lines=value)
+                                        match d_result:
+                                            case Success(value):
+                                                n, date = value
+                                            case Failure(_):
+                                                logger.error("Failed to get date from txt_lines:%s in lang=eng!", txt_lines)
+                                                raise ValueError("Failed to get date from file:%s in lang=eng!", file)
+                                    # if not is_successful(e_result): # type: ignore
+                                    case Failure(_):
+                                        raise ValueError("Failed to run OCR in lang=eng!", path_set)
                     exists_sql = f"SELECT day, app FROM `{self.tbl_name}` WHERE day = {date.day} AND app = {app};"
                     cur.execute(exists_sql)
                     one = cur.fetchone()
