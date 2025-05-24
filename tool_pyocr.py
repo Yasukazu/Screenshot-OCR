@@ -17,9 +17,14 @@ import pyocr
 import pyocr.builders
 from pyocr.builders import LineBox
 from returns.pipeline import is_successful, UnwrapFailedError
-import logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+import loguru # logging
+logger = loguru.logger # logging.getLogger(__name__)
+#logger.setLevel(logging.DEBUG)
+logger.remove()
+import sys
+logger.add(sys.stderr, level="DEBUG")
+logger.add(sys.stdout, level="INFO")
+logger.add("WARNING.log", level="WARNING")
 from app_type import AppType
 @dataclass
 class Date:
@@ -447,8 +452,7 @@ class Main:
         if not app_type_list:
             app_type_list = [e for e in list(AppType) if e != AppType.NUL]  
         assert limit > 0 
-        while(limit):
-          with closing(self.conn.cursor()) as cur:
+        with closing(self.conn.cursor()) as cur:
             for app_type in app_type_list:
                 stem_end_patt = APP_TYPE_TO_STEM_END[app_type]
                 glob_patt = "*" + stem_end_patt + '.png'
@@ -513,7 +517,7 @@ class Main:
                     exists_sql = f"SELECT day, app FROM `{self.tbl_name}` WHERE day = {date.day} AND app = {app};"
                     cur.execute(exists_sql)
                     one = cur.fetchone()
-                    if not one:
+                    if one is None:
                         tm_txt_lines = {AppType.T: TTxtLines, AppType.M: MTxtLines}[app_type](txt_lines)
                         wages = tm_txt_lines.wages()
                         title = tm_txt_lines.title(n)
@@ -526,6 +530,9 @@ class Main:
                         cur.execute(insert_sql, (wages, title, file.stem, None))
                         logger.info("INSERT: %s", (app, date.day, wages, title, file.stem))
                         limit -= 1
+                        if limit <= 0:
+                            logger.info("Limit reached: %d", limit)
+                            break
         self.conn.commit()
     def save_as_csv(self):
         #conn = sqlite3.connect(db_file, isolation_level=None, detect_types=sqlite3.PARSE_COLNAMES)
