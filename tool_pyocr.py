@@ -22,7 +22,7 @@ logger = loguru.logger # logging.getLogger(__name__)
 #logger.setLevel(logging.DEBUG)
 logger.remove()
 import sys
-logger.add(sys.stderr, level="DEBUG")
+#logger.add(sys.stderr, level="DEBUG")
 logger.add(sys.stdout, level="INFO")
 logger.add("WARNING.log", level="WARNING")
 from app_type import AppType
@@ -187,27 +187,26 @@ class MyOcr:
             yield PathSet(self.path_feeder.dir, stem, self.path_feeder.ext)'''
     @safe
     def run_ocr(self, path_set: Path | PathSet, lang='eng+jpn', delim='',
-                builder=pyocr.builders.LineBoxBuilder, layout=3, opt_img: Image.Image|None=None)-> Sequence[pyocr.builders.LineBox]|str:#, Exception]: # Digit
+                builder_class=pyocr.builders.LineBoxBuilder, layout=3, opt_img: Image.Image|None=None)-> Sequence[pyocr.builders.LineBox]|str:#, Exception]: # Digit
         #stem_without_delim = ''.join([s for s in path_set[1] if s!= self.delim])
         fullpath = path_set if isinstance(path_set, Path) else path_set.path / (path_set.stem_without_delim(delim) + path_set.ext)
         if not opt_img:
             img = Image.open(fullpath).convert('L')
             enhancer= ImageEnhance.Contrast(img)
             self.image = enhancer.enhance(2.0)
-        logger.info("Start to OCR: file: %s, file-size: %d, image-width: %d, image-height: %d", fullpath, fullpath.stat().st_size, opt_img.width if opt_img else self.image.width, opt_img.height if opt_img else self.image.height)
+        logger.info("Start to OCR: file: {}, file-size: {}, image-width: {}, image-height: {}", fullpath, fullpath.stat().st_size, opt_img.width if opt_img else self.image.width, opt_img.height if opt_img else self.image.height)
         txt_lines = self.tool.image_to_string(
             opt_img or self.image,
             lang=lang,
-            builder=builder(tesseract_layout=layout)
+            builder=builder_class(tesseract_layout=layout)
         )
-        if txt_lines:
-            if isinstance(builder, pyocr.builders.LineBox):
-                logger.info("OCR result: %d lines", len(txt_lines))
-            elif isinstance(builder, pyocr.builders.TextBuilder):
-                logger.info("OCR result: %s", txt_lines)
+        if isinstance(txt_lines, list) and txt_lines:
+            self.txt_lines = txt_lines
+            logger.info("OCR result: %d lines", len(txt_lines))
+        elif isinstance(txt_lines, str) and txt_lines:
+            logger.info("OCR result: {}", txt_lines)
         else:
             logger.warning("OCR result is None!")
-        self.txt_lines = txt_lines
         return txt_lines
         # raise ValueError("PYOCR run failed!")
         
@@ -258,7 +257,7 @@ class MyOcr:
                 found = True
                 break
         if not found:
-            raise ValueError("'合計' is not found!%s", txt_lines)    
+            raise ValueError(f"'合計' is not found!:{txt_lines}")
         content = ln.content
         nn = []
         for n in content:
@@ -394,7 +393,7 @@ class Main:
                 with closing(self.conn.cursor()) as cur:
                     cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app_type.value, date.day, wages, title, stem, pkl))
                 for line in txt_lines:
-                    logging.info("txt_lines: %s", line.content)
+                    logger.info("txt_lines: {}", line.content)
                 self.conn.commit()
                 ocr_done.append((app_type, date))
         return ocr_done
@@ -423,7 +422,7 @@ class Main:
                 case Success(value):
                     txt_lines = value # result.unwrap()
                 case Failure(_):
-                    raise ValueError("Failed to run OCR of %s!", path_set)
+                    raise ValueError(f"Failed to run OCR of {path_set}")
             n, date = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
             existing_day_list = existing_day_dict[app_type] if (existing_day_dict and app_type in existing_day_dict) else None
             if existing_day_list:
@@ -452,6 +451,7 @@ class Main:
         if not app_type_list:
             app_type_list = [e for e in list(AppType) if e != AppType.NUL]  
         assert limit > 0 
+        count = 0
         with closing(self.conn.cursor()) as cur:
             for app_type in app_type_list:
                 stem_end_patt = APP_TYPE_TO_STEM_END[app_type]
@@ -475,32 +475,33 @@ class Main:
                             box_pos = [box_pos[0] + box_pos[3] - box_pos[1], box_pos[1], box_pos[2], box_pos[3]]
                             box_img = self.my_ocr.image.crop(box_pos) if self.my_ocr.image else None
                             if not box_img:
-                                logger.error("Failed to crop box image: %s", box_pos)
-                                raise ValueError("Failed to crop box image: %s", box_pos)
-                            box_result = self.my_ocr.run_ocr(path_set, lang='eng+jpn', builder=pyocr.builders.TextBuilder, layout=7, opt_img=box_img)
+                                logger.error("Failed to crop box image: {}", box_pos)
+                                raise ValueError(f"Failed to crop box image: {box_pos}")
+                            box_result = self.my_ocr.run_ocr(path_set, lang='eng+jpn', builder_class=pyocr.builders.TextBuilder, layout=7, opt_img=box_img)
                             match box_result:
                                 case Success(value):
                                     n, dt, hrs = self.my_ocr.check_date(app_type=app_type, txt_lines=[value])
                                     if dt is None:
-                                        logger.error("Failed to get date from box image: %s", box_pos)
-                                        raise ValueError("Failed to get date from box image: %s", box_pos)
-                                    logger.info("Date by run_ocr with TextBuilder and cropped image: %s", dt)
+                                        logger.error("Failed to get date from box image: {}", box_pos)
+                                        raise ValueError(f"Failed to get date from box image: {box_pos}")
+                                    logger.info("Date by run_ocr with TextBuilder and cropped image: {}", dt)
+                                    breakpoint()
                                 case Failure(_):
-                                    logger.error("Failed to run OCR on box image: %s", box_pos)
-                                    raise ValueError("Failed to run OCR on box image: %s", box_pos)
+                                    logger.error("Failed to run OCR on box image: {}", box_pos)
+                                    raise ValueError(f"Failed to run OCR on box image: {box_pos}")
                             if test:
                                 debug_dir = self.my_ocr.input_dir / 'DEBUG'
                                 debug_dir.mkdir(parents=True, exist_ok=True)
                                 debug_fullpath = debug_dir / (file.stem + '.dbg.png') 
                                 box_img.save(debug_fullpath)
-                                logger.info("Saved debug image: %s", debug_fullpath)
+                                logger.info("Saved debug image: {}", debug_fullpath)
                     else:
                         result = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
                         match result:
                             case Success(value):
                                 n, date = value # result.unwrap()
                             case Failure(_): # if not is_successful(result): # type: ignore
-                                logger.info("Failed to get date from %s in lang=jpn+eng, try to run_ocr in lang=jpn..", file)
+                                logger.info("Failed to get date from {} in lang=jpn+eng, try to run_ocr in lang=jpn..", file)
                                 e_result = self.my_ocr.run_ocr(path_set, lang='eng',)
                                 match e_result:
                                     case Success(value):
@@ -509,8 +510,8 @@ class Main:
                                             case Success(value):
                                                 n, date = value
                                             case Failure(_):
-                                                logger.error("Failed to get date from txt_lines:%s in lang=eng!", txt_lines)
-                                                raise ValueError("Failed to get date from file:%s in lang=eng!", file)
+                                                logger.error("Failed to get date from txt_lines:{} in lang=eng!", txt_lines)
+                                                raise ValueError(f"Failed to get date from file: {file} in lang=eng!")
                                     # if not is_successful(e_result): # type: ignore
                                     case Failure(_):
                                         raise ValueError("Failed to run OCR in lang=eng!", path_set)
@@ -528,12 +529,15 @@ class Main:
                             pickle.dump(txt_lines, wf)
                         insert_sql = f"INSERT INTO `{self.tbl_name}` VALUES ({app}, {date.day}, ?, ?, ?, ?)" 
                         cur.execute(insert_sql, (wages, title, file.stem, None))
-                        logger.info("INSERT: %s", (app, date.day, wages, title, file.stem))
+                        logger.info("INSERT: {}", (app, date.day, wages, title, file.stem))
+                        count += 1
                         limit -= 1
                         if limit <= 0:
                             logger.info("Limit reached: %d", limit)
                             break
         self.conn.commit()
+        return count
+
     def save_as_csv(self):
         #conn = sqlite3.connect(db_file, isolation_level=None, detect_types=sqlite3.PARSE_COLNAMES)
         table = f"text_lines-{self.my_ocr.date.month:02}"
@@ -590,10 +594,11 @@ def edit_wages(month: int, app=AppType.T):
                     assert row[0] == wages
                     print(f"Wages of {day=} is Updated as {wages=} in table `{table=}`.")
                     feeder.conn.commit()
-def run_ocr(month: str, limit=62):
+def run_ocr(month: str, limit=62, app_type: AppType = AppType.NUL):
+    """Run OCR and save result into DB."""
     m = int(month)
     my_ocr = MyOcr(month=m)
-    main = Main(my_ocr=my_ocr)
+    main = Main(my_ocr=my_ocr, app=app_type)
     main.ocr_result_into_db(limit=limit)    
 
 import click
