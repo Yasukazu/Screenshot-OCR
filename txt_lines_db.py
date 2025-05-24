@@ -41,8 +41,7 @@ _conn: list[sqlite3.Connection] = []
 def connect(db_fullpath=sqlite_fullpath()):
     if _conn:
         return _conn[0]
-    if not db_fullpath.exists():
-        raise ValueError(f"`{db_fullpath=}` does not exist!")
+    #if not db_fullpath.exists():raise ValueError(f"`{db_fullpath=}` does not exist!")
     if sqlite3.threadsafety == 3:
         check_same_thread = False
     else:
@@ -59,20 +58,18 @@ def clear_txt_lines_of(month: int):
         cur.execute(clear_txt_lines_sql)
     conn.commit()
 
+def init():
+    db_fullpath = sqlite_fullpath()
+    if not db_fullpath.exists():
+        db_fullpath.parent.mkdir(parents=True, exist_ok=True)
+    logger.info("Database path created: %s", db_fullpath.parent) 
+
 import click
 
 @click.group()
 def cli():
     pass
-@cli.command()
-def init():
-    db_fullpath = sqlite_fullpath()
-    if not db_fullpath.exists():
-        db_fullpath.parent.mkdir(parents=True, exist_ok=True)
-    for month in range(1, 13):
-        tbl_name = get_table_name(month)
-        create_tbl_if_not_exists(tbl_name, db_fullpath=db_fullpath)
-    logger.info("Database initialized at %s", db_fullpath) 
+
 @cli.command()
 @click.argument('month')
 def clear_txt_lines(month: str):
