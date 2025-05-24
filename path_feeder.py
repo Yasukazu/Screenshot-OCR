@@ -15,14 +15,14 @@ config = dotenv_values(".env")
 logger.info("config from dotenv_values: %s", config)
 # is_dotenv_loaded = load_dotenv('.env', verbose=True)
 
-def supple_config(key):
-	value = config.get(key)
-	if not value:
-		value = os.environ.get(key)
-
 for k in [SCREEN_BASE_DIR, SCREEN_YEAR, SCREEN_MONTH]:
-	supple_config(k)
-
+	config[k] = config.get(k) or os.environ.get(k)
+try:
+	input_dir_root = Path(config[SCREEN_BASE_DIR])
+except Exception as exc:
+	raise ValueError(f"{SCREEN_BASE_DIR} is not set.") from exc
+if not input_dir_root.exists():
+	raise ValueError(f"`{input_dir_root=}` for {SCREEN_BASE_DIR} does not exist!")
 def check_y_m(key):
 	value = config.get(key)
 	if not value:
@@ -36,11 +36,6 @@ for key in [SCREEN_YEAR, SCREEN_MONTH]:
 	check_y_m(key)
 
 input_ext = '.png'
-
-try:
-	input_dir_root = Path(config[SCREEN_BASE_DIR])
-except Exception as exc:
-	raise ValueError(f"{SCREEN_BASE_DIR} is not set.") from exc
 
 if not input_dir_root.exists():
 	raise ValueError(f"`{input_dir_root}` for {SCREEN_BASE_DIR} does not exist!")
