@@ -468,8 +468,8 @@ class Main:
                         case Failure(_):
                             raise ValueError("Failed to run OCR!", path_set)
                     if app_type == AppType.M:
-                        n, dt, hrs = self.my_ocr.check_date(app_type=app_type, txt_lines=txt_lines)
-                        if dt is None:
+                        n, date, hrs = self.my_ocr.check_date(app_type=app_type, txt_lines=txt_lines)
+                        if date is None:
                             box_pos = [*txt_lines[n].position]
                             box_pos = box_pos[0] + box_pos[1]
                             box_pos = [box_pos[0] + box_pos[3] - box_pos[1], box_pos[1], box_pos[2], box_pos[3]]
@@ -480,12 +480,11 @@ class Main:
                             box_result = self.my_ocr.run_ocr(path_set, lang='eng+jpn', builder_class=pyocr.builders.TextBuilder, layout=7, opt_img=box_img)
                             match box_result:
                                 case Success(value):
-                                    n, dt, hrs = self.my_ocr.check_date(app_type=app_type, txt_lines=[value])
-                                    if dt is None:
+                                    n, date, hrs = self.my_ocr.check_date(app_type=app_type, txt_lines=[value])
+                                    if date is None:
                                         logger.error("Failed to get date from box image: {}", box_pos)
                                         raise ValueError(f"Failed to get date from box image: {box_pos}")
-                                    logger.info("Date by run_ocr with TextBuilder and cropped image: {}", dt)
-                                    breakpoint()
+                                    logger.info("Date by run_ocr with TextBuilder and cropped image: {}", date)
                                 case Failure(_):
                                     logger.error("Failed to run OCR on box image: {}", box_pos)
                                     raise ValueError(f"Failed to run OCR on box image: {box_pos}")
@@ -515,26 +514,26 @@ class Main:
                                     # if not is_successful(e_result): # type: ignore
                                     case Failure(_):
                                         raise ValueError("Failed to run OCR in lang=eng!", path_set)
-                    exists_sql = f"SELECT day, app FROM `{self.tbl_name}` WHERE day = {date.day} AND app = {app};"
+                    '''exists_sql = f"SELECT day, app FROM `{self.tbl_name}` WHERE day = {date.day} AND app = {app};"
                     cur.execute(exists_sql)
                     one = cur.fetchone()
-                    if one is None:
-                        tm_txt_lines = {AppType.T: TTxtLines, AppType.M: MTxtLines}[app_type](txt_lines)
-                        wages = tm_txt_lines.wages()
-                        title = tm_txt_lines.title(n)
-                        pkl_dir = file.parent.parent / 'pkl'
-                        pkl_dir.mkdir(parents=True, exist_ok=True)
-                        pkl_fullpath = pkl_dir / (file.stem + '.pkl')
-                        with pkl_fullpath.open('wb') as wf:
-                            pickle.dump(txt_lines, wf)
-                        insert_sql = f"INSERT INTO `{self.tbl_name}` VALUES ({app}, {date.day}, ?, ?, ?, ?)" 
-                        cur.execute(insert_sql, (wages, title, file.stem, None))
-                        logger.info("INSERT: {}", (app, date.day, wages, title, file.stem))
-                        count += 1
-                        limit -= 1
-                        if limit <= 0:
-                            logger.info("Limit reached: %d", limit)
-                            break
+                    if one is None:'''
+                    tm_txt_lines = {AppType.T: TTxtLines, AppType.M: MTxtLines}[app_type](txt_lines)
+                    wages = tm_txt_lines.wages()
+                    title = tm_txt_lines.title(n)
+                    pkl_dir = file.parent.parent / 'pkl'
+                    pkl_dir.mkdir(parents=True, exist_ok=True)
+                    pkl_fullpath = pkl_dir / (file.stem + '.pkl')
+                    with pkl_fullpath.open('wb') as wf:
+                        pickle.dump(txt_lines, wf)
+                    insert_sql = f"INSERT INTO `{self.tbl_name}` VALUES ({app}, {date.day}, ?, ?, ?, ?)" 
+                    cur.execute(insert_sql, (wages, title, file.stem, None))
+                    logger.info("INSERT: {}", (app, date.day, wages, title, file.stem))
+                    count += 1
+                    limit -= 1
+                    if limit <= 0:
+                        logger.info("Limit reached: %d", limit)
+                        break
         self.conn.commit()
         return count
 
