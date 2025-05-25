@@ -1,4 +1,4 @@
-from typing import Sequence
+from typing import Sequence, Union
 from contextlib import closing
 from enum import IntEnum
 from types import MappingProxyType
@@ -9,6 +9,7 @@ from pathlib import Path
 from dataclasses import dataclass
 import pickle
 
+from returns.result import safe, Result, Failure, Success
 import pandas
 from dotenv import load_dotenv
 load_dotenv()
@@ -34,13 +35,21 @@ class Date:
     def as_float(self):
         return float(f"{self.month}.{self.day:02}")
 
-from typing import Union
-def get_date(line_box: pyocr.builders.LineBox)-> Union[Date, None]:
+def get_date_split(line_box: pyocr.builders.LineBox)-> Union[Date, None]:
     content = line_box.content.split()
     if len(content) > 3:
         if (content[1] == '月') and (content[3] == '日'):
         #raise ValueError("Not 月日!")
             return Date(month=int(content[0]), day=int(content[2]))
+
+DATE_PATT = re.compile(r"(\d+)月(\d+)日")
+@safe
+def get_date(line_box: pyocr.builders.LineBox)-> Union[Date, None]:
+    content = line_box.content.replace(' ', '')
+    result = DATE_PATT.search(content)
+    if result:
+        month, day = result.groups()
+        return Date(month=int(month), day=int(day)) 
 
 '''def next_gyoumu(txt_lines: Sequence[pyocr.builders.LineBox]):
     lines_len = len(txt_lines)
@@ -70,7 +79,6 @@ APP_TYPE_TO_STEM_END = MappingProxyType({
 class OCRError(Exception):
     pass
 
-from returns.result import safe, Result, Failure, Success
 class MDateError(OCRError):
     def __init__(self, message: str):
         super().__init__(message)
@@ -160,15 +168,16 @@ class MyOcr:
                             raise MDateError(f"Could not find month and day: AppType.M txt_lines!: {txt_lines}")
                 raise MDateError(f"Could not resolve date! AppType.M txt_lines!: {txt_lines}")
             case AppType.T:
-                # n_gyoumu = next_gyoumu(txt_lines)
-                date = None
                 for n, txt_line in enumerate(txt_lines):
-                    date = get_date(txt_line)
-                    if date:
+                    content = txt_line.content.replace(' ', '') if isinstance(txt_line, LineBox) else txt_line
+                    if '業務開始' in content:
                         break
-                if not date:
-                    raise ValueError("No date found in T!")
-                return n, date
+                result = get_date(txt_lines[n + 1]) # next line
+                match(result):
+                    case Success(date):
+                        return n, date
+                    case Failure(_):
+                        raise ValueError("No date found in T!")
             case _:
                 raise ValueError("Undefined AppType!")
 
@@ -234,23 +243,12 @@ class MyOcr:
     @classmethod
     def t_title(cls, txt_lines: Sequence[LineBox]):
         return txt_lines[1].content.replace(' ', '')
-        '''stop = 'この 店 舗 の 募集 状況'.replace(' ', '')
-        lines = []
-        for line in txt_lines:
-            if (content:=''.join(line.content.split())) == stop:
-                break
-            lines.append(content)
-        return ';'.join(lines)'''
+
     @classmethod
     def m_title(cls, txt_lines: Sequence[LineBox], n: int):
         return ''.join([txt_lines[i].content.replace(' ', '') for i in range(n - 3, n - 1)])
 
-    '''def get_date(self, app_tpe: AppType):
-        if not self.txt_lines:
-            raise bb ValueError('`txt_lines` is None!')
-        match
-        n_gyoumu = next_gyoumu(self.txt_lines)
-        return get_date(n_gyoumu)'''
+
     @classmethod
     def m_wages(cls, txt_lines: Sequence[LineBox], n_cc=['%d' % c for c in range(10)]):
         found = False
@@ -548,7 +546,6 @@ class Main:
                                 box_result = self.my_ocr.run_ocr(path_set, lang='eng+jpn', builder_class=pyocr.builders.TextBuilder, layout=7, opt_img=box_img)
                                 match box_result:
                                     case Success(value):
-                                        breakpoint()
                                         logger.debug("date-part OCR result: {}", value)
                                         no_spc_value = value.replace(' ', '')
                                         mt = re.match(r"(\d+)月(\d+)日", no_spc_value)
@@ -558,16 +555,22 @@ class Main:
                                             assert box_date.month == date.month, f"Month from box image: {box_date.month} does not match: {date.month}"
                                             if box_date.day != date.day:
                                                 logger.info("Date from box image: {} is different from DB ", box_date.day)
-                                                backup_sql = f"SELECT wages, title, stem FROM `{self.tbl_name}` WHERE day = {date.day} AND app = {app};"
-                                                cur.execute(backup_sql)
-                                                old_wages, old_stem, old_title = cur.fetchone()
-                                                replace_sql = f"UPDATE `{self.tbl_name}` SET stem = ?, wages = ?, title = ? WHERE day = {date.day} AND app = {app};"
-                                                cur.execute(replace_sql, (file.stem, wages, title))
-                                                logger.info("REPLACE: {}", (file.stem, wages, title))
+                                                logger.info("Proceeding to fix the date in DB: {} to {}", date.day, box_date.day)
+                                                breakpoint()
+                                                result = self.fix_day(old_day=date.day, new_day=box_date.day, app=app)
+                                                match result:
+                                                    case Success(_):
+                                                        logger.info("Fixed day from {} to {} for app {}", date.day, box_date.day, app)
+                                                    case Failure(_):
+                                                        logger.error("Failed to fix day from {} to {} for app {}", date.day, box_date.day, app)
+                                                        raise ValueError(f"Failed to fix day from {date.day} to {box_date.day} for app {app}")
+                                                breakpoint()
+                                                logger.info("Date from box image: {} replaces the date here: {}.", box_date, date)
+                                                date = box_date
+
                                             else:
                                                 logger.error("Date from box image does not match: {}, expected: {}", box_date, date)
                                                 raise ValueError(f"Date from box image does not match: {box_date}, expected: {date}")
-                                            replace_sql = f"UPDATE `{self.tbl_name}` SET stem = ?, wages = ?, title = ? WHERE day = {date.day} AND app = {app};"
                                         else:
                                             logger.error("Failed to get date from value: {}", no_spc_value)
                                             raise ValueError(f"Failed to get date from value: {no_spc_value}")
@@ -606,6 +609,7 @@ class Main:
         self.conn.commit()
         return count
 
+    @safe
     def fix_day(self, old_day: int, new_day: int, app: int):
         """Fix the day of the record in the DB."""
         assert app in [v for v in AppType.__members__.values() if v != AppType.NUL], f"Invalid app type: {app}"
@@ -626,7 +630,7 @@ class Main:
                             (`day`, `app`, `wages`, `title`, `stem`, `txt_lines`)
                  VALUES     ({new_day}, {app}, {wages}, {title}, {stem}, NULL)
             """
-            cur.execute(delete_sql)
+            cur.execute(insert_sql)
             logger.info("Fixed day from {} to {} for app {}:keeping wages={}, title={}, stem={}", old_day, new_day, app, wages, title, stem)       
 
     def get_pkl_path(self, stem: str):
