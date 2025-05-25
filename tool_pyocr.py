@@ -445,8 +445,7 @@ class Main:
         with closing(self.conn.cursor()) as cur:
             cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app_type.value, date.day, wages, title, stem, pkl))
         self.conn.commit()
-    t_patt = APP_TYPE_TO_STEM_END[AppType.T]
-    m_patt = APP_TYPE_TO_STEM_END[AppType.M]
+
     def ocr_result_into_db(self, app_type_list: list[AppType]|None=None, limit=62, test=False):
         if not app_type_list:
             app_type_list = [e for e in list(AppType) if e != AppType.NUL]  
@@ -494,7 +493,7 @@ class Main:
                                 debug_fullpath = debug_dir / (file.stem + '.dbg.png') 
                                 box_img.save(debug_fullpath)
                                 logger.info("Saved debug image: {}", debug_fullpath)
-                    else:
+                    elif app_type == AppType.T:
                         result = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
                         match result:
                             case Success(value):
@@ -514,16 +513,46 @@ class Main:
                                     # if not is_successful(e_result): # type: ignore
                                     case Failure(_):
                                         raise ValueError("Failed to run OCR in lang=eng!", path_set)
-                    '''exists_sql = f"SELECT day, app FROM `{self.tbl_name}` WHERE day = {date.day} AND app = {app};"
+                    else:
+                        raise NotImplementedError(f"Undefined AppType: {app_type}!")
+                    exists_sql = f"SELECT day, app, stem FROM `{self.tbl_name}` WHERE day = {date.day} AND app = {app};"
                     cur.execute(exists_sql)
-                    one = cur.fetchone()
-                    if one is None:'''
+                    if (one:= cur.fetchone()):
+                        logger.info("Day {} of App {} already exists in DB: {}", date.day, app, one)
+                        old_stem = one[2]
+                        if old_stem != file.stem:
+                            old_pkl_path = self.get_pkl_path(old_stem)
+                            if old_pkl_path.exists():
+                                logger.warning("Old pkl file exists: {}", old_pkl_path)
+                                with old_pkl_path.open('rb') as rf:
+                                    old_txt_lines = pickle.load(rf)
+                                    box_pos = [*old_txt_lines[n + 1].position]
+                                    box_pos = box_pos[0] + box_pos[1]
+                                old_file = self.get_replaced_stem_file(file, old_stem)
+                                if not old_file.exists():
+                                    raise ValueError(f"Old file does not exist: {old_file}")
+                                if test:
+                                    breakpoint()
+                                    image = Image.open(old_file)
+                                    if not image:
+                                        logger.error("Failed to open old file: {}", old_file)
+                                        raise ValueError(f"Failed to open old file: {old_file}")
+                                    data_image = image.crop(box_pos)
+                                    debug_dir = self.my_ocr.input_dir.parent / 'DEBUG'
+                                    debug_dir.mkdir(exist_ok=True)
+                                    debug_fullpath = debug_dir / (file.stem + f'({box_pos}).png') 
+                                    data_image.save(debug_fullpath)
+                                    logger.info("Saved debug image: {}", debug_fullpath)
+                                    breakpoint()
+                            else:
+                                logger.warning("Old pkl file does not exist: {}", old_pkl_path)
+                        assert old_stem != file.stem
+                        raise ValueError(f"Day {date.day} of App {app} already exists in DB with stem: {old_stem}: new stem:{file.stem}!")
                     tm_txt_lines = {AppType.T: TTxtLines, AppType.M: MTxtLines}[app_type](txt_lines)
                     wages = tm_txt_lines.wages()
                     title = tm_txt_lines.title(n)
-                    pkl_dir = file.parent.parent / 'pkl'
-                    pkl_dir.mkdir(parents=True, exist_ok=True)
-                    pkl_fullpath = pkl_dir / (file.stem + '.pkl')
+
+                    pkl_fullpath = self.get_pkl_path(file.stem) #pkl_dir / (file.stem + '.pkl')
                     with pkl_fullpath.open('wb') as wf:
                         pickle.dump(txt_lines, wf)
                     insert_sql = f"INSERT INTO `{self.tbl_name}` VALUES ({app}, {date.day}, ?, ?, ?, ?)" 
@@ -536,6 +565,15 @@ class Main:
                         break
         self.conn.commit()
         return count
+
+    def get_pkl_path(self, stem: str):
+        """Get the path of the pkl file."""
+        pkl_dir = self.img_dir.parent / 'pkl'
+        pkl_dir.mkdir(parents=True, exist_ok=True)
+        return pkl_dir / (stem + '.pkl')
+    def get_replaced_stem_file(self, file: Path, new_stem: str):
+        """Replace the stem of the file with the new stem."""
+        return file.parent / (new_stem + file.suffix)
 
     def save_as_csv(self):
         #conn = sqlite3.connect(db_file, isolation_level=None, detect_types=sqlite3.PARSE_COLNAMES)
@@ -593,12 +631,12 @@ def edit_wages(month: int, app=AppType.T):
                     assert row[0] == wages
                     print(f"Wages of {day=} is Updated as {wages=} in table `{table=}`.")
                     feeder.conn.commit()
-def run_ocr(month: str, limit=62, app_type: AppType = AppType.NUL):
+def run_ocr(month: str, limit=62, app_type: AppType = AppType.NUL, test=False):
     """Run OCR and save result into DB."""
     m = int(month)
     my_ocr = MyOcr(month=m)
     main = Main(my_ocr=my_ocr, app=app_type)
-    main.ocr_result_into_db(limit=limit)    
+    main.ocr_result_into_db(limit=limit, test=test)
 
 import click
 @click.group()
