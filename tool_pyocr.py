@@ -141,6 +141,8 @@ class MyOcr:
                 raise MDateError(f"Could not resolve date! AppType.M txt_lines!:{txt_lines}")
             case AppType.T:
                 raise NotImplementedError("Not implemented yet!")
+            case _:
+                raise ValueError("Undefined AppType!")
     @classmethod
     @safe
     def get_date(cls, app_type: AppType, txt_lines: Sequence[LineBox]|str):
@@ -423,7 +425,13 @@ class Main:
                     txt_lines = value # result.unwrap()
                 case Failure(_):
                     raise ValueError(f"Failed to run OCR of {path_set}")
-            n, date = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
+            n_date = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
+            hrs = None
+            match len(n_date):
+                case 2:
+                    n, date = n_date
+                case 3:
+                    n, date, hrs = n_date
             existing_day_list = existing_day_dict[app_type] if (existing_day_dict and app_type in existing_day_dict) else None
             if existing_day_list:
                 if date.day in existing_day_list:
@@ -597,6 +605,29 @@ class Main:
                         break
         self.conn.commit()
         return count
+
+    def fix_day(self, old_day: int, new_day: int, app: int):
+        """Fix the day of the record in the DB."""
+        assert app in [v for v in AppType.__members__.values() if v != AppType.NUL], f"Invalid app type: {app}"
+        if old_day == new_day:
+            return
+        with closing(self.conn.cursor()) as cur:
+            backup_sql = f"SELECT wages, title, stem FROM `{self.tbl_name}` WHERE day = {old_day} AND app = {app}"
+            for old_one in cur.execute(backup_sql):
+                break
+            if not old_one:
+                logger.error("No record found for day {} and app {}.", old_day, app)
+                raise ValueError(f"No record found for day {old_day} and app {app}.")
+            assert old_one, f"No record found for day {old_day} and app {app}."
+            wages, title, stem = old_one[:]
+            delete_sql = f"DELETE FROM `{self.tbl_name}` WHERE day = {old_day} AND app = {app}"
+            cur.execute(delete_sql)
+            insert_sql = f"""INSERT INTO `{self.tbl_name}`
+                            (`day`, `app`, `wages`, `title`, `stem`, `txt_lines`)
+                 VALUES     ({new_day}, {app}, {wages}, {title}, {stem}, NULL)
+            """
+            cur.execute(delete_sql)
+            logger.info("Fixed day from {} to {} for app {}:keeping wages={}, title={}, stem={}", old_day, new_day, app, wages, title, stem)       
 
     def get_pkl_path(self, stem: str):
         """Get the path of the pkl file."""
