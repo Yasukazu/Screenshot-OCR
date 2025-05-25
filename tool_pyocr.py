@@ -519,8 +519,9 @@ class Main:
                     cur.execute(exists_sql)
                     if (one:= cur.fetchone()):
                         logger.info("Day {} of App {} already exists in DB: {}", date.day, app, one)
+                        old_app = int(one[1])
                         old_stem = one[2]
-                        if old_stem != file.stem:
+                        if old_app == app and old_stem != file.stem:
                             old_pkl_path = self.get_pkl_path(old_stem)
                             if old_pkl_path.exists():
                                 logger.warning("Old pkl file exists: {}", old_pkl_path)
@@ -531,13 +532,44 @@ class Main:
                                 old_file = self.get_replaced_stem_file(file, old_stem)
                                 if not old_file.exists():
                                     raise ValueError(f"Old file does not exist: {old_file}")
+                                image = Image.open(old_file)
+                                if not image:
+                                    logger.error("Failed to open old file: {}", old_file)
+                                    raise ValueError(f"Failed to open old file: {old_file}")
+                                box_img = image.crop(box_pos)
+                                box_result = self.my_ocr.run_ocr(path_set, lang='eng+jpn', builder_class=pyocr.builders.TextBuilder, layout=7, opt_img=box_img)
+                                match box_result:
+                                    case Success(value):
+                                        breakpoint()
+                                        logger.debug("date-part OCR result: {}", value)
+                                        no_spc_value = value.replace(' ', '')
+                                        mt = re.match(r"(\d+)月(\d+)日", no_spc_value)
+                                        if mt:
+                                            month, day = mt.groups()
+                                            box_date = Date(int(month), int(day))
+                                            assert box_date.month == date.month, f"Month from box image: {box_date.month} does not match: {date.month}"
+                                            if box_date.day != date.day:
+                                                logger.info("Date from box image: {} is different from DB ", box_date.day)
+                                                backup_sql = f"SELECT wages, title, stem FROM `{self.tbl_name}` WHERE day = {date.day} AND app = {app};"
+                                                cur.execute(backup_sql)
+                                                old_wages, old_stem, old_title = cur.fetchone()
+                                                replace_sql = f"UPDATE `{self.tbl_name}` SET stem = ?, wages = ?, title = ? WHERE day = {date.day} AND app = {app};"
+                                                cur.execute(replace_sql, (file.stem, wages, title))
+                                                logger.info("REPLACE: {}", (file.stem, wages, title))
+                                            else:
+                                                logger.error("Date from box image does not match: {}, expected: {}", box_date, date)
+                                                raise ValueError(f"Date from box image does not match: {box_date}, expected: {date}")
+                                            replace_sql = f"UPDATE `{self.tbl_name}` SET stem = ?, wages = ?, title = ? WHERE day = {date.day} AND app = {app};"
+                                        else:
+                                            logger.error("Failed to get date from value: {}", no_spc_value)
+                                            raise ValueError(f"Failed to get date from value: {no_spc_value}")
+                                        breakpoint()
+                                    case Failure(_):
+                                        logger.error("Failed to run OCR on box image: {}", box_pos)
+                                        raise ValueError(f"Failed to run OCR on box image: {box_pos}")
+
+
                                 if test:
-                                    breakpoint()
-                                    image = Image.open(old_file)
-                                    if not image:
-                                        logger.error("Failed to open old file: {}", old_file)
-                                        raise ValueError(f"Failed to open old file: {old_file}")
-                                    data_image = image.crop(box_pos)
                                     debug_dir = self.my_ocr.input_dir.parent / 'DEBUG'
                                     debug_dir.mkdir(exist_ok=True)
                                     debug_fullpath = debug_dir / (file.stem + f'({box_pos}).png') 
