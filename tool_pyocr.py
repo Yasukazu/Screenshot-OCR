@@ -651,6 +651,17 @@ class Main:
         assert output_path.exists()
         output_fullpath = output_path / (table + '.csv')
         db_df.to_csv(str(output_fullpath), index=False)
+    def check_DB_T(self, month: int):
+        """Check the DB for the given month of AppType.T"""
+        with closing(self.conn.cursor()) as cur:
+            app_type = AppType.T
+            stem_end_patt = APP_TYPE_TO_STEM_END[app_type]
+            glob_patt = "*" + stem_end_patt + '.png'
+            for file in self.my_ocr.input_dir.glob(glob_patt):
+                ocred_files = self.get_OCRed_files()
+                if ocred_files and file.stem in ocred_files:
+                    breakpoint()
+                    continue
 
 from contextlib import closing
 from pickle import load
@@ -676,7 +687,17 @@ def edit_title(month: int, day: int):
         feeder.conn.commit()
 def edit_wages(month: int, app=AppType.T):
     assert app != AppType.NUL
-    from path_feeder import DbPathFeeder
+    from path_def check_DB_T(month: int):
+    """Check the DB for the given month of AppType.T"""
+    my_ocr = MyOcr(month=month)
+    main = Main(my_ocr=my_ocr, app=AppType.T)
+    with closing(self.conn.cursor()) as cur:
+        for app_type in app_type_list:
+            stem_end_patt = APP_TYPE_TO_STEM_END[app_type]
+            glob_patt = "*" + stem_end_patt + '.png'
+            for file in self.my_ocr.input_dir.glob(glob_patt):
+                if file.stem in self.get_OCRed_files():
+                    continuefeeder import DbPathFeeder
     feeder = DbPathFeeder(month=month)
     with closing(feeder.conn.cursor()) as cur:
         sql = f"SELECT stem, day FROM 'text_lines-{month:02}' WHERE wages IS NULL"
@@ -698,6 +719,14 @@ def edit_wages(month: int, app=AppType.T):
                     assert row[0] == wages
                     print(f"Wages of {day=} is Updated as {wages=} in table `{table=}`.")
                     feeder.conn.commit()
+    
+
+def run_check_DB_T(month: int):
+    """Check the DB for the given month of AppType.T"""
+    my_ocr = MyOcr(month=month)
+    main = Main(my_ocr=my_ocr, app=AppType.T)
+    main.check_DB_T(month=month)
+
 def run_ocr(month: str, limit=62, app_type: AppType = AppType.NUL, test=False):
     """Run OCR and save result into DB."""
     m = int(month)
