@@ -331,7 +331,7 @@ class Main:
             if result:
                 return [r[0] for r in result][0]
     def get_OCRed_files(self):
-        qry = f"SELECT stem FROM `{self.tbl_name}` ORDER BY stem WHERE stem != NULL"
+        qry = f"SELECT stem FROM `{self.tbl_name}` WHERE stem IS NOT NULL ORDER BY stem"
         with closing(self.conn.cursor()) as cur:
             cur.execute(qry)
             all = cur.fetchall()
@@ -339,7 +339,7 @@ class Main:
                 return [a[0] for a in all]
     def get_having_stem(self):
         self.conn.row_factory = sqlite3.Row
-        qry = f"SELECT * FROM `{self.tbl_name}` ORDER BY stem WHERE stem != NULL"
+        qry = f"SELECT * FROM `{self.tbl_name}` WHERE stem IS NOT NULL ORDER BY stem"
         cur = self.conn.cursor()
         cur.execute(qry)
         self.conn.row_factory = None
@@ -671,14 +671,21 @@ class Main:
         if not pkl_file_dir.exists():
             logger.warning("pkl file directory does not exist: %s", pkl_file_dir)
             return
-
-        app_type = AppType.T
-        stem_end_patt = APP_TYPE_TO_STEM_END[app_type]
-        glob_patt = "*" + stem_end_patt + '.png'
-        for file in self.my_ocr.input_dir.glob(glob_patt):
-            if file.stem in ocred_file_db:
-                breakpoint()
-                continue
+        pkl_files = [f for f in pkl_file_dir.iterdir() if f.is_file()]
+        if not pkl_files:
+            logger.warning("No pkl files found in the directory: %s", pkl_file_dir)
+            return
+        pkl_files_set = set([f.stem for f in pkl_files])
+        ocred_file_db_set = set([f['stem'] for f in ocred_file_db])
+        if pkl_files_set != ocred_file_db_set:
+            logger.warning("pkl files and DB stem files do not match!")
+            breakpoint()
+            only_in_pkl_files = pkl_files_set - ocred_file_db_set
+            logger.info("Only in pkl files: {}", only_in_pkl_files)
+            only_in_DB_stem_files = ocred_file_db_set - pkl_files_set
+            if only_in_DB_stem_files:
+                logger.error("Only in DB stem files: {}", only_in_DB_stem_files)
+                raise ValueError(f"Pkl files missing!")
         
 
 from contextlib import closing
@@ -704,9 +711,8 @@ def edit_title(month: int, day: int):
             rr = list(cur.execute(sql, (title,)))
         feeder.conn.commit()
 def edit_wages(month: int, app=AppType.T):
-    assert app != AppType.NUL
-    from path_def check_DB_T(month: int):
     """Check the DB for the given month of AppType.T"""
+    assert app != AppType.NUL
     my_ocr = MyOcr(month=month)
     main = Main(my_ocr=my_ocr, app=AppType.T)
     with closing(self.conn.cursor()) as cur:
@@ -715,7 +721,7 @@ def edit_wages(month: int, app=AppType.T):
             glob_patt = "*" + stem_end_patt + '.png'
             for file in self.my_ocr.input_dir.glob(glob_patt):
                 if file.stem in self.get_OCRed_files():
-                    continuefeeder import DbPathFeeder
+                    continue
     feeder = DbPathFeeder(month=month)
     with closing(feeder.conn.cursor()) as cur:
         sql = f"SELECT stem, day FROM 'text_lines-{month:02}' WHERE wages IS NULL"
