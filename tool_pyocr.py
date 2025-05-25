@@ -8,7 +8,7 @@ from pprint import pp
 from pathlib import Path
 from dataclasses import dataclass
 import pickle
-
+import sqlite3
 from returns.result import safe, Result, Failure, Success
 import pandas
 from dotenv import load_dotenv
@@ -331,12 +331,21 @@ class Main:
             if result:
                 return [r[0] for r in result][0]
     def get_OCRed_files(self):
-        qry = f"SELECT stem from `{self.tbl_name}` order by stem;"
+        qry = f"SELECT stem FROM `{self.tbl_name}` ORDER BY stem WHERE stem != NULL"
         with closing(self.conn.cursor()) as cur:
             cur.execute(qry)
             all = cur.fetchall()
             if all:
                 return [a[0] for a in all]
+    def get_having_stem(self):
+        self.conn.row_factory = sqlite3.Row
+        qry = f"SELECT * FROM `{self.tbl_name}` ORDER BY stem WHERE stem != NULL"
+        cur = self.conn.cursor()
+        cur.execute(qry)
+        self.conn.row_factory = None
+        return cur.fetchall()
+    def get_having_pkl(self):
+        pass
 
     def get_existing_days(self, app_type=AppType.NUL)-> dict[AppType, list[int]] | list[int] | None:
         if not app_type.value:
@@ -437,7 +446,9 @@ class Main:
             else:
                 wages = self.my_ocr.get_wages(app_type=app_type, txt_lines=txt_lines)
                 title = self.my_ocr.get_title(app_type, txt_lines, n)
-                pkl_file_fullpath = self.img_dir / (stem + '.pkl')
+                pkl_file_dir = self.img_dir.parent / 'pkl'
+                pkl_file_dir.mkdir(parents=True, exist_ok=True)
+                pkl_file_fullpath = pkl_file_dir / (stem + '.pkl')
                 with pkl_file_fullpath.open('wb') as wf:
                     pkl = pickle.dump(txt_lines, wf)
                 with closing(self.conn.cursor()) as cur:
@@ -643,7 +654,6 @@ class Main:
         return file.parent / (new_stem + file.suffix)
 
     def save_as_csv(self):
-        #conn = sqlite3.connect(db_file, isolation_level=None, detect_types=sqlite3.PARSE_COLNAMES)
         table = f"text_lines-{self.my_ocr.date.month:02}"
         sql = f"SELECT * FROM `{table}`"
         db_df = pandas.read_sql_query(sql, self.conn)
@@ -653,15 +663,23 @@ class Main:
         db_df.to_csv(str(output_fullpath), index=False)
     def check_DB_T(self, month: int):
         """Check the DB for the given month of AppType.T"""
-        with closing(self.conn.cursor()) as cur:
-            app_type = AppType.T
-            stem_end_patt = APP_TYPE_TO_STEM_END[app_type]
-            glob_patt = "*" + stem_end_patt + '.png'
-            for file in self.my_ocr.input_dir.glob(glob_patt):
-                ocred_files = self.get_OCRed_files()
-                if ocred_files and file.stem in ocred_files:
-                    breakpoint()
-                    continue
+        ocred_file_db = self.get_having_stem()
+        if not ocred_file_db:
+            logger.info("No OCRed files found in the DB for month: %s", month)
+            return
+        pkl_file_dir = self.img_dir.parent / 'pkl'
+        if not pkl_file_dir.exists():
+            logger.warning("pkl file directory does not exist: %s", pkl_file_dir)
+            return
+
+        app_type = AppType.T
+        stem_end_patt = APP_TYPE_TO_STEM_END[app_type]
+        glob_patt = "*" + stem_end_patt + '.png'
+        for file in self.my_ocr.input_dir.glob(glob_patt):
+            if file.stem in ocred_file_db:
+                breakpoint()
+                continue
+        
 
 from contextlib import closing
 from pickle import load
