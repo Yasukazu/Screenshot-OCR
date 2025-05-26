@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+"""
+txt_lines_db.py
+This module provides functions to manage a SQLite database for storing text lines.
+"""
+from enum import Enum
 import os
 from contextlib import closing
 import sqlite3
@@ -15,25 +21,28 @@ def get_db_name():
     except KeyError:
         return 'txt_lines.sqlite'
 
-TABLE_NAME_FORMAT = "text_lines-{:02}"
-def get_table_name(month: int):
-    return TABLE_NAME_FORMAT.format(month)#:02}"
-    #return "text_lines-%02d" % month #:02}"
+class TableVersion(Enum):
+    TEXT_LINES = 0
+    PKL = 1
+TABLE_NAME_FORMATS = [f"{TableVersion(e).name.lower()}-{{:02}}" for e in range(len(TableVersion))]#"text_lines-{:02}", "pkl-{:02}"]
+def get_table_name(month: int, version=0) -> str:
+    return TABLE_NAME_FORMATS[version].format(month)
 
-CREATE_TABLE_SQL = "CREATE TABLE if not exists '{}' (`app` INTEGER, `day` INTEGER, `wages` INTEGER, `title` TEXT, `stem` TEXT, `txt_lines` BLOB, PRIMARY KEY (app, day))"
+CREATE_TABLE_SQL_LIST = ["CREATE TABLE if not exists '{}' (`app` INTEGER, `day` INTEGER, `wages` INTEGER, `title` TEXT, `stem` TEXT, `txt_lines` BLOB, PRIMARY KEY (app, day))",
+"CREATE TABLE if not exists '{}' (`app` INTEGER, `day` INTEGER, `wages` INTEGER, `title` TEXT, `stem` TEXT, `checksum` BLOB, PRIMARY KEY (stem, checksum))"]
 
-def sqlite_fullpath(dir=input_dir_root, year=YEAR, db_name=get_db_name()):
-    if not dir:
+def sqlite_fullpath(direc=input_dir_root, year=YEAR, db_name=get_db_name()):
+    if not direc:
         raise ValueError("input_dir_root is not set!")
     if not year:
         raise ValueError("YEAR is not set!")
-    db_fullpath = dir / year / db_name
+    db_fullpath = direc / year / db_name
     return db_fullpath  
 
-def create_tbl_if_not_exists(tbl_name: str, db_fullpath=sqlite_fullpath()):
+def create_tbl_if_not_exists(tbl_name: str, db_fullpath=sqlite_fullpath(), version=0):
     con = connect(db_fullpath=db_fullpath)
     with closing(con.cursor()) as cur:
-        cur.execute(CREATE_TABLE_SQL.format(tbl_name))
+        cur.execute(CREATE_TABLE_SQL_LIST[version].format(tbl_name))
     con.commit()
 
 _conn: list[sqlite3.Connection] = []

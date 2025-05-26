@@ -299,7 +299,7 @@ class MTxtLines(TTxtLines):
 
 class Main:
     import txt_lines_db
-    def __init__(self, app=AppType.NUL, db_fullpath=txt_lines_db.sqlite_fullpath(), my_ocr=MyOcr()):  
+    def __init__(self, app=AppType.NUL, db_fullpath=txt_lines_db.sqlite_fullpath(), my_ocr=MyOcr(), tbl_ver=0):  
         self.my_ocr = my_ocr
         #self.img_dir = self.my_ocr.input_dir
         #month = self.my_ocr.month
@@ -307,8 +307,8 @@ class Main:
         self.app = app # tm
         # txt_lines_db = TxtLinesDB(img_parent_dir=img_parent_dir)
         self.conn = Main.txt_lines_db.connect(db_fullpath=db_fullpath)
-        self.tbl_name = Main.txt_lines_db.get_table_name(self.my_ocr.date.month)
-        Main.txt_lines_db.create_tbl_if_not_exists(self.tbl_name)
+        self.tbl_name = Main.txt_lines_db.get_table_name(self.my_ocr.date.month, version=tbl_ver)
+        Main.txt_lines_db.create_tbl_if_not_exists(self.tbl_name, version=tbl_ver)
     
     @property
     def img_dir(self):
