@@ -662,7 +662,8 @@ class Main:
         assert output_path.exists()
         output_fullpath = output_path / (table + '.csv')
         db_df.to_csv(str(output_fullpath), index=False)
-    def check_DB_T(self, month: int):
+
+    def check_DB_T(self, month: int, day_check_only=False):
         """Check the DB for the given month of AppType.T"""
         ocred_file_db = self.get_having_stem()
         if not ocred_file_db:
@@ -680,7 +681,6 @@ class Main:
         ocred_file_db_set = set([f['stem'] for f in ocred_file_db])
         if pkl_files_set != ocred_file_db_set:
             logger.warning("pkl files and DB stem files do not match!")
-            breakpoint()
             only_in_pkl_files = pkl_files_set - ocred_file_db_set
             if only_in_pkl_files:
                 logger.info("Only in pkl files: {}", only_in_pkl_files)
@@ -700,9 +700,8 @@ class Main:
                 continue
             with closing(self.conn.cursor()) as cur:
                 sql = f"SELECT stem, day FROM `{self.tbl_name}` WHERE app = {AppType.T.value}"
-                cur.execute(sql)
-                row = cur.fetchone()
-                if row:
+                for row in cur.execute(sql):
+                    breakpoint()
                     db_stem = row[0]
                     db_day = row[1]
                     if db_stem:
@@ -718,7 +717,6 @@ class Main:
                         if n >= len(txt_lines) - 1:
                             logger.warning("No date found in txt_lines for stem: %s", stem)
                             continue
-                        breakpoint()
                         date_position = txt_lines[n + 1].position
                         date_position = date_position[0] + date_position[1]
                         img_fullpath = self.img_dir / (stem + '.png') 
@@ -726,7 +724,7 @@ class Main:
                             date_image = Image.open(img_fullpath).crop(date_position)
                             date_image_dir = self.img_dir.parent / 'DEBUG'
                             date_image_dir.mkdir(parents=True, exist_ok=True)
-                            date_image_fullpath = date_image_dir / (stem + '-date.png')
+                            date_image_fullpath = date_image_dir / f'{stem}-{db_day:02}.png'
                             date_image.save(date_image_fullpath, format='PNG')
                             logger.info("Saved date image: {}", date_image_fullpath)
                             result = self.my_ocr.run_ocr(path_set=date_image_fullpath, lang='eng+jpn', builder_class=pyocr.builders.TextBuilder, layout=7)
@@ -744,15 +742,18 @@ class Main:
                                                 self.fix_day(old_day=db_day, new_day=date.day, app=AppType.T.value)
                                                 logger.info("Replaced DB day {} with OCRed date {}", db_day, date.day)
                                     else:
-                                        logger.error("Failed to get date from value: {}", no_spc_value)
-                                        raise ValueError(f"Failed to get date from value: {no_spc_value}")
+                                        logger.error("Failed to get date of day {} from value: {}", db_day, no_spc_value)
+                                        if day_check_only:
+                                            logger.error("Day check only, skipping the fix.")
+                                            print(db_day)
+                                            brakpoint()
+                                            continue
+                                        else:
+                                            raise ValueError(f"Failed to get date of day {db_day} from value: {no_spc_value}")
                                         # TODO: check all date positions
                         else:
-                            logger.warning("Image file does not exist: {}", img_fullpath)
-                            continue
-
-
-        
+                            logger.error("Image file does not exist: {}", img_fullpath)
+                            raise ValueError(f"Image file does not exist: {img_fullpath}")
 
 from contextlib import closing
 from pickle import load
@@ -811,11 +812,11 @@ def edit_wages(month: int, app=AppType.T):
                     feeder.conn.commit()
     
 
-def run_check_DB_T(month: int):
+def run_check_DB_T(month: int, day_check_only=False):
     """Check the DB for the given month of AppType.T"""
     my_ocr = MyOcr(month=month)
     main = Main(my_ocr=my_ocr, app=AppType.T)
-    main.check_DB_T(month=month)
+    main.check_DB_T(month=month, day_check_only=day_check_only)
 
 def run_ocr(month: str, limit=62, app_type: AppType = AppType.NUL, test=False):
     """Run OCR and save result into DB."""
