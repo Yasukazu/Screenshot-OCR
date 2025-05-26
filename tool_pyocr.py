@@ -11,6 +11,7 @@ import pickle
 import sqlite3
 from returns.result import safe, Result, Failure, Success
 import pandas
+from ipdb import set_trace as breakpoint
 from dotenv import load_dotenv
 load_dotenv()
 from PIL import Image, ImageDraw, ImageEnhance
@@ -44,7 +45,7 @@ def get_date_split(line_box: pyocr.builders.LineBox)-> Union[Date, None]:
 
 DATE_PATT = re.compile(r"(\d+)月(\d+)日")
 @safe
-def get_date(line_box: pyocr.builders.LineBox)-> Union[Date, None]:
+def get_date_T_LineBox(line_box: pyocr.builders.LineBox)-> Union[Date, None]:
     content = line_box.content.replace(' ', '')
     result = DATE_PATT.search(content)
     if result:
@@ -172,7 +173,7 @@ class MyOcr:
                     content = txt_line.content.replace(' ', '') if isinstance(txt_line, LineBox) else txt_line
                     if '業務開始' in content:
                         break
-                result = get_date(txt_lines[n + 1]) # next line
+                result = get_date_T_LineBox(txt_lines[n + 1]) # next line
                 match(result):
                     case Success(date):
                         return n, date
@@ -213,7 +214,7 @@ class MyOcr:
         )
         if isinstance(txt_lines, list) and txt_lines:
             self.txt_lines = txt_lines
-            logger.info("OCR result: %d lines", len(txt_lines))
+            logger.info("OCR result: {} lines", len(txt_lines))
         elif isinstance(txt_lines, str) and txt_lines:
             logger.info("OCR result: {}", txt_lines)
         else:
@@ -516,7 +517,7 @@ class Main:
                             case Success(value):
                                 n, date = value # result.unwrap()
                             case Failure(_): # if not is_successful(result): # type: ignore
-                                logger.info("Failed to get date from {} in lang=jpn+eng, try to run_ocr in lang=jpn..", file)
+                                logger.info("Failed to get date from {} in lang=jpn+eng, try to run_ocr in lang=eng", file)
                                 e_result = self.my_ocr.run_ocr(path_set, lang='eng',)
                                 match e_result:
                                     case Success(value):
@@ -681,11 +682,76 @@ class Main:
             logger.warning("pkl files and DB stem files do not match!")
             breakpoint()
             only_in_pkl_files = pkl_files_set - ocred_file_db_set
-            logger.info("Only in pkl files: {}", only_in_pkl_files)
+            if only_in_pkl_files:
+                logger.info("Only in pkl files: {}", only_in_pkl_files)
             only_in_DB_stem_files = ocred_file_db_set - pkl_files_set
             if only_in_DB_stem_files:
-                logger.error("Only in DB stem files: {}", only_in_DB_stem_files)
-                raise ValueError(f"Pkl files missing!")
+                logger.info("Only in DB stem files: {}", only_in_DB_stem_files)
+        ocred_stems = sorted(ocred_file_db_set - only_in_pkl_files)
+        for stem in ocred_stems:
+            pkl_fullpath = pkl_file_dir / (stem + '.pkl')
+            if not pkl_fullpath.exists():
+                logger.warning("pkl file does not exist: %s", pkl_fullpath)
+                continue
+            with pkl_fullpath.open('rb') as rf:
+                txt_lines = pickle.load(rf)
+            if not txt_lines:
+                logger.warning("txt_lines is empty for stem: %s", stem)
+                continue
+            with closing(self.conn.cursor()) as cur:
+                sql = f"SELECT stem, day FROM `{self.tbl_name}` WHERE app = {AppType.T.value}"
+                cur.execute(sql)
+                row = cur.fetchone()
+                if row:
+                    db_stem = row[0]
+                    db_day = row[1]
+                    if db_stem:
+                        db_pkl_fullpath = pkl_file_dir / (db_stem + '.pkl')
+                        if not db_pkl_fullpath.exists():
+                            logger.warning("DB pkl file does not exist: %s", db_pkl_fullpath)
+                            continue
+                        txt_lines = pickle.load(db_pkl_fullpath.open('rb'))
+                        self.my_ocr.txt_lines = txt_lines
+                        for n, txt_line in enumerate(txt_lines):
+                            if txt_line.content.replace(' ', '').startswith('業務開始'):
+                                break
+                        if n >= len(txt_lines) - 1:
+                            logger.warning("No date found in txt_lines for stem: %s", stem)
+                            continue
+                        breakpoint()
+                        date_position = txt_lines[n + 1].position
+                        date_position = date_position[0] + date_position[1]
+                        img_fullpath = self.img_dir / (stem + '.png') 
+                        if img_fullpath.exists():
+                            date_image = Image.open(img_fullpath).crop(date_position)
+                            date_image_dir = self.img_dir.parent / 'DEBUG'
+                            date_image_dir.mkdir(parents=True, exist_ok=True)
+                            date_image_fullpath = date_image_dir / (stem + '-date.png')
+                            date_image.save(date_image_fullpath, format='PNG')
+                            logger.info("Saved date image: {}", date_image_fullpath)
+                            result = self.my_ocr.run_ocr(path_set=date_image_fullpath, lang='eng+jpn', builder_class=pyocr.builders.TextBuilder, layout=7)
+                            match result:
+                                case Success(value):
+                                    no_spc_value = value.replace(' ', '')
+                                    mt = re.match(r"(\d+)月(\d+)日", no_spc_value)
+                                    if mt and len(mt.groups()) == 2:
+                                        month, day = mt.groups()
+                                        date = Date(int(month), int(day))
+                                        if date.day != db_day:
+                                            logger.warning("Date from OCRed image: {} does not match DB day: {}", date, db_day)
+                                            yn = input(f"Replace DB day {db_day} with OCRed date {date.day}? (y/n): ")
+                                            if yn.lower() == 'y':
+                                                self.fix_day(old_day=db_day, new_day=date.day, app=AppType.T.value)
+                                                logger.info("Replaced DB day {} with OCRed date {}", db_day, date.day)
+                                    else:
+                                        logger.error("Failed to get date from value: {}", no_spc_value)
+                                        raise ValueError(f"Failed to get date from value: {no_spc_value}")
+                                        # TODO: check all date positions
+                        else:
+                            logger.warning("Image file does not exist: {}", img_fullpath)
+                            continue
+
+
         
 
 from contextlib import closing
