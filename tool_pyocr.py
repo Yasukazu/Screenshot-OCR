@@ -29,28 +29,28 @@ logger.add(sys.stdout, level="WARNING")
 logger.add("ERROR.log", level="ERROR")
 from app_type import AppType
 @dataclass
-class Date:
+class MonthDay:
     month: int
     day: int
     @property
     def as_float(self):
         return float(f"{self.month}.{self.day:02}")
 
-def get_date_split(line_box: pyocr.builders.LineBox)-> Union[Date, None]:
+def get_date_split(line_box: pyocr.builders.LineBox)-> Union[MonthDay, None]:
     content = line_box.content.split()
     if len(content) > 3:
         if (content[1] == '月') and (content[3] == '日'):
         #raise ValueError("Not 月日!")
-            return Date(month=int(content[0]), day=int(content[2]))
+            return MonthDay(month=int(content[0]), day=int(content[2]))
 
 DATE_PATT = re.compile(r"(\d+)月(\d+)日")
 @safe
-def get_date_T_LineBox(line_box: pyocr.builders.LineBox)-> Union[Date, None]:
+def get_date_T_LineBox(line_box: pyocr.builders.LineBox)-> Union[MonthDay, None]:
     content = line_box.content.replace(' ', '')
     result = DATE_PATT.search(content)
     if result:
         month, day = result.groups()
-        return Date(month=int(month), day=int(day)) 
+        return MonthDay(month=int(month), day=int(day)) 
 
 '''def next_gyoumu(txt_lines: Sequence[pyocr.builders.LineBox]):
     lines_len = len(txt_lines)
@@ -65,13 +65,13 @@ from collections import namedtuple
 from dataclasses import dataclass
 @dataclass
 class PathSet:
-    path: Path
+    parent: Path
     stem: str
     ext: str
     def stem_without_delim(self, delim: str=''):
         return ''.join([s for s in self.stem if s!= delim])
     def exists(self):
-        return (self.path / (self.stem_without_delim('') + self.ext)).exists()
+        return (self.parent / (self.stem_without_delim('') + self.ext)).exists()
 
 APP_TYPE_TO_STEM_END = MappingProxyType({
     AppType.T: ".co.taimee",
@@ -135,7 +135,7 @@ class MyOcr:
         re.compile(r"(\d+?)/(\d+?)"),
         re.compile(r"時\s*間$")]
     @classmethod
-    def check_date(cls, app_type: AppType, txt_lines: Sequence[LineBox|str])->tuple[int, Date|None,Sequence[str]]:
+    def check_date(cls, app_type: AppType, txt_lines: Sequence[LineBox|str])->tuple[int, MonthDay|None,Sequence[str]]:
         match app_type:
             case AppType.M:
                 for n in range(len(txt_lines)):
@@ -145,7 +145,7 @@ class MyOcr:
                         m_d = MyOcr.M_DATE_PATT[1].match(cntnt)
                         if m_d:
                             grps = m_d.groups()
-                            date = Date(int(grps[0]), int(grps[1]))
+                            date = MonthDay(int(grps[0]), int(grps[1]))
                             return n, date, hours
                         else:
                             return n, None, hours
@@ -165,7 +165,7 @@ class MyOcr:
                         m_d = MyOcr.M_DATE_PATT[1].match(cntnt)
                         if m_d:
                             grps = m_d.groups()
-                            date = Date(int(grps[1]), int(grps[2]))
+                            date = MonthDay(int(grps[1]), int(grps[2]))
                             return n, date, hours
                         else:
                             raise MDateError(f"Could not find month and day: AppType.M txt_lines!: {txt_lines}")
@@ -203,7 +203,7 @@ class MyOcr:
     def run_ocr(self, path_set: Path | PathSet, lang='eng+jpn', delim='',
                 builder_class=pyocr.builders.LineBoxBuilder, layout=3, opt_img: Image.Image|None=None)-> Sequence[pyocr.builders.LineBox]|str:#, Exception]: # Digit
         #stem_without_delim = ''.join([s for s in path_set[1] if s!= self.delim])
-        fullpath = path_set if isinstance(path_set, Path) else path_set.path / (path_set.stem_without_delim(delim) + path_set.ext)
+        fullpath = path_set if isinstance(path_set, Path) else path_set.parent / (path_set.stem_without_delim(delim) + path_set.ext)
         if not opt_img:
             img = Image.open(fullpath).convert('L')
             enhancer= ImageEnhance.Contrast(img)
@@ -461,7 +461,7 @@ class Main:
                 self.conn.commit()
                 ocr_done.append((app_type, date))
         return ocr_done
-    def add_image_file_without_content_into_db(self, app_type: AppType, stem: str, date: Date, wages=None, title=None, pkl=None):
+    def add_image_file_without_content_into_db(self, app_type: AppType, stem: str, date: MonthDay, wages=None, title=None, pkl=None):
         with closing(self.conn.cursor()) as cur:
             cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app_type.value, date.day, wages, title, stem, pkl))
         self.conn.commit()
@@ -565,7 +565,7 @@ class Main:
                                         mt = re.match(r"(\d+)月(\d+)日", no_spc_value)
                                         if mt:
                                             month, day = mt.groups()
-                                            box_date = Date(int(month), int(day))
+                                            box_date = MonthDay(int(month), int(day))
                                             assert box_date.month == date.month, f"Month from box image: {box_date.month} does not match: {date.month}"
                                             if box_date.day != date.day:
                                                 logger.info("Date from box image: {} is different from DB ", box_date.day)
@@ -803,7 +803,7 @@ class Main:
                                 mt = re.match(r"(\d+)月(\d+)日", no_spc_value)
                                 if mt and len(mt.groups()) == 2:
                                     month, day = mt.groups()
-                                    date = Date(int(month), int(day))
+                                    date = MonthDay(int(month), int(day))
                                     if date.day != db_day:
                                         logger.warning("Date from OCRed image: {} does not match DB day: {}", date, db_day)
                                         if day_check_only:

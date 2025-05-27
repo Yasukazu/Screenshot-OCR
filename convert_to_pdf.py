@@ -26,7 +26,7 @@ def convert_to_pdf(output_fullpath: Path, stems: Sequence[str], layout=PdfLayout
 		if buff:
 			f.write(buff)
 
-from tool_pyocr import Main, Date
+from tool_pyocr import Main, MonthDay
 from path_feeder import input_dir_root
 from app_type import AppType
 def conv_to_pdf(app: AppType, main: Main):
@@ -48,7 +48,7 @@ class MdPage(UserList):
 	date_patt = re.compile(r"(\d+)\s*月\s*(\d+)\s*日")
 	def __init__(self):#, lst: list[list[str]]):
 		super().__init__()
-		self._date: Date | None = None
+		self._date: MonthDay | None = None
 
 	def get_block(self, block: int):
 		return self.data[block]
@@ -65,7 +65,7 @@ class MdPage(UserList):
 			for line in block:
 				mt = MdPage.date_patt.search(line)
 				if mt:
-					self._date = Date(int(mt[1]), int(mt[2]))
+					self._date = MonthDay(int(mt[1]), int(mt[2]))
 					return self._date
 		raise ValueError('No date block!')
 
@@ -88,13 +88,13 @@ class MMdPage(MdPage):
 			for line in block:
 				mt = MMdPage.date_patt.search(line)
 				if mt:
-					self._date = Date(int(mt[1]), int(mt[2]))
+					self._date = MonthDay(int(mt[1]), int(mt[2]))
 					return self._date
 		raise ValueError('No date block!')
 
 def update_title_in_db_as_md(md: MdPage, main: Main, day: int):
 	dt = md.date
-	db_date = Date(main.month, day)
+	db_date = MonthDay(main.month, day)
 	if dt != db_date:
 		raise ValueError(f'Mismatch md date:{dt} with db:{db_date}!')
 	title = md.title
@@ -181,7 +181,7 @@ def get_day_from_page(page: Sequence[Sequence[str]]):
 		for line in block:
 			mt = date_patt.search(line)
 			if mt:
-				return Date(int(mt[1]), int(mt[2]))
+				return MonthDay(int(mt[1]), int(mt[2]))
 
 def get_wages_from_page(page: Sequence[Sequence[str]]):
 	for block in page:

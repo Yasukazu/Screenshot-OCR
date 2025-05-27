@@ -157,7 +157,7 @@ from path_feeder import DbPathFeeder
 def draw_onto_pages(div=64, th=H_PAD // 2,
     path_feeder: PathFeeder=DbPathFeeder(),
     v_pad=16, h_pad=8, mode='L', dst_bg=ImageFill.BLACK, app_type=AppType.T)-> Iterator[Image.Image]:
-    from tool_pyocr import Date
+    from tool_pyocr import MonthDay
     first_fullpath = path_feeder.first_fullpath
     if not first_fullpath:
         raise ValueError(f"No '{path_feeder.ext}' file in {path_feeder.dir}!")
@@ -222,7 +222,7 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
     img_size = Image.open(str(path_feeder.first_fullpath)).size
     def concat_h(day_stem_list: list[tuple[int, str]], pad=h_pad)-> Image.Image:
         imim_len = len(day_stem_list)
-        imim = [get_numbered_img(s, number=Date(month, d).as_float) for d, s in day_stem_list]
+        imim = [get_numbered_img(s, number=MonthDay(month, d).as_float) for d, s in day_stem_list]
         max_height = img_size[1]
         im_width = img_size[0]
         width_sum = imim_len * img_size[0]
