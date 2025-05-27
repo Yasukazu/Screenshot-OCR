@@ -72,6 +72,9 @@ class PathSet:
         return ''.join([s for s in self.stem if s!= delim])
     def exists(self):
         return (self.parent / (self.stem_without_delim('') + self.ext)).exists()
+    def open(self):
+        return (self.parent / (self.stem_without_delim('') + self.ext)).open()
+
 
 APP_TYPE_TO_STEM_END = MappingProxyType({
     AppType.T: ".co.taimee",
@@ -135,7 +138,7 @@ class MyOcr:
                 raise ValueError("Undefined AppType!")
 
     M_DATE_PATT = [re.compile(r"(\d\d:\d\d)"),
-        re.compile(r"(\d+?)/(\d+?)"),
+        re.compile(r"(\d+)/(\d+)"),
         re.compile(r"時\s*間$")]
     @classmethod
     def check_date(cls, app_type: AppType, txt_lines: Sequence[LineBox|str])->tuple[int, MonthDay|None,Sequence[str]]:
@@ -295,7 +298,7 @@ class TTxtLines:
         return self.txt_lines[1].content.replace(' ', '')
     def wages(self):
         return MyOcr.t_wages(self.txt_lines)
-    def get_date(self, img_pathset: PathSet, my_ocr: MyOcr) -> MonthDay:
+    def get_date(self, img_pathset: PathSet, my_ocr: MyOcr) -> tuple[int, MonthDay]:
 
         for n, txt_line in enumerate(self.txt_lines):
             if txt_line.content.replace(' ', '').startswith('業務開始'):
@@ -322,7 +325,7 @@ class TTxtLines:
                 if mt and len(mt.groups()) == 2:
                     month, day = mt.groups()
                     date = MonthDay(int(month), int(day))
-                    return date
+                    return 0, date
                 raise ValueError(f"No match string of date!")
             case Failure(_):
                 logger.error("No date found in txt_lines for stem: {}", img_pathset.stem)
@@ -330,10 +333,46 @@ class TTxtLines:
 
 
 class MTxtLines(TTxtLines):
+
     def title(self, n: int):
-        return ''.join([self.txt_lines[i].content.replace(' ', '') for i in range(n - 3, n - 1)])
+        return ':'.join([self.txt_lines[i].content.replace(' ', '') for i in range(n - 3, n - 1)])
+
     def wages(self):
         return MyOcr.m_wages(self.txt_lines)
+
+    def get_date(self, img_pathset: PathSet, my_ocr: MyOcr) -> tuple[int, MonthDay]:
+        n, date, hrs = my_ocr.check_date(app_type=AppType.M, txt_lines=self.txt_lines)
+        if date:
+            return n, date
+        else: # Retry cropping the image..
+            box_pos = [*self.txt_lines[n].position]
+            box_pos = list(box_pos[0] + box_pos[1])
+            box_pos[0] += box_pos[3] - box_pos[1] # remove leading emoji that is about the same width of the box height
+            image = Image.open(img_pathset.parent / (img_pathset.stem + img_pathset.ext))
+            if not image:
+                logger.error("Failed to open image: {}", img_pathset)
+                raise ValueError(f"Failed to open image: {img_pathset}")
+            box_img = image.crop(tuple(box_pos))
+            if not box_img:
+                logger.error("Failed to crop box image: {}", box_pos)
+                raise ValueError(f"Failed to crop box image: {box_pos}")
+            tmp_img_dir = img_pathset.parent.parent / 'TMP'
+            tmp_img_dir.mkdir(parents=True, exist_ok=True)
+            box_img_fullpath = tmp_img_dir / f'{img_pathset.stem}.box.png'
+            box_img.save(box_img_fullpath, format='PNG')
+            logger.info("Saved box image: {}", box_img_fullpath)    
+            box_result = my_ocr.run_ocr(box_img_fullpath, lang='jpn', builder_class=pyocr.builders.TextBuilder, layout=7, opt_img=box_img)
+            match box_result:
+                case Success(value):
+                    _n, date, hrs = my_ocr.check_date(app_type=AppType.M, txt_lines=[value]) # len(txt_lines) == 1
+                    if date is None:
+                        logger.error("Failed to get date from box image: {}", box_pos)
+                        raise ValueError(f"Failed to get date from box image: {box_pos}")
+                    logger.info("Date by run_ocr with TextBuilder and cropped image: {}", date)
+                    return n, date
+                case Failure(_):
+                    logger.error("Failed to run OCR on box image: {}", box_pos)
+                    raise ValueError(f"Failed to run OCR on box image: {box_pos}")
 
 class Main:
     import txt_lines_db
@@ -530,24 +569,24 @@ class Main:
                             raise ValueError("Failed to run OCR!", path_set)
                     match(app_type):
                         case AppType.M:
-                            raise NotImplementedError("Not implemented yet!")
+                            ttxt_lines = MTxtLines(txt_lines)
                         case AppType.T:
                             ttxt_lines = TTxtLines(txt_lines)
-                            date = ttxt_lines.get_date(path_set, self.my_ocr)
-                            if date.month != self.month:
-                                raise ValueError(f"{date.month=} != {self.month=} in {path_set}")
-                            wages = ttxt_lines.wages()
-                            title = ttxt_lines.title()
-                            sql = f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?, ?)"
-                            pkl = pickle.dumps(txt_lines)
-                            from checksum import calculate_checksum
-                            chksum = calculate_checksum(file)
-                            prm = (app_type.value, date.day, wages, title, file.stem, pkl, chksum)
-                            cur.execute(sql, prm)
-                            self.conn.commit()
-                            logger.info("Saved into DB:  app:{}, day:{}, wages:{}, title:{}, stem:{}", *prm[:-3])
                         case _:
                             raise NotImplementedError(f"Undefined AppType: {app_type}!")
+                    n, date = ttxt_lines.get_date(path_set, self.my_ocr)
+                    if date.month != self.month:
+                        raise ValueError(f"{date.month=} != {self.month=} in {path_set}")
+                    wages = ttxt_lines.wages()
+                    title = ttxt_lines.title(n)
+                    sql = f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?, ?)"
+                    pkl = pickle.dumps(txt_lines)
+                    from checksum import calculate_checksum
+                    chksum = calculate_checksum(file)
+                    prm = (app_type.value, date.day, wages, title, file.stem, pkl, chksum)
+                    cur.execute(sql, prm)
+                    self.conn.commit()
+                    logger.info("Saved into DB:  app:{}, day:{}, wages:{}, title:{}, stem:{}", *prm[:-3])
                             
 
 
