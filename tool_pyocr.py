@@ -529,8 +529,19 @@ class Main:
                             raise NotImplementedError("Not implemented yet!")
                         case AppType.T:
                             ttxt_lines = TTxtLines(txt_lines)
-                            date = ttxt_lines.get_date(path_set, self.my_ocr)   
-                            breakpoint() # TODO: get wages then save to DB
+                            date = ttxt_lines.get_date(path_set, self.my_ocr)
+                            if date.month != self.month:
+                                raise ValueError(f"{date.month=} != {self.month=} in {path_set}")
+                            wages = ttxt_lines.wages()
+                            title = ttxt_lines.title()
+                            sql = "INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?, ?)"
+                            pkl = pickle.dumps(txt_lines)
+                            from checksum import calculate_checksum
+                            chksum = calculate_checksum(file)
+                            breakpoint() # TODO: check DB param
+                            prm = (app_type.value, date.day, wages, title, file.stem, pkl, chksum)
+                            cur.execute(sql, prm)
+                            self.conn.commit()
 
 
     def ocr_result_into_db0(self, app_type_list: list[AppType]|None=None, limit=62, test=False):
@@ -732,7 +743,7 @@ class Main:
         output_fullpath = output_path / (table + '.csv')
         db_df.to_csv(str(output_fullpath), index=False)
 
-    def check_DB_T(self, month: int, day_check_only=False):
+    def check_DB_T0(self, month: int, day_check_only=False):
         """Check the DB for the given month of AppType.T"""
         ocred_file_db = self.get_having_stem()
         if not ocred_file_db:
