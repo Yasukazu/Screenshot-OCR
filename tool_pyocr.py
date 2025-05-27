@@ -11,7 +11,7 @@ import pickle
 import sqlite3
 from returns.result import safe, Result, Failure, Success
 import pandas
-from ipdb import set_trace as breakpoint
+#from ipdb import set_trace as breakpoint
 from dotenv import load_dotenv
 load_dotenv()
 from PIL import Image, ImageDraw, ImageEnhance
@@ -292,6 +292,38 @@ class TTxtLines:
         return self.txt_lines[1].content.replace(' ', '')
     def wages(self):
         return MyOcr.t_wages(self.txt_lines)
+    def get_date(self, img_pathset: PathSet, my_ocr: MyOcr) -> MonthDay:
+
+        for n, txt_line in enumerate(self.txt_lines):
+            if txt_line.content.replace(' ', '').startswith('業務開始'):
+                break
+        if n >= len(self.txt_lines) - 1:
+            logger.error("No date found in txt_lines for stem: {}", img_pathset.stem)
+            raise ValueError(f"No date found in txt_lines for stem: {img_pathset.stem}")
+        date_position = self.txt_lines[n + 1].position
+        date_position = date_position[0] + date_position[1]
+
+        img_path = img_pathset.parent / (img_pathset.stem + img_pathset.ext)
+        date_image = Image.open(str(img_path)).crop(date_position)
+
+        date_image_dir = img_pathset.parent.parent / 'TMP'
+        date_image_dir.mkdir(parents=True, exist_ok=True)
+        date_image_fullpath = date_image_dir / f'{img_pathset.stem}.date.png'
+        date_image.save(date_image_fullpath, format='PNG')
+        logger.info("Saved date image: {}", date_image_fullpath)
+        result = my_ocr.run_ocr(path_set=date_image_fullpath, lang='eng+jpn', builder_class=pyocr.builders.TextBuilder, layout=7)
+        match result:
+            case Success(value):
+                no_spc_value = value.replace(' ', '')
+                mt = re.match(r"(\d+)月(\d+)日", no_spc_value)
+                if mt and len(mt.groups()) == 2:
+                    month, day = mt.groups()
+                    date = MonthDay(int(month), int(day))
+                    return date
+            case Failure(_):
+                logger.error("No date found in txt_lines for stem: {}", img_pathset.stem)
+                raise ValueError(f"No date found in txt_lines for stem: {img_pathset.stem}")
+
 
 class MTxtLines(TTxtLines):
     def title(self, n: int):
@@ -302,7 +334,7 @@ class MTxtLines(TTxtLines):
 class Main:
     import txt_lines_db
     def __init__(self, app=AppType.NUL, db_fullpath=txt_lines_db.sqlite_fullpath(), my_ocr=MyOcr(), tbl_ver=0):  
-        breakpoint()
+
         self.my_ocr = my_ocr
         self.app = app
         self.conn = Main.txt_lines_db.connect(db_fullpath=db_fullpath)
@@ -481,8 +513,9 @@ class Main:
                 stem_end_patt = APP_TYPE_TO_STEM_END[app_type]
                 glob_patt = "*" + stem_end_patt + '.png'
                 for file in self.my_ocr.input_dir.glob(glob_patt):
-                    if file.stem in self.get_OCRed_files():
-                        continue
+                    if (ocred_files:=self.get_OCRed_files()):
+                        if file.stem in ocred_files:
+                            continue
                     app = app_type.value
                     path_set = PathSet(self.my_ocr.input_dir, file.stem, ext=self.my_ocr.input_ext)
                     result = self.my_ocr.run_ocr(path_set)
@@ -496,8 +529,8 @@ class Main:
                             raise NotImplementedError("Not implemented yet!")
                         case AppType.T:
                             ttxt_lines = TTxtLines(txt_lines)
-                            date = ttxt_lines.get_date()   
-                            breakpoint()
+                            date = ttxt_lines.get_date(path_set, self.my_ocr)   
+                            breakpoint() # TODO: get wages then save to DB
 
 
     def ocr_result_into_db0(self, app_type_list: list[AppType]|None=None, limit=62, test=False):
@@ -924,11 +957,11 @@ def run_check_DB_T(month: int, day_check_only=False):
     main = Main(my_ocr=my_ocr, app=AppType.T)
     main.check_DB_T(month=month, day_check_only=day_check_only)
 
-def run_ocr(month: str, limit=62, app_type: AppType = AppType.NUL, test=False, tbl_ver=1):
+def run_ocr(month: int, limit=62, app_type: AppType = AppType.NUL, test=False, tbl_ver=1):
     """Run OCR and save result into DB."""
-    m = int(month)
-    my_ocr = MyOcr(month=m)
+    my_ocr = MyOcr(month=month)
     main = Main(my_ocr=my_ocr, app=app_type, tbl_ver=tbl_ver)
+
     main.ocr_result_into_db(limit=limit, test=test)
 
 import click
@@ -964,6 +997,4 @@ def run_main(options: Sequence[FunctionItem]):#=get_options(int(input("Month?:")
     if choice:
         options[choice].exec()
 if __name__ == '__main__':
-    import sys
-    cli()
-    sys.exit(0)
+    run_ocr(5)
