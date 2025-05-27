@@ -781,10 +781,10 @@ class Main:
         return file.parent / (new_stem + file.suffix)
 
     def save_as_csv(self):
-        table = f"text_lines-{self.my_ocr.date.month:02}"
-        sql = f"SELECT * FROM `{table}`"
+        """Save the DB to a CSV file."""
+        sql = f"SELECT app, day, wages, title, stem FROM `{self.tbl_name}`"
         db_df = pandas.read_sql_query(sql, self.conn)
-        output_path = self.img_dir# / str(self.my_ocr.date.year) / f"{self.my_ocr.date.month:02}"
+        output_path = self.img_dir.par
         assert output_path.exists()
         output_fullpath = output_path / (table + '.csv')
         db_df.to_csv(str(output_fullpath), index=False)
