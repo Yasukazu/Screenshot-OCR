@@ -17,20 +17,6 @@ load_dotenv()
 from PIL import Image, ImageDraw, ImageEnhance
 import pyocr
 import pyocr.builders
-'''['BaseBuilder',
- 'Box',
- 'DigitBuilder',
- 'DigitLineBoxBuilder',
- 'HTMLParser',
- 'LineBox',
- 'LineBoxBuilder',
- 'TextBuilder',
- 'WordBoxBuilder','''
-''' TextBuilder            ：　文字列を認識
-    WordBoxBuilder      ：　単語単位で文字認識 + BoundingBox
-    LineBoxBuilder       ：　行単位で文字認識 + BoundingBox
-    DigitBuilder            ：　数字 / 記号を認識
-    DigitLineBoxBuilder ：　数字 / 記号を認識 + BoundingBox'''
 from pyocr.builders import LineBoxBuilder, TextBuilder, DigitLineBoxBuilder, DigitBuilder, LineBox, Box, WordBoxBuilder
 from returns.pipeline import is_successful, UnwrapFailedError
 import loguru # logging

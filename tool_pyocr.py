@@ -302,12 +302,9 @@ class MTxtLines(TTxtLines):
 class Main:
     import txt_lines_db
     def __init__(self, app=AppType.NUL, db_fullpath=txt_lines_db.sqlite_fullpath(), my_ocr=MyOcr(), tbl_ver=0):  
+        breakpoint()
         self.my_ocr = my_ocr
-        #self.img_dir = self.my_ocr.input_dir
-        #month = self.my_ocr.month
-        #img_parent_dir = self.img_dir.parent
-        self.app = app # tm
-        # txt_lines_db = TxtLinesDB(img_parent_dir=img_parent_dir)
+        self.app = app
         self.conn = Main.txt_lines_db.connect(db_fullpath=db_fullpath)
         self.tbl_name = Main.txt_lines_db.get_table_name(self.my_ocr.date.month, version=tbl_ver)
         Main.txt_lines_db.create_tbl_if_not_exists(self.tbl_name, version=tbl_ver)
@@ -473,8 +470,36 @@ class Main:
                 return self.ocr_result_into_db1(app_type_list=app_type_list, limit=limit, test=test)
             case _:
                 raise ValueError(f"Unsupported tbl_ver: {tbl_ver}!")
+
     def ocr_result_into_db1(self, app_type_list: list[AppType]|None=None, limit=62, test=False):
-        pass
+        if not app_type_list:
+            app_type_list = [e for e in list(AppType) if e != AppType.NUL]  
+        assert limit > 0 
+        count = 0
+        with closing(self.conn.cursor()) as cur:    
+            for app_type in app_type_list:
+                stem_end_patt = APP_TYPE_TO_STEM_END[app_type]
+                glob_patt = "*" + stem_end_patt + '.png'
+                for file in self.my_ocr.input_dir.glob(glob_patt):
+                    if file.stem in self.get_OCRed_files():
+                        continue
+                    app = app_type.value
+                    path_set = PathSet(self.my_ocr.input_dir, file.stem, ext=self.my_ocr.input_ext)
+                    result = self.my_ocr.run_ocr(path_set)
+                    match result:
+                        case Success(value):
+                            txt_lines = value # result.unwrap()
+                        case Failure(_):
+                            raise ValueError("Failed to run OCR!", path_set)
+                    match(app_type):
+                        case AppType.M:
+                            raise NotImplementedError("Not implemented yet!")
+                        case AppType.T:
+                            ttxt_lines = TTxtLines(txt_lines)
+                            date = ttxt_lines.get_date()   
+                            breakpoint()
+
+
     def ocr_result_into_db0(self, app_type_list: list[AppType]|None=None, limit=62, test=False):
         if not app_type_list:
             app_type_list = [e for e in list(AppType) if e != AppType.NUL]  
