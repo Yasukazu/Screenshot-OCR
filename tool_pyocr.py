@@ -91,6 +91,9 @@ class MDateError(OCRError):
 class MyOcr:
     from path_feeder import input_dir_root, input_ext
     tools = pyocr.get_available_tools()
+
+    if len(tools) == 0:
+        raise ValueError("No OCR tool found")
     tool = tools[0]
     assert tool is not None, "No OCR tool found!"
 
@@ -311,7 +314,7 @@ class TTxtLines:
         date_image_fullpath = date_image_dir / f'{img_pathset.stem}.date.png'
         date_image.save(date_image_fullpath, format='PNG')
         logger.info("Saved date image: {}", date_image_fullpath)
-        result = my_ocr.run_ocr(path_set=date_image_fullpath, lang='eng+jpn', builder_class=pyocr.builders.TextBuilder, layout=7)
+        result = my_ocr.run_ocr(path_set=date_image_fullpath, lang='jpn', builder_class=pyocr.builders.TextBuilder, layout=7)
         match result:
             case Success(value):
                 no_spc_value = value.replace(' ', '')
@@ -320,6 +323,7 @@ class TTxtLines:
                     month, day = mt.groups()
                     date = MonthDay(int(month), int(day))
                     return date
+                raise ValueError(f"No match string of date!")
             case Failure(_):
                 logger.error("No date found in txt_lines for stem: {}", img_pathset.stem)
                 raise ValueError(f"No date found in txt_lines for stem: {img_pathset.stem}")
@@ -538,10 +542,13 @@ class Main:
                             pkl = pickle.dumps(txt_lines)
                             from checksum import calculate_checksum
                             chksum = calculate_checksum(file)
-                            breakpoint() # TODO: check DB param
                             prm = (app_type.value, date.day, wages, title, file.stem, pkl, chksum)
                             cur.execute(sql, prm)
                             self.conn.commit()
+                            logger.info("Saved into DB:  app:{}, day:{}, wages:{}, title:{}, stem:{}", *prm[:-3])
+                        case _:
+                            raise NotImplementedError(f"Undefined AppType: {app_type}!")
+                            
 
 
     def ocr_result_into_db0(self, app_type_list: list[AppType]|None=None, limit=62, test=False):
