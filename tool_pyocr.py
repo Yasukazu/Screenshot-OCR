@@ -534,7 +534,7 @@ class Main:
                                 raise ValueError(f"{date.month=} != {self.month=} in {path_set}")
                             wages = ttxt_lines.wages()
                             title = ttxt_lines.title()
-                            sql = "INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?, ?)"
+                            sql = f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?, ?)"
                             pkl = pickle.dumps(txt_lines)
                             from checksum import calculate_checksum
                             chksum = calculate_checksum(file)
