@@ -465,8 +465,17 @@ class Main:
         with closing(self.conn.cursor()) as cur:
             cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app_type.value, date.day, wages, title, stem, pkl))
         self.conn.commit()
-
-    def ocr_result_into_db(self, app_type_list: list[AppType]|None=None, limit=62, test=False):
+    def ocr_result_into_db(self, app_type_list: list[AppType]|None=None, limit=62, test=False, tbl_ver=1):
+        match tbl_ver:
+            case 0:
+                return self.ocr_result_into_db0(app_type_list=app_type_list, limit=limit, test=test)
+            case 1: 
+                return self.ocr_result_into_db1(app_type_list=app_type_list, limit=limit, test=test)
+            case _:
+                raise ValueError(f"Unsupported tbl_ver: {tbl_ver}!")
+    def ocr_result_into_db1(self, app_type_list: list[AppType]|None=None, limit=62, test=False):
+        pass
+    def ocr_result_into_db0(self, app_type_list: list[AppType]|None=None, limit=62, test=False):
         if not app_type_list:
             app_type_list = [e for e in list(AppType) if e != AppType.NUL]  
         assert limit > 0 
@@ -890,11 +899,11 @@ def run_check_DB_T(month: int, day_check_only=False):
     main = Main(my_ocr=my_ocr, app=AppType.T)
     main.check_DB_T(month=month, day_check_only=day_check_only)
 
-def run_ocr(month: str, limit=62, app_type: AppType = AppType.NUL, test=False):
+def run_ocr(month: str, limit=62, app_type: AppType = AppType.NUL, test=False, tbl_ver=1):
     """Run OCR and save result into DB."""
     m = int(month)
     my_ocr = MyOcr(month=m)
-    main = Main(my_ocr=my_ocr, app=app_type)
+    main = Main(my_ocr=my_ocr, app=app_type, tbl_ver=tbl_ver)
     main.ocr_result_into_db(limit=limit, test=test)
 
 import click
