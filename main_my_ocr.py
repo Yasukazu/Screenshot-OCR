@@ -610,12 +610,12 @@ class Main:
     def fix_title(self, day: int, month=0, app_type=AppType.T):
         if not month:
             month = self.my_ocr.date.month
-            logeer.debug("month==0 is reset as:{}", month)
-        with closing(self.my_ocr.conn.cursor()) as cur:
-            sql = f"SELECT title FROM {self.tbl_name} WHERE app = {app_type.value} AND day = {day}"
+            logger.debug("month==0 is reset as:{}", month)
+        with closing(self.conn.cursor()) as cur:
+            sql = f"SELECT title FROM `{self.tbl_name}` WHERE app = {app_type.value} AND day = {day}"
             cur.execute(sql)
             one = cur.fetchone()
-            breakpoint()
+            breakpoint()#TODO: if one[0] is NG, then replace the title
 
 
 from contextlib import closing
