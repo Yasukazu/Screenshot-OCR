@@ -864,8 +864,15 @@ class Main:
                         logger.error("Image file does not exist: {}", img_fullpath)
                         raise ValueError(f"Image file does not exist: {img_fullpath}")
 
-    def fix_title(self, month=0, app_type=AppType.T):
-        pass        
+    def fix_title(self, day: int, month=0, app_type=AppType.T):
+        if not month:
+            month = self.my_ocr.date.month
+            logeer.debug("month==0 is reset as:{}", month)
+        with closing(self.my_ocr.conn.cursor()) as cur:
+            sql = f"SELECT title FROM {self.tbl_name} WHERE app = {app_type.value} AND day = {day}"
+            cur.execute(sql)
+            one = cur.fetchone()
+            breakpoint()
 
 
 from contextlib import closing
@@ -947,7 +954,8 @@ class RunSaveAsCsv(RunMain):
     def run(self):
         self.main.save_as_csv()
 
-
+def run_fix_title(day, month=0):
+    Main(my_ocr=MyOcr(month=month)).fix_title(day=day)
 
 def run_save_as_csv(month: int):
     Main(my_ocr=MyOcr(month=month)).save_as_csv()
