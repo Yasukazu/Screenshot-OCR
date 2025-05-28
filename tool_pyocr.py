@@ -73,6 +73,8 @@ class PathSet:
         return (self.parent / (self.stem_without_delim('') + self.ext)).exists()
     def open(self):
         return (self.parent / (self.stem_without_delim('') + self.ext)).open()
+    def to_path(self):
+        return self.parent / (self.stem_without_delim('') + self.ext)
 
 
 APP_TYPE_TO_STEM_END = MappingProxyType({

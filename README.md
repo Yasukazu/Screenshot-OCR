@@ -49,10 +49,12 @@
 
 ## Extract Text from PNG image file:
 0. install Tesseract OCR
-  - `sudo apt install tesseract-ocr`
-  - `sudo apt install libtesseract-dev`
 0a. install tesseract-ocr language data
-  - `sudo apt install tesseract-ocr-jpn`
+```
+sudo apt install tesseract-ocr -y
+sudo apt install libtesseract-dev -y
+sudo apt install tesseract-ocr-jpn -y
+```
 0b. check tesseract-ocr version and language data
   - `tesseract --version`
   - `tesseract --list-langs`
