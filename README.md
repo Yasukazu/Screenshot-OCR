@@ -84,12 +84,28 @@ sudo apt install tesseract-ocr-jpn -y
 0d. install ImageMagick
   - `sudo apt install imagemagick`
 0e. setup `.env` file
-  - `TXT_LINES_DB=txt_lines.sqlite`
+```
+SCREEN_BASE_DIR='/home/user1/screen'
+SCREEN_YEAR='2025'
+SCREEN_MONTH='05'
+TXT_LINES_DB='txt_lines.sqlite'
+IMG_WIDTH=720
+IMG_HEIGHT=1612
+H_PAD=20
+V_PAD=40
+```
   - `TESSDATA_PREFIX=/usr/share/tesseract-ocr/4.00/tessdata`
   - `TESSDATA_DIR=/usr/share/tesseract-ocr/4.00/tessdata`
   - `PYTHONPATH=/usr/local/lib/python3.8/dist-packages`
   - `LD_LIBRARY_PATH=/usr/local/lib:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/lib64:/lib:/usr/lib`
-
+0f. Install Misaki Font
+from cwd as screen root:
+```
+wget https://littlelimit.net/arc/misaki/misaki_png_2021-05-05a.zip
+mkdir font
+unzip misaki_png_2021-05-05a.zip -d font
+ls font/misaki_gothic.png
+```
 
 ## In case of failure of OCR or unable to setup tesseract-ocr and Python packages:
 1. convert png files into a pdf file: `convert *.png dest.pdf `

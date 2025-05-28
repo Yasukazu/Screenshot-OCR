@@ -25,7 +25,7 @@ class TableVersion(Enum):
     TEXT_LINES = 0
     TXT_LINES = 1
 TABLE_NAME_FORMATS = [f"{TableVersion(e).name.lower()}-{{:02}}" for e in range(len(TableVersion))]
-def get_table_name(month: int, version=0) -> str:
+def get_table_name(month: int, version=1) -> str:
     return TABLE_NAME_FORMATS[version].format(month)
 
 CREATE_TABLE_SQL_LIST = ["CREATE TABLE if not exists '{}' (`app` INTEGER, `day` INTEGER, `wages` INTEGER, `title` TEXT, `stem` TEXT, `txt_lines` BLOB, PRIMARY KEY (app, day))",

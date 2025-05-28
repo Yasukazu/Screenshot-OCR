@@ -4,7 +4,14 @@ from typing import Sequence, Iterator
 from typing import Callable, Any
 import os.path, calendar
 from pathlib import Path
+import logbook
+logbook.StreamHandler(sys.stdout,
+	format_string='{record.time:%Y-%m-%d %H:%M:%S.%f} {record.level_name} {record.filename}:{record.lineno}: {record.message}').push_application()
+logger = logbook.Logger(__file__)
+logger.level = logbook.INFO
 
+from dotenv import load_dotenv
+load_dotenv()
 from PIL import Image, ImageDraw
 import img2pdf
 import click
@@ -17,17 +24,22 @@ from path_feeder import PathFeeder, get_last_month #, YearMonth
 from digit_image import ImageFill
 from put_number import PutPos #, put_number
 from app_type import AppType
-
-last_month_date = get_last_month(year=year)
-year = last_month_date.year
-month = last_month_date.month
-img_dir = home_dir / 'Documents' / 'screen' / str(year) / f'{month:02}'
+import os
+year = int(os.environ['SCREEN_YEAR'])
+month = int(os.environ['SCREEN_MONTH'])
+base_dir = Path(os.environ['SCREEN_BASE_DIR'])
+#last_month_date = get_last_month(year=year)
+#year = last_month_date.year
+#month = last_month_date.month
+img_dir = base_dir / str(year) / f'{month:02}'
 if not img_dir.exists():
     img_dir.mkdir()
-
-IMG_SIZE = (720, 1612)
-H_PAD = 20
-V_PAD = 40
+    logger.info("img_dir is made: {}", img_dir)
+img_width = int(os.environ['IMG_WIDTH'])
+img_height = int(os.environ['IMG_HEIGHT'])
+IMG_SIZE = (img_width, img_height)
+H_PAD = int(os.environ['H_PAD'])
+V_PAD = int(os.environ['V_PAD'])
 
 file_over = False
 
@@ -355,8 +367,8 @@ def get_options():
         FunctionItem('None', None),
         FunctionItem('save TM screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.T}),
         FunctionItem('save MH screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.M}),
-        FunctionItem('T save_pages_as_4 png files into qpng dir.', save_qpng_pages),
-        FunctionItem('M save_pages_as_4 png files into qpng dir.', save_qpng_pages, kwargs={'app_type': AppType.M}),
+        FunctionItem('T save_qpng_pages png files into qpng dir.', save_qpng_pages),
+        FunctionItem('M save_qpng_pages png files into qpng dir.', save_qpng_pages, kwargs={'app_type': AppType.M}),
         FunctionItem('save_pages_as_TIFF', save_pages_as_tiff),
         FunctionItem('T convert_to_pdf', convert_to_pdf, kwargs={'layout':PdfLayout.a3lp, 'app_type': AppType.T}),
         FunctionItem('M convert_to_pdf', convert_to_pdf, kwargs={'layout':PdfLayout.a3lp, 'app_type': AppType.M}),
@@ -365,23 +377,9 @@ def main(options=get_options()):
     for n, option in enumerate(options):
         print(f"{n}. {option.title}")
     choice = int(input(f"Choose(0 to {len(options)}):"))
-    breakpoint()
     if choice:
         options[choice].exec()
-    '''
-    import simple_term_menu as st_menu
-    term_menu = st_menu.TerminalMenu([op.title for op in options])
-    from consolemenu import ConsoleMenu
-    from consolemenu.items import FunctionItem, SubmenuItem
-    menu = ConsoleMenu("Tile Menu")
-    submenu = ConsoleMenu("Save images as TIFF")
-    for fi in [
-            FunctionItem('save TM screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.T}),
-            FunctionItem('save MH screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.M}),
-            ]:
-        submenu.append_item(fi)
 
-    menu.show()'''
 if __name__ == '__main__':
 
     main()

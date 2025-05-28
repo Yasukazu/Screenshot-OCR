@@ -9,3 +9,4 @@ returns
 ipdb
 loguru
 logbook
+img2pdf
