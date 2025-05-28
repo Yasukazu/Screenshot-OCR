@@ -18,7 +18,7 @@ from digit_image import ImageFill
 from put_number import PutPos #, put_number
 from app_type import AppType
 
-last_month_date = get_last_month()
+last_month_date = get_last_month(year=year)
 year = last_month_date.year
 month = last_month_date.month
 img_dir = home_dir / 'Documents' / 'screen' / str(year) / f'{month:02}'

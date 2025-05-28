@@ -12,9 +12,9 @@
 
 ## Directory structure:
 
-1. App route: ~/screen/from contextlib import closing
-2. Year: screen/2025/
-3. Month: screen/2025/01/ : 01 is January.
+1. App route: `~/screen/`
+2. Year: `screen/2025/`
+3. Month: `screen/2025/01/` : 01 is January.
 
 ## Necessary files:
 
@@ -65,6 +65,20 @@
   - `pip install opencv-python-headless`
   - `pip install Pillow`
   - `pip install pandas`
+  - `pip install logbook`
+  ## `requirements.txt`:  ```
+        pandas
+        Pillow
+        click
+        opencv-contrib-python
+        python-dotenv
+        pytesseract
+        pyocr
+        returns
+        ipdb
+        loguru
+        logbook
+      ```
 0d. install ImageMagick
   - `sudo apt install imagemagick`
 0e. setup `.env` file

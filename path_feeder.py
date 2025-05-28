@@ -1,7 +1,16 @@
 import os
 from pathlib import Path
-import logging
-logger = logging.getLogger(__name__)
+#import logging
+#logger = logging.getLogger(__name__)
+import sys
+
+import logbook
+
+logbook.StreamHandler(sys.stdout,
+	format_string='{record.time:%Y-%m-%d %H:%M:%S.%f} {record.level_name} {record.filename}:{record.lineno}: {record.message}').push_application()
+
+logger = logbook.Logger(__file__)
+logger.level = logbook.INFO
 home_dir = os.path.expanduser('~')
 home_path = Path(home_dir)
 
@@ -12,7 +21,7 @@ SCREEN_MONTH = 'SCREEN_MONTH'
 from dotenv import dotenv_values
 
 config = dotenv_values(".env")
-logger.info("config from dotenv_values: %s", config)
+rlogger.info("config from dotenv_values: {}", config)
 # is_dotenv_loaded = load_dotenv('.env', verbose=True)
 
 for k in [SCREEN_BASE_DIR, SCREEN_YEAR, SCREEN_MONTH]:
@@ -75,7 +84,7 @@ YEAR_FORMAT = "{:04}"
 MONTH_FORMAT = "{:02}"
 
 def get_last_month_path(dir: Path=input_dir_root, year=0, month=0)-> Path:
-	last_month = get_last_month()
+	last_month = get_last_month(year=year)
 	if not year:
 		year = last_month.year
 	if not month:
@@ -85,18 +94,28 @@ def get_last_month_path(dir: Path=input_dir_root, year=0, month=0)-> Path:
 	# ymstr = f"{year}{month:02}"
 from datetime import date
 def get_year_month(year=0, month=0, config=config)-> date: # tuple[int, int]:
-	year = int(config[SCREEN_YEAR])
+	year = year or int(config[SCREEN_YEAR])
 	# if isinstance(SCREEN_MONTH, int) and SCREEN_MONTH > 0:
-	month = int(config[SCREEN_MONTH])
-	last_month = get_last_month()
+	month = month or int(config[SCREEN_MONTH])
+	last_month = get_last_month(year=year)
 	if not year:
 		year = last_month.year
+		logger.debug("year==0 is set as last_month:%s", year)
+	if year < 0:
+		cur_date = get_cur_date()
+		year = cur_date.year
+		logger.debug("year<0 is set as current year: %s", year)
 	if not month:
 		month = last_month.month
+		logger.debug("month==0 is set as last_month:%s", month)
+	if month < 0:
+		cur_date = get_cur_date()
+		month = cur_date.month
+		logger.debug("month<0 is set as last_month:%s", month)
 	return date(year, month, 1)
 
 def get_ymstr(year=0, month=0, sep=False)-> str:
-	last_month = get_last_month()
+	last_month = get_last_month(year=year)
 	if not year:
 		year = last_month.year
 	if not month:
@@ -218,13 +237,21 @@ class DbPathFeeder(PathFeeder):
 			else:
 				for dy in day_to_stem:
 					yield dy, day_to_stem[dy]
-
 def path_feeder(year=0, month=0, from_=1, to=-1, input_type:FileExt=FileExt.PNG, padding=True)-> Generator[tuple[Path | None, str, int], None, None]:
-	'''to=0:glob, -1:end of month
+	''' year,month: 0 -> current, -1 -> last; to=0:glob, -1:end of month
 	returns: directory, filename, day'''
-	last_date = get_last_month(year=year, month=month) # f"{year}{month:02}"
-	year = last_date.year
-	month = last_date.month
+	if year == 0:
+		cur_date = get_cur_date()
+		year = cur_date.year
+	if month == 0:
+		cur_date = get_cur_date()
+		month = cur_date.month
+	if month < 0:
+		if year < 0:
+			year = last_month_date.year
+		last_month_date = get_last_month(year=year) # f"{year}{month:02}"year=year, month=month
+		month = last_month_date.month
+		year = last_month_date.year
 	input_path = input_dir_root / str(year) / ("%02d" % month) / input_type.value.dir
 	#if direc: input_path = input_path / direc
 	if to < 0:
@@ -246,22 +273,23 @@ def path_feeder(year=0, month=0, from_=1, to=-1, input_type:FileExt=FileExt.PNG,
 import datetime
 from datetime import date
 
-def get_last_month(year=0, month=0)-> date:
-	if not (year and month):
-		today = datetime.date.today()
-		first = today.replace(day=1)
-		last_month = first - datetime.timedelta(days=1)
-		ym = last_month.strftime("%Y,%m").split(',')
-		y, m = (int(i) for i in ym)
-		year = year or y
-		month = month or m
-	return date(year=year, month=month, day=1) # YearMonth(*iym)
+def get_last_month(year=0)-> date:
+	today = datetime.date.today()
+	if year < 0:
+		year = today.year
+		logger.debug("year<0 set as current year: %s", year)
+	first = today.replace(day=1)
+	last_month = first - datetime.timedelta(days=1)
+	ym = last_month.strftime("%Y,%m").split(',')
+	_year, month = (int(i) for i in ym)
+	return date(year=year or _year, month=month, day=1) # YearMonth(*iym)
 
-def get_cur_month()-> date: #YearMonth:
+def get_cur_date()-> datetime.date: #YearMonth:
+	"""day is 1"""
 	today = datetime.date.today()
 	ym = today.strftime("%Y,%m").split(',')
 	y, m = (int(i) for i in ym)
-	return date(y, m, 1) # YearMonth(*iym)
+	return datetime.date(y, m, 1) # YearMonth(*iym)
 
 from enum import StrEnum
 

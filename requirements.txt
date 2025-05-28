@@ -8,3 +8,4 @@ pyocr
 returns
 ipdb
 loguru
+logbook

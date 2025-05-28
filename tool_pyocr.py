@@ -864,7 +864,7 @@ class Main:
                         logger.error("Image file does not exist: {}", img_fullpath)
                         raise ValueError(f"Image file does not exist: {img_fullpath}")
 
-    def void_func(self, month=0, app_type=AppType.NUL):
+    def fix_title(self, month=0, app_type=AppType.T):
         pass        
 
 
