@@ -733,6 +733,7 @@ def run_fix_title(day, month=0):
     Main(my_ocr=MyOcr(month=month)).fix_title(day=day)
 
 def run_save_as_csv(month: int):
+    """save DB table of the month except pickle of txt_lines"""
     Main(my_ocr=MyOcr(month=month)).save_as_csv()
 
 def run_check_DB_T(month: int, day_check_only=False):
@@ -782,8 +783,9 @@ def run_main(options: Sequence[FunctionItem]):#=get_options(int(input("Month?:")
         options[choice].exec()
 if __name__ == '__main__':
     import sys
-    day = int(sys.argv[1])
-    run_fix_title(day)
+    month = int(sys.argv[1])
+    run_save_as_csv(month=month)
+    #run_fix_title(day)
     #art = sys.argv[2][0].upper()
     #app_type = {'T':AppType.T, 'M':AppType.M}[art]
     #run_save_as_csv(month)
