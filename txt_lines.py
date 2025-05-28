@@ -2,7 +2,7 @@ from typing import Sequence, Union
 from contextlib import closing
 from enum import IntEnum
 from types import MappingProxyType
-import re
+import re, sys
 from typing import Sequence, Callable, Any
 from pprint import pp
 from pathlib import Path
@@ -11,7 +11,7 @@ import pickle
 import sqlite3
 from returns.result import safe, Result, Failure, Success
 import pandas
-from ipdb import set_trace as breakpoint
+
 from dotenv import load_dotenv
 load_dotenv()
 from PIL import Image, ImageDraw, ImageEnhance
@@ -19,17 +19,25 @@ import pyocr
 import pyocr.builders
 from pyocr.builders import LineBoxBuilder, TextBuilder, DigitLineBoxBuilder, DigitBuilder, LineBox, Box, WordBoxBuilder
 from returns.pipeline import is_successful, UnwrapFailedError
-import loguru # logging
-logger = loguru.logger # logging.getLogger(__name__)
+import logbook
+
+logbook.StreamHandler(sys.stdout,
+	format_string='{record.time:%Y-%m-%d %H:%M:%S.%f} {record.level_name} {record.filename}:{record.lineno}: {record.message}').push_application()
+
+logger = logbook.Logger(__file__)
+logger.level = logbook.INFO
+
+#import loguru # logging
+#logger = loguru.logger # logging.getLogger(__name__)
 #logger.setLevel(logging.DEBUG)
-logger.remove()
+#logger.remove()
 import sys
 #logger.add(sys.stderr, level="INFO")
-logger.add(sys.stdout, level="WARNING")
-logger.add("ERROR.log", level="ERROR")
+#logger.add(sys.stdout, level="WARNING")
+#logger.add("ERROR.log", level="ERROR")
 from app_type import AppType
-from tool_pyocr import PathSet, MyOcr, MonthDay
 from path_feeder import input_dir_root
+from tool_pyocr import PathSet, MyOcr, MonthDay
 
 class DigitLines:
     def __init__(self, stem: str, direc: Path=input_dir_root, ext='.png', year=0, month=0):
@@ -48,6 +56,7 @@ class DigitLines:
 
 class TxtLines:
     """Enhance txt_lines(Sequence[LineBox]) with img_pathset and MyOcr"""
+
     app_type = AppType.NUL
 
     def __init__(self, txt_lines: Sequence[LineBox], img_pathset: PathSet, my_ocr: MyOcr = MyOcr()):
@@ -66,6 +75,7 @@ class TTxtLines(TxtLines):
     """
     Class to handle text lines from T app..
     """
+
     app_type = AppType.T
 
     def __init__(self, txt_lines: Sequence[LineBox], img_pathset: PathSet, my_ocr: MyOcr = MyOcr()):

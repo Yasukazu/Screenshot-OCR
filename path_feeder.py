@@ -21,7 +21,7 @@ SCREEN_MONTH = 'SCREEN_MONTH'
 from dotenv import dotenv_values
 
 config = dotenv_values(".env")
-rlogger.info("config from dotenv_values: {}", config)
+logger.info("config from dotenv_values: {}", config)
 # is_dotenv_loaded = load_dotenv('.env', verbose=True)
 
 for k in [SCREEN_BASE_DIR, SCREEN_YEAR, SCREEN_MONTH]:
