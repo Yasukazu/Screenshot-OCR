@@ -32,6 +32,7 @@ from tool_pyocr import PathSet, MyOcr, MonthDay
 from app_type import AppType
 
 from txt_lines import TTxtLines, MTxtLines
+from checksum import calculate_checksum
 
 class Main:
     import txt_lines_db
@@ -353,7 +354,6 @@ class Main:
                                             if box_date.day != date.day:
                                                 logger.info("Date from box image: {} is different from DB ", box_date.day)
                                                 logger.info("Proceeding to fix the date in DB: {} to {}", date.day, box_date.day)
-                                                breakpoint()
                                                 result = self.fix_day(old_day=date.day, new_day=box_date.day, app=app)
                                                 match result:
                                                     case Success(_):
@@ -361,7 +361,6 @@ class Main:
                                                     case Failure(_):
                                                         logger.error("Failed to fix day from {} to {} for app {}", date.day, box_date.day, app)
                                                         raise ValueError(f"Failed to fix day from {date.day} to {box_date.day} for app {app}")
-                                                breakpoint()
                                                 logger.info("Date from box image: {} replaces the date here: {}.", box_date, date)
                                                 date = box_date
 
@@ -371,7 +370,6 @@ class Main:
                                         else:
                                             logger.error("Failed to get date from value: {}", no_spc_value)
                                             raise ValueError(f"Failed to get date from value: {no_spc_value}")
-                                        breakpoint()
                                     case Failure(_):
                                         logger.error("Failed to run OCR on box image: {}", box_pos)
                                         raise ValueError(f"Failed to run OCR on box image: {box_pos}")
@@ -383,7 +381,6 @@ class Main:
                                     debug_fullpath = debug_dir / (file.stem + f'({box_pos}).png') 
                                     data_image.save(debug_fullpath)
                                     logger.info("Saved debug image: {}", debug_fullpath)
-                                    breakpoint()
                             else:
                                 logger.warning("Old pkl file does not exist: {}", old_pkl_path)
                         assert old_stem != file.stem
@@ -612,10 +609,45 @@ class Main:
             month = self.my_ocr.date.month
             logger.debug("month==0 is reset as:{}", month)
         with closing(self.conn.cursor()) as cur:
-            sql = f"SELECT title FROM `{self.tbl_name}` WHERE app = {app_type.value} AND day = {day}"
+            sql = f"SELECT title, stem, txt_lines, checksum FROM `{self.tbl_name}` WHERE app = {app_type.value} AND day = {day}"
             cur.execute(sql)
-            one = cur.fetchone()
-            breakpoint()#TODO: if one[0] is NG, then replace the title
+            row = cur.fetchone()
+            # if one[0] is NG, then replace the title
+            yn = input(f"Is '{row[0]}' good for the title?:(y/N)")
+            if not yn or yn[0].lower() == 'n':
+                # load original image
+                if not (stem:=row[1]):
+                    raise ValueError(f"No stem for the record!")
+                img_pathset = PathSet(self.img_dir, stem, '.png')
+                img_fullpath = img_pathset.to_path()
+                if not img_fullpath.exists():
+                    raise ValueError(f"`{img_fullpath=}` does not exists!")
+                db_chksum = row[3]
+                if not db_chksum:
+                    raise ValueError("No checksum in DB row!")
+                if calculate_checksum(img_fullpath) != db_chksum:
+                    raise ValueError("Checksum of the file doesn't match with DB's!")
+                txt_lines_pkl = row[2]
+                if not txt_lines_pkl:
+                    raise ValueError(f"No txt_lines in the row in DB!")
+                txt_lines = pickle.loads(txt_lines_pkl)
+                if not txt_lines:
+                    raise ValueError(f"No txt_lines loaded from its pickle!")
+                t_txt_lines = TTxtLines(txt_lines=txt_lines, img_pathset=img_pathset, my_ocr=self.my_ocr)
+                new_title = t_txt_lines.get_title()
+                if not new_title:
+                    raise ValueError("Unable to get a new title!")
+                yn = input(f"Do you want to update to the new title?(Y/n): {new_title}")
+                if not yn or yn[0].lower() == 'y':
+                    # TODO: update DB sequence
+                    sql = f"UPDATE `{self.tbl_name}` SET title = '{new_title}' WHERE app = {app_type.value} AND day = {day}"
+                    cur.execute(sql)
+                    self.conn.commit()
+                    logger.info("DB is updated app:{}, day:{}, title:{}", app_type, day, new_title)
+
+
+                
+
 
 
 from contextlib import closing

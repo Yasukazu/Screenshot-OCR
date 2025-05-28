@@ -45,7 +45,6 @@ class DigitLines:
         self.my_ocr = MyOcr(year=year, month=month)
         self.digit_lines: Sequence[Any]|None = None
     def run_ocr(self) -> Sequence[Any]|None:
-        breakpoint()
         result = self.my_ocr.run_ocr(path_set=self.path_set, lang='jpn+eng', builder_class=DigitLineBoxBuilder, layout=7) 
         match result:
             case Success(self.digit_lines):
@@ -122,32 +121,28 @@ class TTxtLines(TxtLines):
         if n == 0:
             logger.error("No title found in txt_lines for stem: {}", self.img_pathset.stem)
             raise ValueError(f"No title found in txt_lines for stem: {self.img_pathset.stem}")
-        xmax = max([p[1][1] for p in [s.position for s in txt_lines[:n]]])
-        breakpoint()
+        xmax = max([p[1][0] for p in [s.position for s in self.txt_lines[:n]]])
+
         rec_pos = self.txt_lines[n].position
-        title_box = (rec_pos[0][0] - (rec_pos[1][1] - rec_pos[0][1]), 15,
-                     rec_pos[1][0], rec_pos[0][1] - 5 )
+        title_box = (rec_pos[0][0] - (rec_pos[1][1] - rec_pos[0][1]) - 10, 15,
+                     xmax + 5, rec_pos[0][1] - 5 )
 
         img_path = self.img_pathset.parent / (self.img_pathset.stem + self.img_pathset.ext)
         title_img = Image.open(str(img_path)).crop(title_box)
 
         title_img_dir = self.img_pathset.parent.parent / 'TMP'
         title_img_dir.mkdir(parents=True, exist_ok=True)
-        title_img_fullpath = title_img_dir / f'{self.img_pathset.stem}.title.png'
+        title_img_fullpath = title_img_dir / f'title-{self.img_pathset.stem}.png'
         title_img.save(title_img_fullpath, format='PNG')
         logger.info("Saved title image: {}", title_img_fullpath)
         result = self.my_ocr.run_ocr(path_set=title_img_fullpath, lang='jpn', builder_class=pyocr.builders.LineBoxBuilder)
         match result:
-            case Success(value):
-                no_spc_value = value.replace(' ', '')
-                mt = re.match(r"(\d+)月(\d+)日", no_spc_value)
-                if mt and len(mt.groups()) == 2:
-                    month, day = mt.groups()
-                    date = MonthDay(int(month), int(day))
-                    return date
+            case Success(title_txt_lines):
+                acc_title = ''.join([line.content.replace(' ', '') for line in title_txt_lines])
+                return acc_title
             case Failure(_):
-                logger.error("No date found in txt_lines for stem: {}", self.img_pathset.stem)
-                raise ValueError(f"No date found in txt_lines for stem: {self.img_pathset.stem}")
+                logger.error("No text lines found in : {}", title_img_fullpath)
+                raise ValueError(f"No text lines found in : {title_img_fullpath}")
 
 
 class MTxtLines(TxtLines):
