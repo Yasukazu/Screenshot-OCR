@@ -288,98 +288,14 @@ class MyOcr:
     def w_wages(cls, txt_lines: Sequence[LineBox]):
         raise NotImplementedError("Not implemented yet!")
 
-
-class TTxtLines:
-    TITLE = 1
-    def __init__(self, txt_lines: Sequence[LineBox]):
-        self.txt_lines = txt_lines
-
-    def title(self, n=0):
-        return self.txt_lines[1].content.replace(' ', '')
-    def wages(self):
-        return MyOcr.t_wages(self.txt_lines)
-    def get_date(self, img_pathset: PathSet, my_ocr: MyOcr) -> tuple[int, MonthDay]:
-
-        for n, txt_line in enumerate(self.txt_lines):
-            if txt_line.content.replace(' ', '').startswith('業務開始'):
-                break
-        if n >= len(self.txt_lines) - 1:
-            logger.error("No date found in txt_lines for stem: {}", img_pathset.stem)
-            raise ValueError(f"No date found in txt_lines for stem: {img_pathset.stem}")
-        date_position = self.txt_lines[n + 1].position
-        date_position = date_position[0] + date_position[1]
-
-        img_path = img_pathset.parent / (img_pathset.stem + img_pathset.ext)
-        date_image = Image.open(str(img_path)).crop(date_position)
-
-        date_image_dir = img_pathset.parent.parent / 'TMP'
-        date_image_dir.mkdir(parents=True, exist_ok=True)
-        date_image_fullpath = date_image_dir / f'{img_pathset.stem}.date.png'
-        date_image.save(date_image_fullpath, format='PNG')
-        logger.info("Saved date image: {}", date_image_fullpath)
-        result = my_ocr.run_ocr(path_set=date_image_fullpath, lang='jpn', builder_class=pyocr.builders.TextBuilder, layout=7)
-        match result:
-            case Success(value):
-                no_spc_value = value.replace(' ', '')
-                mt = re.match(r"(\d+)月(\d+)日", no_spc_value)
-                if mt and len(mt.groups()) == 2:
-                    month, day = mt.groups()
-                    date = MonthDay(int(month), int(day))
-                    return 0, date
-                raise ValueError(f"No match string of date!")
-            case Failure(_):
-                logger.error("No date found in txt_lines for stem: {}", img_pathset.stem)
-                raise ValueError(f"No date found in txt_lines for stem: {img_pathset.stem}")
-
-
-class MTxtLines(TTxtLines):
-
-    def title(self, n: int):
-        return ':'.join([self.txt_lines[i].content.replace(' ', '') for i in range(n - 3, n - 1)])
-
-    def wages(self):
-        return MyOcr.m_wages(self.txt_lines)
-
-    def get_date(self, img_pathset: PathSet, my_ocr: MyOcr) -> tuple[int, MonthDay]:
-        n, date, hrs = my_ocr.check_date(app_type=AppType.M, txt_lines=self.txt_lines)
-        if date:
-            return n, date
-        else: # Retry cropping the image..
-            box_pos = [*self.txt_lines[n].position]
-            box_pos = list(box_pos[0] + box_pos[1])
-            box_pos[0] += box_pos[3] - box_pos[1] # remove leading emoji that is about the same width of the box height
-            image = Image.open(img_pathset.parent / (img_pathset.stem + img_pathset.ext))
-            if not image:
-                logger.error("Failed to open image: {}", img_pathset)
-                raise ValueError(f"Failed to open image: {img_pathset}")
-            box_img = image.crop(tuple(box_pos))
-            if not box_img:
-                logger.error("Failed to crop box image: {}", box_pos)
-                raise ValueError(f"Failed to crop box image: {box_pos}")
-            tmp_img_dir = img_pathset.parent.parent / 'TMP'
-            tmp_img_dir.mkdir(parents=True, exist_ok=True)
-            box_img_fullpath = tmp_img_dir / f'{img_pathset.stem}.box.png'
-            box_img.save(box_img_fullpath, format='PNG')
-            logger.info("Saved box image: {}", box_img_fullpath)    
-            box_result = my_ocr.run_ocr(box_img_fullpath, lang='jpn', builder_class=pyocr.builders.TextBuilder, layout=7, opt_img=box_img)
-            match box_result:
-                case Success(value):
-                    _n, date, hrs = my_ocr.check_date(app_type=AppType.M, txt_lines=[value]) # len(txt_lines) == 1
-                    if date is None:
-                        logger.error("Failed to get date from box image: {}", box_pos)
-                        raise ValueError(f"Failed to get date from box image: {box_pos}")
-                    logger.info("Date by run_ocr with TextBuilder and cropped image: {}", date)
-                    return n, date
-                case Failure(_):
-                    logger.error("Failed to run OCR on box image: {}", box_pos)
-                    raise ValueError(f"Failed to run OCR on box image: {box_pos}")
+from txt_lines import TTxtLines, MTxtLines
 
 class Main:
     import txt_lines_db
-    def __init__(self, app=AppType.NUL, db_fullpath=txt_lines_db.sqlite_fullpath(), my_ocr=MyOcr(), tbl_ver=0):  
+    def __init__(self, app_type=AppType.NUL, db_fullpath=txt_lines_db.sqlite_fullpath(), my_ocr=MyOcr(), tbl_ver=1):  
 
         self.my_ocr = my_ocr
-        self.app = app
+        self.app = app_type
         self.conn = Main.txt_lines_db.connect(db_fullpath=db_fullpath)
         self.tbl_name = Main.txt_lines_db.get_table_name(self.my_ocr.date.month, version=tbl_ver)
         Main.txt_lines_db.create_tbl_if_not_exists(self.tbl_name, version=tbl_ver)
@@ -569,9 +485,9 @@ class Main:
                             raise ValueError("Failed to run OCR!", path_set)
                     match(app_type):
                         case AppType.M:
-                            ttxt_lines = MTxtLines(txt_lines)
+                            ttxt_lines = MTxtLines(txt_lines, path_set, self.my_ocr)
                         case AppType.T:
-                            ttxt_lines = TTxtLines(txt_lines)
+                            ttxt_lines = TTxtLines(txt_lines, path_set, self.my_ocr)
                         case _:
                             raise NotImplementedError(f"Undefined AppType: {app_type}!")
                     n, date = ttxt_lines.get_date(path_set, self.my_ocr)
@@ -782,11 +698,11 @@ class Main:
 
     def save_as_csv(self):
         """Save the DB to a CSV file."""
-        sql = f"SELECT app, day, wages, title, stem FROM `{self.tbl_name}`"
+        sql = f"SELECT app, day, wages, title, stem, checksum FROM `{self.tbl_name}` ORDER BY day"
         db_df = pandas.read_sql_query(sql, self.conn)
-        output_path = self.img_dir.par
-        assert output_path.exists()
-        output_fullpath = output_path / (table + '.csv')
+        output_path = self.img_dir.parent / 'csv'
+        output_path.mkdir(parents=True, exist_ok=True)
+        output_fullpath = output_path / (self.tbl_name + '.csv')
         db_df.to_csv(str(output_fullpath), index=False)
 
     def check_DB_T0(self, month: int, day_check_only=False):
@@ -948,7 +864,8 @@ class Main:
                         logger.error("Image file does not exist: {}", img_fullpath)
                         raise ValueError(f"Image file does not exist: {img_fullpath}")
 
-                
+    def void_func(self, month=0, app_type=AppType.NUL):
+        pass        
 
 
 from contextlib import closing
@@ -977,7 +894,7 @@ def edit_wages(month: int, app=AppType.T):
     """Check the DB for the given month of AppType.T"""
     assert app != AppType.NUL
     my_ocr = MyOcr(month=month)
-    main = Main(my_ocr=my_ocr, app=AppType.T)
+    main = Main(my_ocr=my_ocr, app_type=AppType.T)
     with closing(self.conn.cursor()) as cur:
         for app_type in app_type_list:
             stem_end_patt = APP_TYPE_TO_STEM_END[app_type]
@@ -1006,18 +923,45 @@ def edit_wages(month: int, app=AppType.T):
                     assert row[0] == wages
                     print(f"Wages of {day=} is Updated as {wages=} in table `{table=}`.")
                     feeder.conn.commit()
-    
+from functools import wraps    
+def run_main(month=0, app_typ=AppType.T):
+  def run_main_wrapper(func):
+    @wraps(func)
+    def Inner(*args, **kwargs):
+        def wrapper(*args, **kwargs):
+            my_ocr = MyOcr(month=kwargs['month'])
+            main = Main(my_ocr=my_ocr, app_type=kwargs['app_type'])
+            main.func(*args, **kwargs)
+        return wrapper
+    return Inner
+  return run_main_wrapper
+
+class RunMain:
+    def __init__(self, month=0,app_type=AppType.NUL):
+            my_ocr = MyOcr(month=month)
+            main = Main(my_ocr=my_ocr, app_type=app_type)
+    def run(self):
+        pass
+
+class RunSaveAsCsv(RunMain):
+    def run(self):
+        self.main.save_as_csv()
+
+
+
+def run_save_as_csv(month: int):
+    Main(my_ocr=MyOcr(month=month)).save_as_csv()
 
 def run_check_DB_T(month: int, day_check_only=False):
     """Check the DB for the given month of AppType.T"""
     my_ocr = MyOcr(month=month)
-    main = Main(my_ocr=my_ocr, app=AppType.T)
+    main = Main(my_ocr=my_ocr, app_type=AppType.T)
     main.check_DB_T(month=month, day_check_only=day_check_only)
 
 def run_ocr(month: int, limit=62, app_type: AppType = AppType.NUL, test=False, tbl_ver=1):
     """Run OCR and save result into DB."""
     my_ocr = MyOcr(month=month)
-    main = Main(my_ocr=my_ocr, app=app_type, tbl_ver=tbl_ver)
+    main = Main(my_ocr=my_ocr, app_type=app_type, tbl_ver=tbl_ver)
 
     main.ocr_result_into_db(limit=limit, test=test)
 
@@ -1054,4 +998,9 @@ def run_main(options: Sequence[FunctionItem]):#=get_options(int(input("Month?:")
     if choice:
         options[choice].exec()
 if __name__ == '__main__':
-    run_ocr(5)
+    import sys
+    month = int(sys.argv[1])
+    #art = sys.argv[2][0].upper()
+    #app_type = {'T':AppType.T, 'M':AppType.M}[art]
+    run_save_as_csv(month)
+    #run_ocr(5)
