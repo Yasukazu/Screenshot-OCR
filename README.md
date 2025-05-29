@@ -89,11 +89,10 @@ SCREEN_BASE_DIR='/home/user1/screen'
 SCREEN_YEAR='2025'
 SCREEN_MONTH='05'
 TXT_LINES_DB='txt_lines.sqlite'
-IMG_WIDTH=720
-IMG_HEIGHT=1612
 H_PAD=20
 V_PAD=40
 ```
+
   - `TESSDATA_PREFIX=/usr/share/tesseract-ocr/4.00/tessdata`
   - `TESSDATA_DIR=/usr/share/tesseract-ocr/4.00/tessdata`
   - `PYTHONPATH=/usr/local/lib/python3.8/dist-packages`

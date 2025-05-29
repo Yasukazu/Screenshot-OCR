@@ -14,10 +14,9 @@ from dotenv import load_dotenv
 load_dotenv()
 from PIL import Image, ImageDraw
 import img2pdf
-import click
 import ttl
-home_dir = Path(os.path.expanduser('~'))
-from path_feeder import PathFeeder, get_last_month #, YearMonth
+# home_dir = Path(os.path.expanduser('~'))
+from path_feeder import PathFeeder
 from digit_image import ImageFill
 from put_number import PutPos #, put_number
 from app_type import AppType
@@ -309,7 +308,7 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
 
 from collections import namedtuple
 WidthHeight = namedtuple('WidthHeight', ['width', 'height'])
-def concat_8_pages(img_size: tuple[int, int], dir: Path, ext: str, names: Iterator[str], h_pad: int=0, v_pad: int=0)-> Image:
+def concat_8_pages(img_size: tuple[int, int], dir: Path, ext: str, names: Iterator[str], h_pad: int=0, v_pad: int=0)-> Image.Image:
     def open_img(f: str)-> Image.Image | None:
         fullpath = dir / (f + ext)
         img =  Image.open(fullpath) if fullpath.exists() else None

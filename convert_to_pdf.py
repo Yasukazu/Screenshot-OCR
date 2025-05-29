@@ -1,17 +1,15 @@
 import re
 from contextlib import closing
-import os, sys
+import sys
 from enum import Enum
 from pathlib import Path
-from typing import Sequence, Iterator, Generator
+from typing import Sequence
 from pprint import pp
 
-from PIL import Image, ImageDraw
 import img2pdf
 from dotenv import load_dotenv
 load_dotenv()
 
-from path_feeder import FileExt, PathFeeder, get_last_month #, YearMonth
 
 class PdfLayout(Enum):
 	a4pt = (img2pdf.mm_to_pt(210),img2pdf.mm_to_pt(297))
@@ -27,12 +25,9 @@ def convert_to_pdf(output_fullpath: Path, stems: Sequence[str], layout=PdfLayout
 			f.write(buff)
 
 from tool_pyocr import Main, MonthDay
-from path_feeder import input_dir_root
 from app_type import AppType
 def conv_to_pdf(app: AppType, main: Main):
 	main.app = app
-	# input_dir = Path(os.environ['SCREEN_BASE_DIR']) / '2025' / '03' 
-	# app_c = 'T' if app == 1 else 'M'
 	fullpath = main.img_dir / f'202503_{app.name}.pdf'
 	sql = f"SELECT `day`, `stem` from `{main.tbl_name}` WHERE `app` = ? ORDER BY `day`;"
 	with closing(main.conn.cursor()) as cur:
@@ -105,7 +100,6 @@ def update_title_in_db_as_md(md: MdPage, main: Main, day: int):
 		cur.execute(update_title_q, (title,))
 	main.conn.commit()
 
-from simple_term_menu import TerminalMenu
 
 #    options = ["entry 1", "entry 2", "entry 3"]
 #    terminal_menu = TerminalMenu(options)

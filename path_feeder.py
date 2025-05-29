@@ -11,43 +11,9 @@ logbook.StreamHandler(sys.stdout,
 
 logger = logbook.Logger(__file__)
 logger.level = logbook.INFO
-home_dir = os.path.expanduser('~')
-home_path = Path(home_dir)
-
-SCREEN_BASE_DIR = 'SCREEN_BASE_DIR'
-SCREEN_YEAR = 'SCREEN_YEAR'
-SCREEN_MONTH = 'SCREEN_MONTH'
-
-from dotenv import dotenv_values
-
-config = dotenv_values(".env")
-logger.info("config from dotenv_values: {}", config)
-# is_dotenv_loaded = load_dotenv('.env', verbose=True)
-
-for k in [SCREEN_BASE_DIR, SCREEN_YEAR, SCREEN_MONTH]:
-	config[k] = config.get(k) or os.environ.get(k)
-try:
-	input_dir_root = Path(config[SCREEN_BASE_DIR])
-except Exception as exc:
-	raise ValueError(f"{SCREEN_BASE_DIR} is not set.") from exc
-if not input_dir_root.exists():
-	raise ValueError(f"`{input_dir_root=}` for {SCREEN_BASE_DIR} does not exist!")
-def check_y_m(key):
-	value = config.get(key)
-	if not value:
-		config[key] = '0'
-		return
-	if not value.isdigit():
-		logger.error("Value: %s (for %s) must be digit!", value, key)
-		raise ValueError(f"Invalid {value=} for {key=}!")
-
-for key in [SCREEN_YEAR, SCREEN_MONTH]:
-	check_y_m(key)
-
-input_ext = '.png'
-
-if not input_dir_root.exists():
-	raise ValueError(f"`{input_dir_root}` for {SCREEN_BASE_DIR} does not exist!")
+# home_dir = os.path.expanduser('~')
+# home_path = Path(home_dir)
+from screen_base import input_dir_root
 
 def path_pair_feeder(from_=1, to=31, input_ext='.png', output_ext='.tact'): #rng=range(0, 31)):
 	for day in range(from_, to + 1):
@@ -93,7 +59,8 @@ def get_last_month_path(dir: Path=input_dir_root, year=0, month=0)-> Path:
 	# MONTH_FORMAT.format(month)
 	# ymstr = f"{year}{month:02}"
 from datetime import date
-def get_year_month(year=0, month=0, config=config)-> date: # tuple[int, int]:
+from screen_base import config_dict
+def get_year_month(year=0, month=0, config=config_dict)-> date: # tuple[int, int]:
 	year = year or int(config[SCREEN_YEAR])
 	# if isinstance(SCREEN_MONTH, int) and SCREEN_MONTH > 0:
 	month = month or int(config[SCREEN_MONTH])
@@ -129,7 +96,7 @@ def get_input_path(year=0, month=0)-> Path:
 
 from typing import Generator, Iterator, Sequence
 class PathFeeder:
-	def __init__(self, year=0, month=0, days: Sequence[int] | range | int=-1, input_type:FileExt=FileExt.PNG, input_dir=input_dir_root, type_dir=True, config=config):
+	def __init__(self, year=0, month=0, days: Sequence[int] | range | int=-1, input_type:FileExt=FileExt.PNG, input_dir=input_dir_root, type_dir=True, config=config_dict):
 		last_date = get_year_month(year=year, month=month, config=config)
 		self.year = last_date.year
 		self.month = last_date.month
@@ -203,7 +170,7 @@ class DbPathFeeder(PathFeeder):
 	from app_type import AppType
 	img_file_ext = '.png'
 
-	def __init__(self, year=0, month=0, days=-1, input_type = FileExt.PNG, input_dir=input_dir_root, type_dir=True, app_type=AppType.T, config=config, db_fullpath=txt_lines_db.sqlite_fullpath()):
+	def __init__(self, year=0, month=0, days=-1, input_type = FileExt.PNG, input_dir=input_dir_root, type_dir=True, app_type=AppType.T, config=config_dict, db_fullpath=txt_lines_db.sqlite_fullpath()):
 		super().__init__(year, month, days, input_type, input_dir, type_dir, config)
 		self.app_type = app_type
 		self.conn = txt_lines_db.connect(db_fullpath=db_fullpath)

@@ -5,14 +5,9 @@ import cv2
 from PIL import Image, ImageSequence
 from dotenv import load_dotenv
 load_dotenv()
-import sys,os
-from pathlib import Path
+import sys
 
-def get screen_base_dir(): -> Path:
-	screen_base_dir_name = os.getenv('SCREEN_BASE_DIR')
-	return Path(screen_base_dir_name) if screen_base_dir_name else Path(__file__).parent
-
-
+from screen_base import get_screen_base_dir
 screen_dir = get_screen_base_dir()
 font_dir = screen_dir / 'font'
 
@@ -38,10 +33,10 @@ PNG_EXT = '.png'
 
 class Byte(int):
 	@property
-	def h(self):
+	def hi(self):
 		return self >> 4
 	@property
-	def l(self):
+	def lo(self):
 		return self & 0xf
 
 class MisakiFont(Enum):
@@ -64,7 +59,7 @@ class MisakiFont(Enum):
 
 		def byte_to_xy(byte: int):
 			b = Byte(byte)
-			return b.l, b.h
+			return b.lo, b.hi
 			
 		def append_fonts(ku: int): 
 			x_pos, y_pos = byte_to_xy(ku)
@@ -77,7 +72,7 @@ class MisakiFont(Enum):
 			font_part = full_image.crop(img_area)
 			return font_part
 		font_image = append_fonts(c)
-		font_dict[c] = font_iamge
+		font_dict[c] = font_image
 		return font_image
 
 class SecondMisakiFont(Enum):
@@ -145,7 +140,7 @@ class MisakiFontImage:
 			image.paste(self.fonts[b], (w * n, 0))'''
 
 
-def pil2cv(image: Image):
+def pil2cv(image: Image.Image):
 	''' PIL型 -> OpenCV型 '''
 	new_image = np.array(image, dtype=np.uint8)
 	if new_image.ndim == 2:  # モノクロ
