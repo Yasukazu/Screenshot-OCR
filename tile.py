@@ -98,10 +98,10 @@ def paged_png_feeder(layout=PdfLayout.a3lp, app_type=AppType.T):
 
 def convert_to_pdf(app_type: AppType, layout=PdfLayout.a3lp):
     names = paged_png_feeder(app_type=app_type, layout=layout)
-    parent_dir = names[0].parent
-    fullpath = parent_dir / f"{year}-{month:02}-{app_type.name}.pdf"
+    output_dir = names[0].parent.parent
+    output_fullpath = output_dir / f"{year}-{month:02}-{app_type.name}.pdf"
     layout_fun = img2pdf.get_layout_fun(layout.value)
-    with open(fullpath,"wb") as f:
+    with open(output_fullpath,"wb") as f:
         for name in names:
             assert name.exists()
         name_list = [str(n) for n in names]
@@ -388,8 +388,8 @@ from main_my_ocr import run_ocr
 def get_options():
         return [
         FunctionItem('Exit', None),
-        FunctionItem('T run OCR', save_arc_pages, kwargs={'app_type': AppType.T}),
-        FunctionItem('M run OCR', save_arc_pages, kwargs={'app_type': AppType.M}),
+        FunctionItem('T run OCR', run_ocr, kwargs={'app_type': AppType.T}),
+        FunctionItem('M run OCR', run_ocr, kwargs={'app_type': AppType.M}),
         FunctionItem('save TM screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.T}),
         FunctionItem('save MH screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.M}),
         FunctionItem('T save_qpng_pages png files into qpng dir.', save_qpng_pages),
