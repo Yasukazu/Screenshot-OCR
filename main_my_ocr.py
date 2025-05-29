@@ -28,7 +28,7 @@ logbook.StreamHandler(sys.stdout,
 logger = logbook.Logger(__file__)
 logger.level = logbook.INFO
 
-from tool_pyocr import PathSet, MyOcr, MonthDay
+from tool_pyocr import PathSet, MyOcr, MonthDay, APP_TYPE_TO_STEM_END
 from app_type import AppType
 
 from txt_lines import TTxtLines, MTxtLines
@@ -120,7 +120,7 @@ class Main:
                     txt_lines = value # result.unwrap()
                 case Failure(_): # if not is_successful(result): # type: ignore
                     raise ValueError(f"Failed to run OCR!")#Unable to extract from {path_set}")
-            result = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
+            result = self.my_ocr.get_daAPP_TYPE_TO_STEM_ENDte(app_type=app_type, txt_lines=txt_lines)
             match result:
                 case Success(value):
                     n, date = value # result.unwrap()
@@ -209,6 +209,8 @@ class Main:
     def ocr_result_into_db1(self, app_type_list: list[AppType]|None=None, limit=62, test=False):
         if not app_type_list:
             app_type_list = [e for e in list(AppType) if e != AppType.NUL]  
+        elif isinstance(app_type_list, AppType):
+            app_type_list = [app_type_list]
         assert limit > 0 
         count = 0
         with closing(self.conn.cursor()) as cur:    

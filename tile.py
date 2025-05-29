@@ -390,20 +390,22 @@ def get_options():
         FunctionItem('Exit', None),
         FunctionItem('T run OCR', run_ocr, kwargs={'app_type': AppType.T}),
         FunctionItem('M run OCR', run_ocr, kwargs={'app_type': AppType.M}),
-        FunctionItem('save TM screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.T}),
-        FunctionItem('save MH screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.M}),
+#        FunctionItem('save TM screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.T}),
+#        FunctionItem('save MH screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.M}),
         FunctionItem('T save_qpng_pages png files into qpng dir.', save_qpng_pages),
         FunctionItem('M save_qpng_pages png files into qpng dir.', save_qpng_pages, kwargs={'app_type': AppType.M}),
-        FunctionItem('save_pages_as_TIFF', save_pages_as_tiff),
+#        FunctionItem('save_pages_as_TIFF', save_pages_as_tiff),
         FunctionItem('T convert_to_pdf', convert_to_pdf, kwargs={'layout':PdfLayout.a3lp, 'app_type': AppType.T}),
         FunctionItem('M convert_to_pdf', convert_to_pdf, kwargs={'layout':PdfLayout.a3lp, 'app_type': AppType.M}),
     ]
 def main(options=get_options()):
-    for n, option in enumerate(options):
-        print(f"{n}. {option.title}")
-    choice = int(input(f"Choose(0 to {len(options)}):"))
-    if choice:
-        options[choice].exec()
+    choice = None
+    while (choice is None) or choice:
+        for n, option in enumerate(options):
+            print(f"{n}. {option.title}")
+        choice = int(input(f"Choose(0 to {len(options)-1}):"))
+        if choice:
+            options[choice].exec()
 
 if __name__ == '__main__':
 
