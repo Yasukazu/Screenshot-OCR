@@ -405,7 +405,8 @@ def main(options=get_options()):
             print(f"{n}. {option.title}")
         choice = int(input(f"Choose(0 to {len(options)-1}):"))
         if choice:
-            options[choice].exec()
+            func = options[choice]
+            func.exec()
 
 if __name__ == '__main__':
 

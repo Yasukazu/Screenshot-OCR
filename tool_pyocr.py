@@ -97,7 +97,7 @@ from getpass import getpass
 from subprocess import Popen, PIPE
 import shlex
 def load_tools():
-    password = getpass("Enter your sudo user password:")
+    password = getpass("Going to install Tesseract tools. Enter your sudo user password:(Just 'Enter' if no password)")
     # sudo requires the flag '-S' in order to take input from stdin
     with_pw = f"-S" if password else ''
     cmds_txt = f'''
