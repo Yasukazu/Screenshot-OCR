@@ -8,17 +8,16 @@ load_dotenv()
 import sys,os
 from pathlib import Path
 
-screen_base_dir_name = os.getenv('SCREEN_BASE_DIR')
+def get screen_base_dir(): -> Path:
+	screen_base_dir_name = os.getenv('SCREEN_BASE_DIR')
+	return Path(screen_base_dir_name) if screen_base_dir_name else Path(__file__).parent
 
-if not screen_base_dir_name:
-	raise ValueError(f"{screen_base_dir_name=} is not set in env.!")
 
-screen_dir = Path(screen_base_dir_name)
-font_dir = Path(screen_base_dir_name) / 'font'
+screen_dir = get_screen_base_dir()
+font_dir = screen_dir / 'font'
 
 if not font_dir.exists():
 	raise ValueError(f"`{font_dir=}` does not exists!")
-
 
 FONT_SIZE = (8, 8)
 HALF_FONT_SIZE = (4, 8)
