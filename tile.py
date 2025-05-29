@@ -15,9 +15,6 @@ load_dotenv()
 from PIL import Image, ImageDraw
 import img2pdf
 import click
-@click.group
-def cli():
-    pass
 import ttl
 home_dir = Path(os.path.expanduser('~'))
 from path_feeder import PathFeeder, get_last_month #, YearMonth
@@ -35,9 +32,10 @@ img_dir = base_dir / str(year) / f'{month:02}'
 if not img_dir.exists():
     img_dir.mkdir()
     logger.info("img_dir is made: {}", img_dir)
-img_width = int(os.environ['IMG_WIDTH'])
-img_height = int(os.environ['IMG_HEIGHT'])
-IMG_SIZE = (img_width, img_height)
+#img_width = int(os.environ['IMG_WIDTH'])
+#img_height = int(os.environ['IMG_HEIGHT'])
+# img_size = {'w': os.environ.get('IMG_WIDTH', 0), 'h': os.environ.get('IMG_HEIGHT', 0)}
+#IMG_SIZE = (img_width, img_height)
 H_PAD = int(os.environ['H_PAD'])
 V_PAD = int(os.environ['V_PAD'])
 
@@ -144,9 +142,9 @@ class ArcFileExt(Enum):
     TIFF = ('.tif', {'compression':"tiff_deflate"})
     PDF = ('.pdf', {})
 from tool_pyocr import AppType
-def save_arc_pages(ext: ArcFileExt=ArcFileExt.TIFF, app_type=AppType.NUL):
+def save_arc_pages(ext: ArcFileExt=ArcFileExt.TIFF, app_type=None):
     from path_feeder import DbPathFeeder
-    feeder = DbPathFeeder(app_type=app_type) if app_type in [AppType.M, AppType.T] else PathFeeder()
+    feeder = DbPathFeeder(app_type=app_type) if app_type else PathFeeder() # in [AppType.M, AppType.T]
     imgs: list[Image.Image] = list(draw_onto_pages(path_feeder=feeder))
     fullpath = img_dir / f"{year}-{month:02}-8x4{ext.value[0]}"
     imgs[0].save(fullpath, save_all=True, append_images=imgs[1:], **ext.value[1])
@@ -166,11 +164,35 @@ TXT_OFST = 0 # width-direction / horizontal
 
 
 from path_feeder import DbPathFeeder
+
+def get_image_size(image_size: Sequence[int]=[0] * 2, path_feeder: PathFeeder=DbPathFeeder())-> tuple[int, int]:
+    """ returns [width, height] """
+    if image_size[0] and image_size[1]:
+        return image_size
+    image_size[0] = os.environ.get('IMG_WIDTH', 0)
+    image_size[1] = os.environ.get('IMG_HEIGHT', 0)
+    if image_size[0] and image_size[1]:
+        logger.info("image_size is set as env.val: {}", image_size)
+        return tuple(image_size)
+    first_fullpath = path_feeder.first_fullpath
+    if not first_fullpath:
+        raise ValueError(f"No '{path_feeder.ext}' file in {path_feeder.dir}!")
+    if not first_fullpath.exists():
+        raise ValueError(f"No '{first_fullpath}' exists!")
+    size = Image.open(first_fullpath).size
+    for d in range(2):
+        image_size[d] = size[d]
+    logger.info("image_size is set as: {}, from first image file: {}", size, first_fullpath)
+    return size
+
 def draw_onto_pages(div=64, th=H_PAD // 2,
     path_feeder: PathFeeder=DbPathFeeder(),
     v_pad=16, h_pad=8, mode='L', dst_bg=ImageFill.BLACK, app_type=AppType.T)-> Iterator[Image.Image]:
     from tool_pyocr import MonthDay
-    first_fullpath = path_feeder.first_fullpath
+    # first_fullpath = path_feeder.first_fullpath
+    for n, stem in path_feeder.feed():
+        break
+    first_fullpath = path_feeder.dir / (stem + path_feeder.ext)
     if not first_fullpath:
         raise ValueError(f"No '{path_feeder.ext}' file in {path_feeder.dir}!")
     # first_img_size = Image.open(first_fullpath).size
@@ -231,13 +253,13 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
         himg2 = concat_h(day_stem_list_2)
         return concat_v(himg1, himg2)
 
-    img_size = Image.open(str(path_feeder.first_fullpath)).size
+    # img_size = Image.open(str(path_feeder.first_fullpath)).size
     def concat_h(day_stem_list: list[tuple[int, str]], pad=h_pad)-> Image.Image:
         imim_len = len(day_stem_list)
         imim = [get_numbered_img(s, number=MonthDay(month, d).as_float) for d, s in day_stem_list]
-        max_height = img_size[1]
-        im_width = img_size[0]
-        width_sum = imim_len * img_size[0]
+        max_height = get_image_size()[1]
+        im_width = get_image_size()[0]
+        width_sum = imim_len * get_image_size()[0]
         dst_size = (width_sum + (imim_len - 1) * pad, max_height)
         dst: Image.Image = Image.new(mode, dst_size, color=dst_bg.value)
         cur = 0
@@ -310,9 +332,9 @@ def get_img_file_names_(glob=True):
         yield None
 
 
-blank_img = Image.new('L', IMG_SIZE, (0xff,))
+# blank_img = Image.new('L', IMG_SIZE, (0xff,))
 
-def open_image(dir: Path, name: str, glob=False):
+'''def open_image(dir: Path, name: str, glob=False):
     if not name:
         global file_over 
         file_over = True
@@ -329,7 +351,7 @@ def open_image(dir: Path, name: str, glob=False):
             return blank_img
     else:
         assert (dir / name).exists()
-        return Image.open(dir/ name)
+        return Image.open(dir/ name)'''
 def get_concat_h(imim_len: int, img_size: tuple[int, int], imim: Sequence[Image.Image | None], pad=0, mode='L', dst_bg=(0xff,))-> Image:
     max_height = img_size[1]
     im_width = img_size[0]
@@ -362,9 +384,12 @@ class FunctionItem:
         self.kwargs = kwargs
     def exec(self):
         self.func(**self.kwargs)
+from main_my_ocr import run_ocr
 def get_options():
         return [
-        FunctionItem('None', None),
+        FunctionItem('Exit', None),
+        FunctionItem('T run OCR', save_arc_pages, kwargs={'app_type': AppType.T}),
+        FunctionItem('M run OCR', save_arc_pages, kwargs={'app_type': AppType.M}),
         FunctionItem('save TM screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.T}),
         FunctionItem('save MH screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.M}),
         FunctionItem('T save_qpng_pages png files into qpng dir.', save_qpng_pages),

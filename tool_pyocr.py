@@ -92,12 +92,38 @@ class MDateError(OCRError):
 
     def __str__(self):
         return f"MDateError: {self.args[0]}"
+
+from getpass import getpass
+from subprocess import Popen, PIPE
+import shlex
+def load_tools():
+    password = getpass("Enter your sudo user password:")
+    # sudo requires the flag '-S' in order to take input from stdin
+    with_pw = f"-S" if password else ''
+    cmds_txt = f'''
+        sudo {with_pw} apt install tesseract-ocr -y
+        sudo {with_pw} apt install libtesseract-dev -y
+        sudo {with_pw} apt install tesseract-ocr-jpn -y
+        '''
+    cmd_lines = [txt.strip() for txt in cmds_txt.split('\n') if txt.strip()]
+    for cmd_line in cmd_lines:
+        cmds = shlex.split(cmd_line)
+        proc = Popen(cmds, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+        if password:
+            proc.communicate(password.encode())
+        print("Installing tools: {}".format(proc))
+        while proc.poll() is None:
+            print('status:', proc.stdout.readline().decode().strip())
+
 class MyOcr:
     from path_feeder import input_dir_root, input_ext
     tools = pyocr.get_available_tools()
 
     if len(tools) == 0:
-        raise ValueError("No OCR tool found")
+        load_tools()
+        tools = pyocr.get_available_tools()
+        if len(tools) == 0:
+            raise ValueError("No OCR tool found")
     tool = tools[0]
     assert tool is not None, "No OCR tool found!"
 

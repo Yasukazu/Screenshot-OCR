@@ -222,6 +222,12 @@ class DbPathFeeder(PathFeeder):
 		with closing(self.conn.cursor()) as cur:
 			one = cur.execute(sql, self.table_name).fetchone()
 			return bool(one)
+	@property
+	def first_fullpath(self)-> Path | None:
+		stem = None
+		for day, stem in self.feed(padding=False):
+			break
+		return self.dir / (stem + self.ext) if stem else None
 	
 	def feed(self, padding=False, delim='', day_to_stem={}) -> Iterator[tuple[int, str]]:
 			tbl_name = txt_lines_db.get_table_name(self.month)

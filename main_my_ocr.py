@@ -742,12 +742,12 @@ def run_check_DB_T(month: int, day_check_only=False):
     main = Main(my_ocr=my_ocr, app_type=AppType.T)
     main.check_DB_T(month=month, day_check_only=day_check_only)
 
-def run_ocr(month: int, limit=62, app_type: AppType = AppType.NUL, test=False, tbl_ver=1):
+def run_ocr(month: int=0, limit=62, app_type: AppType = AppType.NUL, test=False, tbl_ver=1):
     """Run OCR and save result into DB."""
     my_ocr = MyOcr(month=month)
     main = Main(my_ocr=my_ocr, app_type=app_type, tbl_ver=tbl_ver)
 
-    main.ocr_result_into_db(limit=limit, test=test)
+    main.ocr_result_into_db(limit=limit, app_type_list=app_type, test=test)
 
 import click
 @click.group()
