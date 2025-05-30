@@ -24,7 +24,8 @@ def convert_to_pdf(output_fullpath: Path, stems: Sequence[str], layout=PdfLayout
 		if buff:
 			f.write(buff)
 
-from tool_pyocr import Main, MonthDay
+from tool_pyocr import MonthDay
+from main_my_ocr import Main
 from app_type import AppType
 def conv_to_pdf(app: AppType, main: Main):
 	main.app = app

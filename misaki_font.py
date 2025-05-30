@@ -4,7 +4,7 @@ import numpy as np
 import cv2
 from PIL import Image, ImageSequence
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(override=True)
 import sys
 
 from screen_base import get_screen_base_dir
@@ -65,7 +65,7 @@ class MisakiFont(Enum):
 			x_pos, y_pos = byte_to_xy(ku)
 			x_offset = x_pos * 4
 			y_offset = y_pos * 8
-			offset = array(x_offset, y_offset)
+			offset = np.array(x_offset, y_offset)
 			end_point = offset + np.array(HALF_FONT_SIZE)
 			area = array([offset, end_point])
 			img_area = area.ravel().tolist()
@@ -144,12 +144,13 @@ def pil2cv(image: Image.Image):
 	''' PIL型 -> OpenCV型 '''
 	new_image = np.array(image, dtype=np.uint8)
 	if new_image.ndim == 2:  # モノクロ
-		pass
+		return new_image
 	elif new_image.shape[2] == 3:  # カラー
-		new_image = cv2.cvtColor(new_image, cv2.COLOR_RGB2BGR)
+		return cv2.cvtColor(new_image, cv2.COLOR_RGB2BGR)
 	elif new_image.shape[2] == 4:  # 透過
-		new_image = cv2.cvtColor(new_image, cv2.COLOR_RGBA2BGRA)
-	return new_image
+		return cv2.cvtColor(new_image, cv2.COLOR_RGBA2BGRA)
+	else:
+		raise ValueError(f"Unsupported image type: {new_image.shape[2]=}")
 
 
 def cv2pil(image):
@@ -167,7 +168,7 @@ def cv2pil(image):
 
 if __name__ == '__main__':
 	import sys
-	c = input('char for the font:')
+	c = input('char for the font:')[0].encode()[0]
 	if c > 255:
 		raise ValueError(f"{c=} exceeds half font range(255)")
 	font_image = MisakiFont.get_half_font_image(c)

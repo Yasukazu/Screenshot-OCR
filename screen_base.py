@@ -1,7 +1,7 @@
 import os, sys
 from pathlib import Path
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(override=True)
 import logbook
 logbook.StreamHandler(sys.stdout,
 	format_string='{record.time:%Y-%m-%d %H:%M:%S.%f} {record.level_name} {record.filename}:{record.lineno}: {record.message}').push_application()
