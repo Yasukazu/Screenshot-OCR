@@ -1,6 +1,7 @@
 # -- coding: utf-8 --
 import os, sys
 from pathlib import Path
+import functools
 import logging
 logger = logging.getLogger(__name__)
 stdout_handler = logging.StreamHandler(stream=sys.stdout)
@@ -11,22 +12,41 @@ home_dir = os.path.expanduser('~')
 home_path = Path(home_dir)
 
 SCREEN_BASE_DIR = 'SCREEN_BASE_DIR'
+DEFAULT_SCREEN_BASE_DIR = 'screen-data' # default value
 SCREEN_YEAR = 'SCREEN_YEAR'
 SCREEN_MONTH = 'SCREEN_MONTH'
 
-from dotenv import dotenv_values, load_dotenv
+from dotenv import dotenv_values
 # load_dotenv('.env', verbose=True, override=True) #, dotenv_path=Path.home() / '.env')
 config = dotenv_values(".env")
+if SCREEN_BASE_DIR not in config:
+	screen_base_dir_config = os.environ.get(SCREEN_BASE_DIR)
+	if screen_base_dir_config:
+		config[SCREEN_BASE_DIR] = screen_base_dir_config
+		logger.info("screen_base_dir_name is supplemented from environ value: %s", screen_base_dir_config)
+	else:
+		logger.warning("Environment variable '%s' is not set, using default value: %s", SCREEN_BASE_DIR, DEFAULT_SCREEN_BASE_DIR)
+		config[SCREEN_BASE_DIR] = DEFAULT_SCREEN_BASE_DIR
 
-logger.info("config from dotenv_values: %s", config)
-# is_dotenv_loaded = load_dotenv('.env', verbose=True)
+def set_input_dir_root(root: Path | str):
+	"""Set the root input directory path."""
+	if isinstance(root, str):
+		root = Path(root)
+	if not root.is_absolute():
+		root = Path().home / root
+	config[SCREEN_BASE_DIR] = str(root)
+	logger.info("'%s' is set as: '%s'", SCREEN_BASE_DIR, config[SCREEN_BASE_DIR])
+	return root
 
-screen_base_dir_name = config.get(SCREEN_BASE_DIR) or os.environ.get(SCREEN_BASE_DIR) or 'screen-data'
-input_dir_root = Path().home / screen_base_dir_name
-logger.info("'input_dir_root' is set as: '%s'", input_dir_root)
-if not input_dir_root.exists():
+def get_input_dir_root():
+	"""Get the root input directory path."""
+	return Path().home / config[SCREEN_BASE_DIR]
+
+# logger.info("'input_dir_root' is set as: '%s'", input_dir_root)
+''' if not get_input_dir_root().exists():
 	input_dir_root.mkdir(parents=True)#, exist_ok=True)
 	logger.info("Created directory for input_dir_root: '%s'", input_dir_root)
+'''
 
 def check_y_m(key: str):
 	value = config.get(key) or os.environ.get(key) or '0'
@@ -43,9 +63,9 @@ def check_y_m(key: str):
 for key in [SCREEN_YEAR, SCREEN_MONTH]:
 	check_y_m(key)
 
-input_ext = '.png'
+INPUT_EXT = '.png'
 
-def path_pair_feeder(from_=1, to=31, input_ext='.png', output_ext='.tact'): #rng=range(0, 31)):
+def path_pair_feeder(from_=1, to=31, input_ext='.png', output_ext='.tact', input_dir_root=get_input_dir_root()): #rng=range(0, 31)):
 	for day in range(from_, to + 1):
 		input_filename = f'2025-01-{day:02}{input_ext}'
 		input_fullpath = input_dir_root / input_filename
@@ -79,13 +99,13 @@ YearMonth = namedtuple('YearMonth', ['year', 'month'] )
 YEAR_FORMAT = "{:04}"
 MONTH_FORMAT = "{:02}"
 
-def get_last_month_path(dir: Path=input_dir_root, year=0, month=0)-> Path:
+def get_last_month_path(direc: Path=get_input_dir_root(), year=0, month=0)-> Path:
 	last_month = get_last_month()
 	if not year:
 		year = last_month.year
 	if not month:
 		month = last_month.month
-	return dir / ("%d" % year) / ("%02d" % month)
+	return direc / ("%d" % year) / ("%02d" % month)
 	# MONTH_FORMAT.format(month)
 	# ymstr = f"{year}{month:02}"
 from datetime import date
@@ -109,13 +129,13 @@ def get_ymstr(year=0, month=0, sep=False)-> str:
 	sepr = '-' if sep else ''
 	return f"{year}{sepr}{month:02}"
 
-def get_input_path(year=0, month=0)-> Path:
+def get_input_path(year=0, month=0, input_dir_root=get_input_dir_root())-> Path:
 	ymstr = get_ymstr(year=year, month=month)
 	return input_dir_root / ymstr
 
 from typing import Generator, Iterator, Sequence
 class PathFeeder:
-	def __init__(self, year=0, month=0, days: Sequence[int] | range | int=-1, input_type:FileExt=FileExt.PNG, input_dir=input_dir_root, type_dir=True, config=config):
+	def __init__(self, year=0, month=0, days: Sequence[int] | range | int=-1, input_type:FileExt=FileExt.PNG, input_dir=get_input_dir_root(), type_dir=True, config=config):
 		last_date = get_year_month(year=year, month=month, config=config)
 		self.year = last_date.year
 		self.month = last_date.month
@@ -189,7 +209,7 @@ class DbPathFeeder(PathFeeder):
 	from app_type import AppType
 	img_file_ext = '.png'
 
-	def __init__(self, year=0, month=0, days=-1, input_type = FileExt.PNG, input_dir=input_dir_root, type_dir=False, app_type=AppType.T, config=config, db_fullpath=txt_lines_db.sqlite_fullpath()):
+	def __init__(self, year=0, month=0, days=-1, input_type = FileExt.PNG, input_dir=get_input_dir_root(), type_dir=False, app_type=AppType.T, config=config, db_fullpath=txt_lines_db.sqlite_fullpath()):
 		super().__init__(year, month, days, input_type, input_dir, type_dir, config)
 		self.app_type = app_type
 		self.conn = txt_lines_db.connect(db_fullpath=db_fullpath)
@@ -224,7 +244,7 @@ class DbPathFeeder(PathFeeder):
 				for dy in day_to_stem:
 					yield dy, day_to_stem[dy]
 
-def path_feeder(year=0, month=0, from_=1, to=-1, input_type:FileExt=FileExt.PNG, padding=True)-> Generator[tuple[Path | None, str, int], None, None]:
+def path_feeder(year=0, month=0, from_=1, to=-1, input_type:FileExt=FileExt.PNG, padding=True, input_dir_root=get_input_dir_root())-> Generator[tuple[Path | None, str, int], None, None]:
 	'''to=0:glob, -1:end of month
 	returns: directory, filename, day'''
 	last_date = get_last_month(year=year, month=month) # f"{year}{month:02}"
@@ -274,13 +294,11 @@ TIFF_EXT = '.tif'
 def get_imgnum_sfx(n):
 	return '-img%02d' % n
 
-def get_tiff_fullpath(year=0, month=0)-> Path:
+def get_tiff_fullpath(year=0, month=0, input_dir=get_input_dir_root())-> Path:
 	ym_str = get_ymstr(year=year, month=month, sep=True)
-	return input_dir_root / ''.join([ym_str, get_imgnum_sfx(32), TIFF_EXT])
+	return input_dir / ''.join([ym_str, get_imgnum_sfx(32), TIFF_EXT])
 
 if __name__ == '__main__':
-	from logger import set_logger
-	set_logger()
 	from pprint import pp
 	feeder = DbPathFeeder()
 	files = [f for f in feeder.feed()]

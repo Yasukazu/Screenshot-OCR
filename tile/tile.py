@@ -257,7 +257,7 @@ def draw_onto_pages(path_feeder: PathFeeder, div=64, th=H_PAD // 2,
 
 from collections import namedtuple
 WidthHeight = namedtuple('WidthHeight', ['width', 'height'])
-def concat_8_pages(img_size: tuple[int, int], dir: Path, ext: str, names: Iterator[str], h_pad: int=0, v_pad: int=0)-> Image:
+def concat_8_pages(img_size: tuple[int, int], dir: Path, ext: str, names: Sequence[str], h_pad: int=0, v_pad: int=0)-> Image.Image:
     def open_img(f: str)-> Image.Image | None:
         fullpath = dir / (f + ext)
         img =  Image.open(fullpath) if fullpath.exists() else None
@@ -267,8 +267,8 @@ def concat_8_pages(img_size: tuple[int, int], dir: Path, ext: str, names: Iterat
     names_2 = list(names[4:])
 
     img_count = len(list(names))
-    himg1 = get_concat_h(img_count, img_size, (open_img(n) for n in names_1), pad=h_pad) # (dq()))
-    himg2 = get_concat_h(img_count, img_size, (open_img(n) for n in names_2), pad=h_pad) # (dq()))h4img()
+    himg1 = get_concat_h(img_count, img_size, [open_img(n) for n in names_1], pad=h_pad) # (dq()))
+    himg2 = get_concat_h(img_count, img_size, [open_img(n) for n in names_2], pad=h_pad) # (dq()))h4img()
     return get_concat_v(2, img_size, (himg1, himg2), pad=v_pad)
 
 def get_img_file_names_(glob=True):
@@ -300,7 +300,7 @@ def open_image(dir: Path, name: str, glob=False):
     else:
         assert (dir / name).exists()
         return Image.open(dir/ name)
-def get_concat_h(imim_len: int, img_size: tuple[int, int], imim: Sequence[Image.Image | None], pad=0, mode='L', dst_bg=(0xff,))-> Image:
+def get_concat_h(imim_len: int, img_size: tuple[int, int], imim: Sequence[Image.Image | None], pad=0, mode='L', dst_bg=(0xff,))-> Image.Image:
     max_height = img_size[1]
     im_width = img_size[0]
     width_sum = imim_len * img_size[0]
@@ -350,26 +350,11 @@ def main(options=get_options()):
     breakpoint()
     if choice:
         options[choice].exec()
-    '''
-    import simple_term_menu as st_menu
-    term_menu = st_menu.TerminalMenu([op.title for op in options])
-    from consolemenu import ConsoleMenu
-    from consolemenu.items import FunctionItem, SubmenuItem
-    menu = ConsoleMenu("Tile Menu")
-    submenu = ConsoleMenu("Save images as TIFF")
-    for fi in [
-            FunctionItem('save TM screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.T}),
-            FunctionItem('save MH screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.M}),
-            ]:
-        submenu.append_item(fi)
 
-    menu.show()'''
 if __name__ == '__main__':
-    import sys
     main()
-    sys.exit(0)
-
-    import click
+    '''import click
     @click.group
     def cli():
         pass
+    '''

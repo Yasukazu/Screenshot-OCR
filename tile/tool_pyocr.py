@@ -81,7 +81,7 @@ class MDateError(OCRError):
     def __str__(self):
         return f"MDateError: {self.args[0]}"
 class MyOcr:
-    from path_feeder import input_dir_root, input_ext
+    from path_feeder import input_dir_root, INPUT_EXT
     tools = pyocr.get_available_tools()
     tool = tools[0]
     assert tool is not None, "No OCR tool found!"
@@ -463,7 +463,7 @@ class Main:
                     if file.stem in self.get_OCRed_files():
                         continue
                     app = app_type.value
-                    path_set = PathSet(self.my_ocr.input_dir, file.stem, ext=self.my_ocr.input_ext)
+                    path_set = PathSet(self.my_ocr.input_dir, file.stem, ext=self.my_ocr.INPUT_EXT)
                     result = self.my_ocr.run_ocr(path_set)
                     match result:
                         case Success(value):
