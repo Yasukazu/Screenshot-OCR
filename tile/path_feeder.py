@@ -1,7 +1,12 @@
-import os
+# -- coding: utf-8 --
+import os, sys
 from pathlib import Path
 import logging
 logger = logging.getLogger(__name__)
+stdout_handler = logging.StreamHandler(stream=sys.stdout)
+logger.addHandler(stdout_handler)
+format_output = logging.Formatter('%(levelname)s : %(name)s : %(message)s : %(asctime)s') # <-
+stdout_handler.setFormatter(format_output)
 home_dir = os.path.expanduser('~')
 home_path = Path(home_dir)
 
@@ -9,36 +14,37 @@ SCREEN_BASE_DIR = 'SCREEN_BASE_DIR'
 SCREEN_YEAR = 'SCREEN_YEAR'
 SCREEN_MONTH = 'SCREEN_MONTH'
 
-from dotenv import dotenv_values
-
+from dotenv import dotenv_values, load_dotenv
+# load_dotenv('.env', verbose=True, override=True) #, dotenv_path=Path.home() / '.env')
 config = dotenv_values(".env")
+
 logger.info("config from dotenv_values: %s", config)
 # is_dotenv_loaded = load_dotenv('.env', verbose=True)
 
-for k in [SCREEN_BASE_DIR, SCREEN_YEAR, SCREEN_MONTH]:
-	config[k] = config.get(k) or os.environ.get(k)
-try:
-	input_dir_root = Path(config[SCREEN_BASE_DIR])
-except Exception as exc:
-	raise ValueError(f"{SCREEN_BASE_DIR} is not set.") from exc
+screen_base_dir = config.get(SCREEN_BASE_DIR) or os.environ.get(SCREEN_BASE_DIR)
+if not screen_base_dir:
+	config[SCREEN_BASE_DIR] = screen_base_dir = str(home_path)
+	logger.warning("'screen_base_dir' is set as '%s' since environment variable '%s' is not set.", screen_base_dir, SCREEN_BASE_DIR)
+input_dir_root = Path(screen_base_dir)
 if not input_dir_root.exists():
 	raise ValueError(f"`{input_dir_root=}` for {SCREEN_BASE_DIR} does not exist!")
-def check_y_m(key):
-	value = config.get(key)
-	if not value:
-		config[key] = '0'
-		return
+
+def check_y_m(key: str):
+	value = config.get(key) or os.environ.get(key) or '0'
 	if not value.isdigit():
 		logger.error("Value: %s (for %s) must be digit!", value, key)
 		raise ValueError(f"Invalid {value=} for {key=}!")
+	else:
+		value = int(value)
+		if value < 0:
+			logger.error("Value: %s (for %s) must be larger than or equal to 0!", value, key)
+			raise ValueError(f"Invalid {value=} for {key=}")
+		config[key] = value
 
 for key in [SCREEN_YEAR, SCREEN_MONTH]:
 	check_y_m(key)
 
 input_ext = '.png'
-
-if not input_dir_root.exists():
-	raise ValueError(f"`{input_dir_root}` for {SCREEN_BASE_DIR} does not exist!")
 
 def path_pair_feeder(from_=1, to=31, input_ext='.png', output_ext='.tact'): #rng=range(0, 31)):
 	for day in range(from_, to + 1):

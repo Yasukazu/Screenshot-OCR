@@ -7,11 +7,18 @@ from dotenv import load_dotenv
 load_dotenv()
 import sys,os
 from pathlib import Path
+import logging
+logger = logging.getLogger(__name__)
+stdout_handler = logging.StreamHandler(stream=sys.stdout)
+logger.addHandler(stdout_handler)
+format_output = logging.Formatter('%(levelname)s : %(name)s : %(message)s : %(asctime)s') # <-
+stdout_handler.setFormatter(format_output)
 
 screen_base_dir_name = os.getenv('SCREEN_BASE_DIR')
 
 if not screen_base_dir_name:
-	raise ValueError(f"{screen_base_dir_name=} is not set in env.!")
+	screen_base_dir_name = str(Path.home())
+	logger.warning("'screen_base_dir_name' is set as '%s' since environment variable 'SCREEN_BASE_DIR' is not set.", screen_base_dir_name)
 
 screen_dir = Path(screen_base_dir_name)
 font_dir = Path(screen_base_dir_name) / 'font'

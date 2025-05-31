@@ -7,14 +7,10 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 import img2pdf
-import click
-@click.group
-def cli():
-    pass
 import ttl
 home_dir = Path(os.path.expanduser('~'))
 from path_feeder import PathFeeder, get_last_month #, YearMonth
-from digit_image import ImageFill
+from image_fill import ImageFill
 from put_number import PutPos #, put_number
 from app_type import AppType
 
@@ -108,7 +104,7 @@ def save_into_pdf(layout=PdfLayout.a3lp):
         name_list = [str(n) for n in names]
         f.write(img2pdf.convert(layout_fun=layout_fun, *name_list, rotation=img2pdf.Rotation.ifvalid))
 
-from path_feeder import PathFeeder
+
 def save_pages_as_pdf(): #fullpath=PathFeeder().first_fullpath):
     fullpath = img_dir / f"{year_month_name}.pdf"
     imges = list(draw_onto_pages())
@@ -117,7 +113,7 @@ def save_pages_as_tiff():
     fullpath = img_dir / f"{year_month_name}.tif"
     imges = list(draw_onto_pages())
     imges[0].save(fullpath, save_all=True, append_imges=imges[1:])
-from path_feeder import ext_to_dir, FileExt, ExtDir
+from path_feeder import FileExt
 def save_qpng_pages(app_type=AppType.T, ext_dir=FileExt.QPNG):
     save_dir = img_dir / ext_dir.value.dir
     if not save_dir.exists():
@@ -138,16 +134,6 @@ def save_arc_pages(ext: ArcFileExt=ArcFileExt.TIFF, app_type=AppType.NUL):
     imgs: list[Image.Image] = list(draw_onto_pages(path_feeder=feeder))
     fullpath = img_dir / f"{year}-{month:02}-8x4{ext.value[0]}"
     imgs[0].save(fullpath, save_all=True, append_images=imgs[1:], **ext.value[1])
-
-
-from path_feeder import FileExt
-'''def get_png_file_names()-> Generator[tuple[Path, str, int], None, None]:
-    for path, stem, m in path_feeder(input_type=FileExt.PNG):
-        yield path, stem, m
-
-def get_quad_png_file_names()-> Generator[tuple[Path, str, int], None, None]:
-    for path, stem, m in path_feeder(input_type=FileExt.QPNG):
-        yield path, stem, m'''
 
 DAY_NOMBRE_H = 50
 TXT_OFST = 0 # width-direction / horizontal
@@ -201,10 +187,6 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
             yield concat_8_pages(block, number=number) # number_str=f"{path_feeder.month:02}{(-0xa - i):x}")
 
 
-    '''digit_image_param_L = BasicDigitImage.calc_scale_from_height(80)
-    from seg_node_pair import DigitStrokeFeeder
-    stroke_feeder = DigitStrokeFeeder(scale=digit_image_param_L.scale, offset=digit_image_param_L.padding)
-    digit_image_feeder_L = BasicDigitImage(stroke_feeder=stroke_feeder, param=digit_image_param_L, bgcolor=ImageFill.BLACK)'''
     # digit_image_param_L = BASIC_DIGIT_IMAGE_PARAM_LIST[1]
     from misaki_font import MisakiFontImage
     digit_image_feeder_L = MisakiFontImage(12)
@@ -250,10 +232,6 @@ def draw_onto_pages(div=64, th=H_PAD // 2,
         if fullpath.exists():
             img = Image.open(fullpath).convert('L')
             return img
-            '''number_image, margin = get_number_image(size=number_size, nn=[int(c) for c in fn])
-            offset = [s for s in (np.array(margin) + np.array(number_offset))]
-            img.paste(number_image, offset)
-            return img'''
 
     for pg, img in enumerate(get_image_blocks()):
         ct = (img.width // 2, img.height // 2) # s // 2 for s in img.size)
@@ -383,5 +361,11 @@ def main(options=get_options()):
 
     menu.show()'''
 if __name__ == '__main__':
-
+    import sys
     main()
+    sys.exit(0)
+
+    import click
+    @click.group
+    def cli():
+        pass

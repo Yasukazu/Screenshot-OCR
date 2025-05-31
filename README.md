@@ -74,7 +74,8 @@
   - `PYTHONPATH=/usr/local/lib/python3.8/dist-packages`
   - `LD_LIBRARY_PATH=/usr/local/lib:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/lib64:/lib:/usr/lib`
 
-
+## Misaki Font PNG image:
+https://littlelimit.net/arc/misaki/misaki_png_2021-05-05a.zip
 ## In case of failure of OCR or unable to setup tesseract-ocr and Python packages:
 1. convert png files into a pdf file: `convert *.png dest.pdf `
 

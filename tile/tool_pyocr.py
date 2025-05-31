@@ -8,6 +8,7 @@ from pprint import pp
 from pathlib import Path
 from dataclasses import dataclass
 import pickle
+import sys
 
 import pandas
 from dotenv import load_dotenv
@@ -17,14 +18,16 @@ import pyocr
 import pyocr.builders
 from pyocr.builders import LineBox
 from returns.pipeline import is_successful, UnwrapFailedError
-import loguru # logging
-logger = loguru.logger # logging.getLogger(__name__)
-#logger.setLevel(logging.DEBUG)
-logger.remove()
-import sys
-logger.add(sys.stderr, level="DEBUG")
-logger.add(sys.stdout, level="INFO")
-logger.add("WARNING.log", level="WARNING")
+
+import logging
+logger = logging.getLogger(__name__)
+stdout_handler = logging.StreamHandler(stream=sys.stdout)
+logger.addHandler(stdout_handler)
+format_output = logging.Formatter('%(levelname)s : %(name)s : %(message)s : %(asctime)s') # <-
+stdout_handler.setFormatter(format_output)
+# logger.add(sys.stderr, level="DEBUG")
+# logger.add(sys.stdout, level="INFO")
+# logger.add("WARNING.log", level="WARNING")
 from app_type import AppType
 @dataclass
 class Date:

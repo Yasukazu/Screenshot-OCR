@@ -5,22 +5,14 @@ from dataclasses import dataclass, field
 from collections.abc import Callable
 from collections.abc import Sequence
 from PIL import ImageDraw, Image
-import numpy as np
-from strok7 import STRK_DICT_STEM, StrokeSlant, i_i_tpl
-from format_num import FormatNum, HexFormatNum, conv_num_to_bin, formatnums_to_bytearray
+from image_fill import ImageFill
+from format_num import FormatNum, FormatNum, formatnums_to_bytearray
 from num_strokes import SEGPOINTS_MAX #, DigitStrokes, BasicDigitStrokes
-from segment_strokes import hex_to_bit8, SegmentStrokes
+
 from seg_node_pair import DigitStrokeFeeder, encode_str_to_seg7bit8
 from seg7bit8 import Seg7Bit8
 from digit_strokes import DigitStrokes
-class ImageFill(Enum): # single element tuple for ImageDraw color
-	BLACK = (0,)
-	WHITE = (0xff,)
-	@classmethod
-	def invert(cls, fill):
-		if fill == ImageFill.BLACK:
-			return ImageFill.WHITE
-		return ImageFill.BLACK
+
 
 OfstIWIH = namedtuple('OfstIWIH', ['ofst', 'img_w', 'img_h'])
 DigitImageCalcResult = namedtuple('DigitImageCalcResult', ['scale', 'font_scale', 'padding', 'line_width'])
