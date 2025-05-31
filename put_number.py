@@ -10,7 +10,7 @@ class PutPos(IntEnum):
 	C = 0
 	R = 1
 from typing import Any
-from misaki import MisakiFontImage
+from misaki_font import MisakiFontImage
 NUMBER_STR = 'number_str'
 NUMBER = 'number'
 def put_number(digit_image_feeder: MisakiFontImage, pos: PutPos=PutPos.L):#SegmentImage(BasicDigitImage.calc_scale_from_height())):

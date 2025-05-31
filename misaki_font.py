@@ -4,21 +4,15 @@ import numpy as np
 import cv2
 from PIL import Image, ImageSequence
 from dotenv import load_dotenv
-load_dotenv()
-import sys,os
-from pathlib import Path
+load_dotenv(override=True)
+import sys
 
-screen_base_dir_name = os.getenv('SCREEN_BASE_DIR')
-
-if not screen_base_dir_name:
-	raise ValueError(f"{screen_base_dir_name=} is not set in env.!")
-
-screen_dir = Path(screen_base_dir_name)
-font_dir = Path(screen_base_dir_name) / 'font'
+from screen_base import get_screen_base_dir
+screen_dir = get_screen_base_dir()
+font_dir = screen_dir / 'font'
 
 if not font_dir.exists():
 	raise ValueError(f"`{font_dir=}` does not exists!")
-
 
 FONT_SIZE = (8, 8)
 HALF_FONT_SIZE = (4, 8)
@@ -39,10 +33,10 @@ PNG_EXT = '.png'
 
 class Byte(int):
 	@property
-	def h(self):
+	def hi(self):
 		return self >> 4
 	@property
-	def l(self):
+	def lo(self):
 		return self & 0xf
 
 class MisakiFont(Enum):
@@ -65,20 +59,20 @@ class MisakiFont(Enum):
 
 		def byte_to_xy(byte: int):
 			b = Byte(byte)
-			return b.l, b.h
+			return b.lo, b.hi
 			
 		def append_fonts(ku: int): 
 			x_pos, y_pos = byte_to_xy(ku)
 			x_offset = x_pos * 4
 			y_offset = y_pos * 8
-			offset = array(x_offset, y_offset)
+			offset = np.array(x_offset, y_offset)
 			end_point = offset + np.array(HALF_FONT_SIZE)
 			area = array([offset, end_point])
 			img_area = area.ravel().tolist()
 			font_part = full_image.crop(img_area)
 			return font_part
 		font_image = append_fonts(c)
-		font_dict[c] = font_iamge
+		font_dict[c] = font_image
 		return font_image
 
 class SecondMisakiFont(Enum):
@@ -146,16 +140,17 @@ class MisakiFontImage:
 			image.paste(self.fonts[b], (w * n, 0))'''
 
 
-def pil2cv(image: Image):
+def pil2cv(image: Image.Image):
 	''' PIL型 -> OpenCV型 '''
 	new_image = np.array(image, dtype=np.uint8)
 	if new_image.ndim == 2:  # モノクロ
-		pass
+		return new_image
 	elif new_image.shape[2] == 3:  # カラー
-		new_image = cv2.cvtColor(new_image, cv2.COLOR_RGB2BGR)
+		return cv2.cvtColor(new_image, cv2.COLOR_RGB2BGR)
 	elif new_image.shape[2] == 4:  # 透過
-		new_image = cv2.cvtColor(new_image, cv2.COLOR_RGBA2BGRA)
-	return new_image
+		return cv2.cvtColor(new_image, cv2.COLOR_RGBA2BGRA)
+	else:
+		raise ValueError(f"Unsupported image type: {new_image.shape[2]=}")
 
 
 def cv2pil(image):
@@ -173,7 +168,7 @@ def cv2pil(image):
 
 if __name__ == '__main__':
 	import sys
-	c = input('char for the font:')
+	c = input('char for the font:')[0].encode()[0]
 	if c > 255:
 		raise ValueError(f"{c=} exceeds half font range(255)")
 	font_image = MisakiFont.get_half_font_image(c)
