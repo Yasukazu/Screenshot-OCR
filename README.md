@@ -12,9 +12,9 @@
 
 ## Directory structure:
 
-1. App route: ~/screen/from contextlib import closing
-2. Year: screen/2025/
-3. Month: screen/2025/01/ : 01 is January.
+1. App route: `~/screen/`
+2. Year: `screen/2025/`
+3. Month: `screen/2025/01/` : 01 is January.
 
 ## Necessary files:
 
@@ -49,10 +49,12 @@
 
 ## Extract Text from PNG image file:
 0. install Tesseract OCR
-  - `sudo apt install tesseract-ocr`
-  - `sudo apt install libtesseract-dev`
 0a. install tesseract-ocr language data
-  - `sudo apt install tesseract-ocr-jpn`
+```
+sudo apt install tesseract-ocr -y
+sudo apt install libtesseract-dev -y
+sudo apt install tesseract-ocr-jpn -y
+```
 0b. check tesseract-ocr version and language data
   - `tesseract --version`
   - `tesseract --list-langs`
@@ -65,15 +67,44 @@
   - `pip install opencv-python-headless`
   - `pip install Pillow`
   - `pip install pandas`
+  - `pip install logbook`
+  ## `requirements.txt`:  ```
+        pandas
+        Pillow
+        click
+        opencv-contrib-python
+        python-dotenv
+        pytesseract
+        pyocr
+        returns
+        ipdb
+        loguru
+        logbook
+      ```
 0d. install ImageMagick
   - `sudo apt install imagemagick`
 0e. setup `.env` file
-  - `TXT_LINES_DB=txt_lines.sqlite`
+```
+SCREEN_BASE_DIR='/home/user1/screen'
+SCREEN_YEAR='2025'
+SCREEN_MONTH='05'
+TXT_LINES_DB='txt_lines.sqlite'
+H_PAD=20
+V_PAD=40
+```
+
   - `TESSDATA_PREFIX=/usr/share/tesseract-ocr/4.00/tessdata`
   - `TESSDATA_DIR=/usr/share/tesseract-ocr/4.00/tessdata`
   - `PYTHONPATH=/usr/local/lib/python3.8/dist-packages`
   - `LD_LIBRARY_PATH=/usr/local/lib:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/lib64:/lib:/usr/lib`
-
+0f. Install Misaki Font
+from cwd as screen root:
+```
+wget https://littlelimit.net/arc/misaki/misaki_png_2021-05-05a.zip
+mkdir font
+unzip misaki_png_2021-05-05a.zip -d font
+ls font/misaki_gothic.png
+```
 
 ## In case of failure of OCR or unable to setup tesseract-ocr and Python packages:
 1. convert png files into a pdf file: `convert *.png dest.pdf `
