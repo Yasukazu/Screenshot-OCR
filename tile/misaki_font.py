@@ -4,7 +4,8 @@ import numpy as np
 import cv2
 from PIL import Image, ImageSequence
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(override=True) #, verbose=True)
+
 import sys,os
 from pathlib import Path
 import logging
@@ -14,33 +15,30 @@ logger.addHandler(stdout_handler)
 format_output = logging.Formatter('%(levelname)s : %(name)s : %(message)s : %(asctime)s') # <-
 stdout_handler.setFormatter(format_output)
 
-screen_base_dir_name = os.getenv('SCREEN_BASE_DIR')
+data_dir = Path(os.getenv('SCREEN_BASE_DIR') or os.getenv('SCREEN_DATA_DIR') or 'screen-data')
 
-if not screen_base_dir_name:
-	screen_base_dir_name = str(Path.home())
-	logger.warning("'screen_base_dir_name' is set as '%s' since environment variable 'SCREEN_BASE_DIR' is not set.", screen_base_dir_name)
-
-screen_dir = Path(screen_base_dir_name)
-font_dir = Path(screen_base_dir_name) / 'font'
-
-if not font_dir.exists():
-	raise ValueError(f"`{font_dir=}` does not exists!")
-
+font_dir = data_dir / 'font'
+font_dir.mkdir(parents=True, exist_ok=True)
+font_file_name = 'misaki_gothic.png'
+font_fullpath = font_dir / font_file_name
+if not font_fullpath.exists():
+	from save_remote_file import save_misaki_font
+	save_misaki_font(target_dir=font_dir, filename_in_zip=font_file_name)
 
 FONT_SIZE = (8, 8)
 HALF_FONT_SIZE = (4, 8)
+
 from typing import TypeAlias
 ku: TypeAlias = tuple[tuple[int, int], int]
 
 DIGIT_KU: ku = (3, 16),10
 HEX_KU: ku = (3, 33),6
 TEN_KU: ku = (1, 4),2
-
-def array(seq):
+from typing import Sequence
+def mkarray(seq: Sequence):
 	return np.array(seq, np.int64)
 
-font_size_array = array(FONT_SIZE)
-font_file_name = 'misaki_gothic.png'
+font_size_array = mkarray(FONT_SIZE)
 
 PNG_EXT = '.png'
 
@@ -78,9 +76,9 @@ class MisakiFont(Enum):
 			x_pos, y_pos = byte_to_xy(ku)
 			x_offset = x_pos * 4
 			y_offset = y_pos * 8
-			offset = array(x_offset, y_offset)
+			offset = mkarray(x_offset, y_offset)
 			end_point = offset + np.array(HALF_FONT_SIZE)
-			area = array([offset, end_point])
+			area = mkarray([offset, end_point])
 			img_area = area.ravel().tolist()
 			font_part = full_image.crop(img_area)
 			return font_part
@@ -95,7 +93,7 @@ class SecondMisakiFont(Enum):
 arc_font_file_name = 'misaki_gothic-digit.tif'
 
 def get_misaki_digit_images(scale=1):
-	re_size = (array(FONT_SIZE) * scale).tolist() if scale > 1 else None
+	re_size = (mkarray(FONT_SIZE) * scale).tolist() if scale > 1 else None
 	arc_font_fullpath = font_dir / arc_font_file_name
 	image_list = {}
 	if arc_font_fullpath.exists():
@@ -115,10 +113,10 @@ def get_misaki_digit_images(scale=1):
 	def append_fonts(ku: ku): 
 		num_ku_ten, num_range = ku
 		num_pos = kuten_to_xy(*num_ku_ten)
-		num_addr = array(num_pos)
+		num_addr = mkarray(num_pos)
 		offset = (num_addr * 8) # - array([0, 2])
 		end_point = offset + np.array(FONT_SIZE)
-		area = array([offset, end_point])
+		area = mkarray([offset, end_point])
 		for i in range(num_range):
 			img_area = area.ravel().tolist()
 			font_part = full_image.crop(img_area)

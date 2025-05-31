@@ -4,12 +4,13 @@ from typing import Sequence, Iterator
 from typing import Callable, Any
 import os.path, calendar
 from pathlib import Path
-
+from dotenv import load_dotenv
+load_dotenv(override=True)
 from PIL import Image, ImageDraw
 import img2pdf
 import ttl
 home_dir = Path(os.path.expanduser('~'))
-from path_feeder import PathFeeder, get_last_month #, YearMonth
+from path_feeder import PathFeeder, get_last_month, FileExt
 from image_fill import ImageFill
 from put_number import PutPos #, put_number
 from app_type import AppType
@@ -17,9 +18,12 @@ from app_type import AppType
 last_month_date = get_last_month()
 year = last_month_date.year
 month = last_month_date.month
-img_dir = home_dir / 'Documents' / 'screen' / str(year) / f'{month:02}'
-if not img_dir.exists():
-    img_dir.mkdir()
+env_base_dir_str = os.environ.get('SCREEN_BASE_DIR')
+env_base_dir = Path(env_base_dir_str) if env_base_dir_str else None
+img_root_dir = env_base_dir or home_dir / 'screen'
+img_root_dir.mkdir(exist_ok=True, parents=True)
+img_dir = img_root_dir / str(year) / f'{month:02}'
+img_dir.mkdir(parents=True, exist_ok=True)
 
 IMG_SIZE = (720, 1612)
 H_PAD = 20
@@ -105,15 +109,16 @@ def save_into_pdf(layout=PdfLayout.a3lp):
         f.write(img2pdf.convert(layout_fun=layout_fun, *name_list, rotation=img2pdf.Rotation.ifvalid))
 
 
-def save_pages_as_pdf(): #fullpath=PathFeeder().first_fullpath):
+def save_pages_as_pdf(feeder: PathFeeder): #fullpath=PathFeeder().first_fullpath):
     fullpath = img_dir / f"{year_month_name}.pdf"
-    imges = list(draw_onto_pages())
+    imges = list(draw_onto_pages(feeder))
     imges[0].save(fullpath, "PDF" ,resolution=200, save_all=True, append_imges=imges[1:])
-def save_pages_as_tiff():
+
+def save_pages_as_tiff(feeder: PathFeeder):
     fullpath = img_dir / f"{year_month_name}.tif"
-    imges = list(draw_onto_pages())
+    imges = list(draw_onto_pages(feeder))
     imges[0].save(fullpath, save_all=True, append_imges=imges[1:])
-from path_feeder import FileExt
+
 def save_qpng_pages(app_type=AppType.T, ext_dir=FileExt.QPNG):
     save_dir = img_dir / ext_dir.value.dir
     if not save_dir.exists():
@@ -140,8 +145,7 @@ TXT_OFST = 0 # width-direction / horizontal
 
 
 from path_feeder import DbPathFeeder
-def draw_onto_pages(div=64, th=H_PAD // 2,
-    path_feeder: PathFeeder=DbPathFeeder(),
+def draw_onto_pages(path_feeder: PathFeeder, div=64, th=H_PAD // 2,
     v_pad=16, h_pad=8, mode='L', dst_bg=ImageFill.BLACK, app_type=AppType.T)-> Iterator[Image.Image]:
     from tool_pyocr import Date
     first_fullpath = path_feeder.first_fullpath

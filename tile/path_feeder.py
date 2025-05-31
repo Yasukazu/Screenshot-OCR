@@ -21,13 +21,12 @@ config = dotenv_values(".env")
 logger.info("config from dotenv_values: %s", config)
 # is_dotenv_loaded = load_dotenv('.env', verbose=True)
 
-screen_base_dir = config.get(SCREEN_BASE_DIR) or os.environ.get(SCREEN_BASE_DIR)
-if not screen_base_dir:
-	config[SCREEN_BASE_DIR] = screen_base_dir = str(home_path)
-	logger.warning("'screen_base_dir' is set as '%s' since environment variable '%s' is not set.", screen_base_dir, SCREEN_BASE_DIR)
-input_dir_root = Path(screen_base_dir)
+screen_base_dir_name = config.get(SCREEN_BASE_DIR) or os.environ.get(SCREEN_BASE_DIR) or 'screen-data'
+input_dir_root = Path().home / screen_base_dir_name
+logger.info("'input_dir_root' is set as: '%s'", input_dir_root)
 if not input_dir_root.exists():
-	raise ValueError(f"`{input_dir_root=}` for {SCREEN_BASE_DIR} does not exist!")
+	input_dir_root.mkdir(parents=True)#, exist_ok=True)
+	logger.info("Created directory for input_dir_root: '%s'", input_dir_root)
 
 def check_y_m(key: str):
 	value = config.get(key) or os.environ.get(key) or '0'
