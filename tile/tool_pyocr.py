@@ -7,6 +7,7 @@ from typing import Sequence, Callable, Any
 from pprint import pp
 from pathlib import Path
 from dataclasses import dataclass
+from collections import defaultdict
 import pickle
 import sys
 
@@ -23,7 +24,7 @@ import logging
 logger = logging.getLogger(__file__)
 
 from app_type import AppType
-
+from get_checksum import get_checksum
 
 @dataclass
 class Date:
@@ -52,6 +53,7 @@ def get_date(line_box: pyocr.builders.LineBox)-> Union[Date, None]:
 
 from collections import namedtuple
 from dataclasses import dataclass
+
 @dataclass
 class PathSet:
     path: Path
@@ -59,6 +61,10 @@ class PathSet:
     ext: str
     def stem_without_delim(self, delim: str):
         return ''.join([s for s in self.stem if s!= delim])
+    def exists(self):
+        return (self.path / (self.stem_without_delim('') + self.ext)).exists()
+    def to_path(self, delim: str = '') -> Path:
+        return self.path / (self.stem_without_delim(delim) + self.ext)
 
 APP_TYPE_TO_STEM_END = MappingProxyType({
     AppType.T: ".co.taimee",
@@ -444,27 +450,46 @@ class Main:
         with closing(self.conn.cursor()) as cur:
             cur.execute(f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?);", (app_type.value, date.day, wages, title, stem, pkl))
         self.conn.commit()
+
     t_patt = APP_TYPE_TO_STEM_END[AppType.T]
     m_patt = APP_TYPE_TO_STEM_END[AppType.M]
-    def ocr_result_into_db(self, app_type_list: list[AppType]|None=None, limit=62, test=False):
+
+    def ocr_result_into_db(self, app_type_list: list[AppType]|None=None, limit=62, test=False, *stems: str, glob=True):
         if not app_type_list:
             app_type_list = [e for e in list(AppType) if e != AppType.NUL]  
+        app_type_to_stems = defaultdict(set)
+        stem_end_to_app_type = {se:apt for apt,se in APP_TYPE_TO_STEM_END.items() if apt in app_type_list}
+        for stem in stems:
+            for stem_end in stem_end_to_app_type.keys():
+                if stem.endswith(stem_end):
+                    app_type = stem_end_to_app_type[stem_end]
+                    app_type_to_stems[app_type].add(stem)
+        if glob:
+            for app_type in stem_end_to_app_type.values():
+                glob_patt = '*' + APP_TYPE_TO_STEM_END[app_type] + '.png'
+                for file in self.my_ocr.input_dir.glob(glob_patt):
+                    stem = file.stem
+                    app_type_to_stems[app_type].add(stem)
+            
         assert limit > 0 
         with closing(self.conn.cursor()) as cur:
             for app_type in app_type_list:
-                stem_end_patt = APP_TYPE_TO_STEM_END[app_type]
-                glob_patt = "*" + stem_end_patt + '.png'
-                for file in self.my_ocr.input_dir.glob(glob_patt):
-                    if file.stem in self.get_OCRed_files():
+                for stem in app_type_to_stems[app_type]:
+                    if stem in self.get_OCRed_files():
                         continue
                     app = app_type.value
-                    path_set = PathSet(self.my_ocr.input_dir, file.stem, ext=self.my_ocr.INPUT_EXT)
+                    path_set = PathSet(self.my_ocr.input_dir, stem, ext=self.my_ocr.INPUT_EXT)
+                    if not path_set.exists():
+                        logger.error("File does not exist: %s", path_set.path)
+                        raise ValueError("File does not exist: ", path_set.path)
                     result = self.my_ocr.run_ocr(path_set)
                     match result:
                         case Success(value):
                             txt_lines = value # result.unwrap()
                         case Failure(_):
                             raise ValueError("Failed to run OCR!", path_set)
+
+                    file = path_set.to_path()
                     if app_type == AppType.M:
                         n, dt, hrs = self.my_ocr.check_date(app_type=app_type, txt_lines=txt_lines)
                         if dt is None:
@@ -474,22 +499,22 @@ class Main:
                             box_img = self.my_ocr.image.crop(box_pos) if self.my_ocr.image else None
                             if not box_img:
                                 logger.error("Failed to crop box image: %s", box_pos)
-                                raise ValueError("Failed to crop box image: %s", box_pos)
+                                raise ValueError("Failed to crop box image: ", box_pos)
                             box_result = self.my_ocr.run_ocr(path_set, lang='eng+jpn', builder=pyocr.builders.TextBuilder, layout=7, opt_img=box_img)
                             match box_result:
                                 case Success(value):
                                     n, dt, hrs = self.my_ocr.check_date(app_type=app_type, txt_lines=[value])
                                     if dt is None:
                                         logger.error("Failed to get date from box image: %s", box_pos)
-                                        raise ValueError("Failed to get date from box image: %s", box_pos)
+                                        raise ValueError("Failed to get date from box image: ", box_pos)
                                     logger.info("Date by run_ocr with TextBuilder and cropped image: %s", dt)
                                 case Failure(_):
                                     logger.error("Failed to run OCR on box image: %s", box_pos)
-                                    raise ValueError("Failed to run OCR on box image: %s", box_pos)
+                                    raise ValueError("Failed to run OCR on box image: ", box_pos)
                             if test:
                                 debug_dir = self.my_ocr.input_dir / 'DEBUG'
                                 debug_dir.mkdir(parents=True, exist_ok=True)
-                                debug_fullpath = debug_dir / (file.stem + '.dbg.png') 
+                                debug_fullpath = debug_dir / (stem + '.dbg.png') 
                                 box_img.save(debug_fullpath)
                                 logger.info("Saved debug image: %s", debug_fullpath)
                     else:
@@ -508,10 +533,10 @@ class Main:
                                                 n, dt = value
                                             case Failure(_):
                                                 logger.error("Failed to get date from txt_lines:%s in lang=eng!", txt_lines)
-                                                raise ValueError("Failed to get date from file:%s in lang=eng!", file)
+                                                raise ValueError("Failed to get date from (in lang=eng)file:", file)
                                     # if not is_successful(e_result): # type: ignore
                                     case Failure(_):
-                                        raise ValueError("Failed to run OCR in lang=eng!", path_set)
+                                        raise ValueError("Failed to run OCR in lang=eng! path_set:", path_set)
                     exists_sql = f"SELECT day, app FROM `{self.tbl_name}` WHERE day = {dt.day} AND app = {app};"
                     cur.execute(exists_sql)
                     one = cur.fetchone()
@@ -524,14 +549,19 @@ class Main:
                         pkl_fullpath = pkl_dir / (file.stem + '.pkl')
                         with pkl_fullpath.open('wb') as wf:
                             pickle.dump(txt_lines, wf)
-                        insert_sql = f"INSERT INTO `{self.tbl_name}` VALUES ({app}, {dt.day}, ?, ?, ?, ?)" 
-                        cur.execute(insert_sql, (wages, title, file.stem, None))
-                        logger.info("INSERT: %s", (app, dt.day, wages, title, file.stem))
+                        checksum = get_checksum(file)
+                        if not checksum:
+                            logger.error("Failed to get checksum for file: %s", file)
+                            raise ValueError("Failed to get checksum for file:", file)
+                        insert_sql = f"INSERT INTO `{self.tbl_name}` VALUES ({app}, {dt.day}, ?, ?, ?, ?, ?)" 
+                        cur.execute(insert_sql, (wages, title, file.stem, txt_lines, checksum))
+                        logger.info("INSERT: %s", (app, dt.day, wages, title, file.stem, pkl_fullpath, checksum))
                         limit -= 1
                         if limit <= 0:
                             logger.info("Limit reached: %d", limit)
                             break
         self.conn.commit()
+
     def save_as_csv(self):
         #conn = sqlite3.connect(db_file, isolation_level=None, detect_types=sqlite3.PARSE_COLNAMES)
         table = f"text_lines-{self.my_ocr.date.month:02}"
