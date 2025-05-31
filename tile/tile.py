@@ -4,6 +4,8 @@ from typing import Sequence, Iterator
 from typing import Callable, Any
 import os.path, calendar
 from pathlib import Path
+import logging
+logger = logging.getLogger(__file__)
 from dotenv import load_dotenv
 load_dotenv(override=True)
 from PIL import Image, ImageDraw
@@ -14,13 +16,12 @@ from path_feeder import PathFeeder, get_last_month, FileExt
 from image_fill import ImageFill
 from put_number import PutPos #, put_number
 from app_type import AppType
+from input_dir import get_last_month, FileExt, get_input_dir_root, get_input_dir
 
 last_month_date = get_last_month()
 year = last_month_date.year
 month = last_month_date.month
-env_base_dir_str = os.environ.get('SCREEN_BASE_DIR')
-env_base_dir = Path(env_base_dir_str) if env_base_dir_str else None
-img_root_dir = env_base_dir or home_dir / 'screen'
+img_root_dir = get_input_dir_root()
 img_root_dir.mkdir(exist_ok=True, parents=True)
 img_dir = img_root_dir / str(year) / f'{month:02}'
 img_dir.mkdir(parents=True, exist_ok=True)
@@ -37,9 +38,7 @@ class PdfLayout(Enum):
     a4pt = (img2pdf.mm_to_pt(210),img2pdf.mm_to_pt(297))
     a3lp = (img2pdf.mm_to_pt(420),img2pdf.mm_to_pt(297))
 
-def convert_tiff_to_png_files():
-    cmd = 'convert 2025-02-8x4.tif -format png -scene 1 2025-02-%d.png'
-from path_feeder import FileExt
+#def convert_tiff_to_png_files(): cmd = 'convert 2025-02-8x4.tif -format png -scene 1 2025-02-%d.png'
 
 def paged_png_feeder(layout=PdfLayout.a3lp, app_type=AppType.T):
     feeder=PathFeeder(input_type=FileExt.QPNG, type_dir=True)
@@ -119,15 +118,31 @@ def save_pages_as_tiff(feeder: PathFeeder):
     imges = list(draw_onto_pages(feeder))
     imges[0].save(fullpath, save_all=True, append_imges=imges[1:])
 
-def save_qpng_pages(app_type=AppType.T, ext_dir=FileExt.QPNG):
-    save_dir = img_dir / ext_dir.value.dir
+def save_qpng_pages(app_type=AppType.T, ext_dir=FileExt.QPNG,
+    save_dir: Path = get_input_dir()):
     if not save_dir.exists():
-        save_dir.mkdir()
+        save_dir.mkdir(parents=True)
+        logger.info("Created directory '%s' for saving pages.", save_dir)
     path_feeder = DbPathFeeder(app_type=app_type)
     hdr = app_type.name
     for pg, img in enumerate(draw_onto_pages(path_feeder=path_feeder, app_type=app_type)):
         fullpath = save_dir / f"{hdr}-{pg + 1}{ext_dir.value.ext}"
         img.save(fullpath) #, 'PNG')
+
+from input_dir import get_year_month
+def check_png_files(year=0, month=0):
+    date = get_year_month(year, month)
+    year = date.year
+    month = date.month
+    f_feeder = PathFeeder(input_type=FileExt.PNG, type_dir=True, year=year, month=month)
+    if not f_feeder.dir.exists():
+        raise ValueError(f"Directory {f_feeder.dir} does not exist!")
+    if not f_feeder.dir.is_dir():
+        raise ValueError(f"Path {f_feeder.dir} is not a directory!")
+    img_files = [f.stem for f in f_feeder.dir.iterdir() if f.is_file() and f.suffix == FileExt.PNG.value.ext]
+    breakpoint()
+
+
 
 class ArcFileExt(Enum):
     TIFF = ('.tif', {'compression':"tiff_deflate"})

@@ -20,15 +20,11 @@ from pyocr.builders import LineBox
 from returns.pipeline import is_successful, UnwrapFailedError
 
 import logging
-logger = logging.getLogger(__name__)
-stdout_handler = logging.StreamHandler(stream=sys.stdout)
-logger.addHandler(stdout_handler)
-format_output = logging.Formatter('%(levelname)s : %(name)s : %(message)s : %(asctime)s') # <-
-stdout_handler.setFormatter(format_output)
-# logger.add(sys.stderr, level="DEBUG")
-# logger.add(sys.stdout, level="INFO")
-# logger.add("WARNING.log", level="WARNING")
+logger = logging.getLogger(__file__)
+
 from app_type import AppType
+
+
 @dataclass
 class Date:
     month: int
@@ -81,7 +77,6 @@ class MDateError(OCRError):
     def __str__(self):
         return f"MDateError: {self.args[0]}"
 class MyOcr:
-    from path_feeder import input_dir_root, INPUT_EXT
     tools = pyocr.get_available_tools()
     tool = tools[0]
     assert tool is not None, "No OCR tool found!"
@@ -501,7 +496,7 @@ class Main:
                         result = self.my_ocr.get_date(app_type=app_type, txt_lines=txt_lines)
                         match result:
                             case Success(value):
-                                n, date = value # result.unwrap()
+                                n, dt = value # result.unwrap()
                             case Failure(_): # if not is_successful(result): # type: ignore
                                 logger.info("Failed to get date from %s in lang=jpn+eng, try to run_ocr in lang=jpn..", file)
                                 e_result = self.my_ocr.run_ocr(path_set, lang='eng',)
@@ -510,14 +505,14 @@ class Main:
                                         d_result = self.my_ocr.get_date(app_type=app_type, txt_lines=value)
                                         match d_result:
                                             case Success(value):
-                                                n, date = value
+                                                n, dt = value
                                             case Failure(_):
                                                 logger.error("Failed to get date from txt_lines:%s in lang=eng!", txt_lines)
                                                 raise ValueError("Failed to get date from file:%s in lang=eng!", file)
                                     # if not is_successful(e_result): # type: ignore
                                     case Failure(_):
                                         raise ValueError("Failed to run OCR in lang=eng!", path_set)
-                    exists_sql = f"SELECT day, app FROM `{self.tbl_name}` WHERE day = {date.day} AND app = {app};"
+                    exists_sql = f"SELECT day, app FROM `{self.tbl_name}` WHERE day = {dt.day} AND app = {app};"
                     cur.execute(exists_sql)
                     one = cur.fetchone()
                     if one is None:
@@ -529,9 +524,9 @@ class Main:
                         pkl_fullpath = pkl_dir / (file.stem + '.pkl')
                         with pkl_fullpath.open('wb') as wf:
                             pickle.dump(txt_lines, wf)
-                        insert_sql = f"INSERT INTO `{self.tbl_name}` VALUES ({app}, {date.day}, ?, ?, ?, ?)" 
+                        insert_sql = f"INSERT INTO `{self.tbl_name}` VALUES ({app}, {dt.day}, ?, ?, ?, ?)" 
                         cur.execute(insert_sql, (wages, title, file.stem, None))
-                        logger.info("INSERT: %s", (app, date.day, wages, title, file.stem))
+                        logger.info("INSERT: %s", (app, dt.day, wages, title, file.stem))
                         limit -= 1
                         if limit <= 0:
                             logger.info("Limit reached: %d", limit)

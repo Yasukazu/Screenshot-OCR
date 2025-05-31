@@ -88,11 +88,11 @@ class DigitImage:
 		return img
 
 
-	def calc_scale_padding(self, scale=MIN_SCALE, padding=STANDARD_PADDING_RATIO, slant: StrokeSlant=StrokeSlant.SLANT02)-> tuple[int, float]:
+	'''def calc_scale_padding(self, scale=MIN_SCALE, padding=STANDARD_PADDING_RATIO, slant: StrokeSlant=StrokeSlant.SLANT02)-> tuple[int, float]:
 		padding = scale * padding or 1
 		_scale = scale - 2 * padding #  int(scale * (1 - slant.value))
 		return int(_scale * (1 - slant.value) * padding or 4 * padding), padding
-
+	'''
 
 
 class BasicDigitImage:

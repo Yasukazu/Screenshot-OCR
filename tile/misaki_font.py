@@ -10,14 +10,11 @@ import sys,os
 from pathlib import Path
 import logging
 logger = logging.getLogger(__name__)
-stdout_handler = logging.StreamHandler(stream=sys.stdout)
-logger.addHandler(stdout_handler)
-format_output = logging.Formatter('%(levelname)s : %(name)s : %(message)s : %(asctime)s') # <-
-stdout_handler.setFormatter(format_output)
+from dotenv import dotenv_values
+from input_dir import get_input_dir_root
+# data_dir = Path(os.getenv('SCREEN_BASE_DIR') or os.getenv('SCREEN_DATA_DIR') or 'screen-data')
 
-data_dir = Path(os.getenv('SCREEN_BASE_DIR') or os.getenv('SCREEN_DATA_DIR') or 'screen-data')
-
-font_dir = data_dir / 'font'
+font_dir = get_input_dir_root() / 'font'
 font_dir.mkdir(parents=True, exist_ok=True)
 font_file_name = 'misaki_gothic.png'
 font_fullpath = font_dir / font_file_name
@@ -35,8 +32,8 @@ DIGIT_KU: ku = (3, 16),10
 HEX_KU: ku = (3, 33),6
 TEN_KU: ku = (1, 4),2
 from typing import Sequence
-def mkarray(seq: Sequence):
-	return np.array(seq, np.int64)
+def mkarray(*seq: Sequence):
+	return np.array(*seq, np.int64)
 
 font_size_array = mkarray(FONT_SIZE)
 
@@ -83,7 +80,7 @@ class MisakiFont(Enum):
 			font_part = full_image.crop(img_area)
 			return font_part
 		font_image = append_fonts(c)
-		font_dict[c] = font_iamge
+		font_dict[c] = font_image
 		return font_image
 
 class SecondMisakiFont(Enum):
@@ -178,7 +175,7 @@ def cv2pil(image):
 
 if __name__ == '__main__':
 	import sys
-	c = input('char for the font:')
+	c = input('char for the font:')[0].encode('utf-8')[0]
 	if c > 255:
 		raise ValueError(f"{c=} exceeds half font range(255)")
 	font_image = MisakiFont.get_half_font_image(c)

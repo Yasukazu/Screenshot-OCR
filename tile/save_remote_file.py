@@ -25,7 +25,7 @@ def save_remote_zip_extract(url: str, local_path: Path, filename: str, extract_t
         extract_to = Path(extract_to)
         if not extract_to.exists():
             extract_to.mkdir(parents=True, exist_ok=True)
-            logger.info(f"Created directory {extract_to}")
+            logger.info("Created directory: %s", extract_to)
         # Extract the specified file from the zip
         if not local_path.suffix == '.zip':
             raise ValueError(f"Expected a zip file, but got {local_path.suffix}")
@@ -48,7 +48,7 @@ def save_remote_file(url: str, local_path: Path):
         with open(local_path, 'wb') as f:
             shutil.copyfileobj(response.raw, f)
     else:
-        raise Exception(f"Failed to download file: {response.status_code}")     
+        raise ValueError(f"Failed to download file: {response.status_code}")     
 
 def save_misaki_font(target_dir: Path | str = "font", filename_in_zip: str = "misaki_gothic.png",
     local_zip_path = Path("misaki_png.zip"),
@@ -59,9 +59,9 @@ def save_misaki_font(target_dir: Path | str = "font", filename_in_zip: str = "mi
     extract_to = Path(target_dir)
     try:
         save_remote_zip_extract(url, local_zip_path, filename_in_zip, extract_to)
-        logger.info(f"File {filename_in_zip} extracted to {extract_to}")
+        logger.info("File '%s' has extracted to '%s'", filename_in_zip, extract_to)
     except Exception as e:
-        logger.error(f"An error occurred: {e}")     
+        logger.error("An error occurred: %s", e)     
         raise
 
 if __name__ == '__main__':

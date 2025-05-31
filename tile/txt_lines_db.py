@@ -1,13 +1,10 @@
 import os
 from contextlib import closing
 import sqlite3
-from dotenv import load_dotenv
-load_dotenv()
-from path_feeder import input_dir_root
 from logging import getLogger
-
 logger = getLogger(__name__)
-YEAR = os.environ['SCREEN_YEAR']
+
+from input_dir import get_input_dir_root
 
 def get_db_name():
     try:
@@ -21,13 +18,14 @@ def get_table_name(month: int):
     #return "text_lines-%02d" % month #:02}"
 
 CREATE_TABLE_SQL = "CREATE TABLE if not exists '{}' (`app` INTEGER, `day` INTEGER, `wages` INTEGER, `title` TEXT, `stem` TEXT, `txt_lines` BLOB, PRIMARY KEY (app, day))"
-
-def sqlite_fullpath(dir=input_dir_root, year=YEAR, db_name=get_db_name()):
-    if not dir:
+from input_dir import get_year_month
+def sqlite_fullpath(dr=get_input_dir_root(), year=0, db_name=get_db_name()):
+    if not dr:
         raise ValueError("input_dir_root is not set!")
     if not year:
-        raise ValueError("YEAR is not set!")
-    db_fullpath = dir / year / db_name
+        date = get_year_month(year=year)
+        year = date.year
+    db_fullpath = dr / str(year) / db_name
     return db_fullpath  
 
 def create_tbl_if_not_exists(tbl_name: str, db_fullpath=sqlite_fullpath()):
