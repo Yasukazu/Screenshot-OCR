@@ -604,10 +604,10 @@ class Main:
 	def save_as_csv(self):
 		import pandas
 		#conn = sqlite3.connect(db_file, isolation_level=None, detect_types=sqlite3.PARSE_COLNAMES)
-		table = f"text_lines-{self.my_ocr.date.month:02}"
-		sql = f"SELECT * FROM `{table}`"
+		table = f"txt_lines-{self.my_ocr.date.month:02}"
+		sql = f"SELECT app, day, wages, title FROM `{table}` ORDER BY day, app"
 		db_df = pandas.read_sql_query(sql, self.conn)
-		output_path = self.img_dir# / str(self.my_ocr.date.year) / f"{self.my_ocr.date.month:02}"
+		output_path = self.img_dir.parent # / str(self.my_ocr.date.year) / f"{self.my_ocr.date.month:02}"
 		assert output_path.exists()
 		output_fullpath = output_path / (table + '.csv')
 		db_df.to_csv(str(output_fullpath), index=False)
@@ -709,6 +709,7 @@ def get_options(month=0):
 	return [
 		FunctionItem('Exit', None),
 		FunctionItem('save OCR result into DB', main.ocr_result_into_db),
+		FunctionItem('save DB as CSV', main.save_as_csv),
 
 	]
 def run_main(options: Sequence[FunctionItem]):#=get_options(int(input("Month?:") or '0'))):
