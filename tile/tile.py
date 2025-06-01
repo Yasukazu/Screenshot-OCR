@@ -85,6 +85,8 @@ def paged_png_feeder(layout=PdfLayout.a3lp, app_type=AppType.T):
                 names.append(save_path)
             return names
 from PIL import ImageSequence
+import tempfile
+import numpy as np
 import input_dir
 def convert_arc_to_pdf(app_type: AppType, month=0, layout=PdfLayout.a3lp):
     ''' arc if TIFF file'''
@@ -97,12 +99,21 @@ def convert_arc_to_pdf(app_type: AppType, month=0, layout=PdfLayout.a3lp):
     fullpath = arc_dir / (stem + '.tif')
     if not fullpath.exists():
         raise ValueError(f"File {fullpath} does not exist!")
-    image = Image.open(fullpath)
-    image_list = list(ImageSequence.Iterator(image))
-    layout_fun = img2pdf.get_layout_fun(layout.value)
-    output_fullpath = arc_dir / (stem + '.pdf')
-    with open(output_fullpath,"wb") as f:
-        f.write(img2pdf.convert(layout_fun=layout_fun, *image_list, rotation=img2pdf.Rotation.ifvalid))
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        output_files = []
+        for n, image in enumerate(ImageSequence.Iterator(Image.open(fullpath))):
+            output_fullpath = Path(tmpdirname) / (stem + f"_{n:02}.png")
+            size_array = np.array(image.size, dtype=np.int64)
+            frame_size = [int(i) for i in (size_array * 1.1)]
+            frame_image = Image.new('L', frame_size, (0xff,))
+            frame_image.paste(image, ((frame_size[0] - size_array[0]) // 2, (frame_size[1] - size_array[1]) // 2))
+            frame_image = frame_image.convert('L')
+            frame_image.save(output_fullpath, 'PNG')
+            output_files.append(output_fullpath)
+        layout_fun = img2pdf.get_layout_fun(layout.value)
+        output_fullpath = arc_dir / (stem + '.pdf')
+        with open(output_fullpath,"wb") as f:
+            f.write(img2pdf.convert(layout_fun=layout_fun, *output_files, rotation=img2pdf.Rotation.ifvalid))
 
 def convert_to_pdf(app_type: AppType, layout=PdfLayout.a3lp):
     names = paged_png_feeder(app_type=app_type, layout=layout)
@@ -357,11 +368,12 @@ class FunctionItem:
 def get_options():
         return [
         FunctionItem('None', None),
-        FunctionItem('save TM screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.T}),
-        FunctionItem('save MH screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.M}),
+        FunctionItem('save T screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.T}),
+        FunctionItem('save M screenshots as TIFF', save_arc_pages, kwargs={'app_type': AppType.M}),
         FunctionItem('T save_pages_as_4 png files into qpng dir.', save_qpng_pages),
         FunctionItem('M save_pages_as_4 png files into qpng dir.', save_qpng_pages, kwargs={'app_type': AppType.M}),
         FunctionItem('save_pages_as_TIFF', save_pages_as_tiff),
+        FunctionItem('convert T TIFF into PDF', convert_arc_to_pdf, kwargs={'app_type': AppType.T}),
         FunctionItem('convert M TIFF into PDF', convert_arc_to_pdf, kwargs={'app_type': AppType.M}),
         FunctionItem('T convert_to_pdf', convert_to_pdf, kwargs={'layout':PdfLayout.a3lp, 'app_type': AppType.T}),
         FunctionItem('M convert_to_pdf', convert_to_pdf, kwargs={'layout':PdfLayout.a3lp, 'app_type': AppType.M}),
