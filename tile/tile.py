@@ -84,6 +84,25 @@ def paged_png_feeder(layout=PdfLayout.a3lp, app_type=AppType.T):
                 image.save(save_path)
                 names.append(save_path)
             return names
+from PIL import ImageSequence
+import input_dir
+def convert_arc_to_pdf(app_type: AppType, month=0, layout=PdfLayout.a3lp):
+    ''' arc if TIFF file'''
+    date = input_dir.get_last_month(year=year, month=month)
+    assert 0 < date.month < 13, f"Invalid month: {month}!"
+    arc_dir = input_dir.get_input_dir_root() / str(date.year) / f"{date.month:02}"
+    if not arc_dir.exists():
+        raise ValueError(f"Directory {arc_dir} does not exist!")
+    stem = f"{date.year}-{date.month:02}_{app_type.name}_8x4"
+    fullpath = arc_dir / (stem + '.tif')
+    if not fullpath.exists():
+        raise ValueError(f"File {fullpath} does not exist!")
+    image = Image.open(fullpath)
+    image_list = list(ImageSequence.Iterator(image))
+    layout_fun = img2pdf.get_layout_fun(layout.value)
+    output_fullpath = arc_dir / (stem + '.pdf')
+    with open(output_fullpath,"wb") as f:
+        f.write(img2pdf.convert(layout_fun=layout_fun, *image_list, rotation=img2pdf.Rotation.ifvalid))
 
 def convert_to_pdf(app_type: AppType, layout=PdfLayout.a3lp):
     names = paged_png_feeder(app_type=app_type, layout=layout)
@@ -140,7 +159,7 @@ def save_arc_pages(ext: ArcFileExt=ArcFileExt.TIFF, app_type=AppType.NUL):
     from path_feeder import DbPathFeeder
     feeder = DbPathFeeder(app_type=app_type) if app_type in [AppType.M, AppType.T] else PathFeeder()
     imgs: list[Image.Image] = list(draw_onto_pages(path_feeder=feeder))
-    fullpath = img_dir / f"{year}-{month:02}-8x4{ext.value[0]}"
+    fullpath = img_dir / f"{year}-{month:02}_{app_type.name}_8x4{ext.value[0]}"
     imgs[0].save(fullpath, save_all=True, append_images=imgs[1:], **ext.value[1])
 
 DAY_NOMBRE_H = 50
@@ -152,7 +171,7 @@ def draw_onto_pages(path_feeder: PathFeeder, div=64, th=H_PAD // 2,
     v_pad=16, h_pad=8, mode='L', dst_bg=ImageFill.BLACK, app_type=AppType.T)-> Iterator[Image.Image]:
     from tool_pyocr import Date
     first_fullpath = path_feeder.first_fullpath
-    if not first_fullpath:
+    if not first_fullpath.exists():
         raise ValueError(f"No '{path_feeder.ext}' file in {path_feeder.dir}!")
     # first_img_size = Image.open(first_fullpath).size
 
@@ -343,6 +362,7 @@ def get_options():
         FunctionItem('T save_pages_as_4 png files into qpng dir.', save_qpng_pages),
         FunctionItem('M save_pages_as_4 png files into qpng dir.', save_qpng_pages, kwargs={'app_type': AppType.M}),
         FunctionItem('save_pages_as_TIFF', save_pages_as_tiff),
+        FunctionItem('convert M TIFF into PDF', convert_arc_to_pdf, kwargs={'app_type': AppType.M}),
         FunctionItem('T convert_to_pdf', convert_to_pdf, kwargs={'layout':PdfLayout.a3lp, 'app_type': AppType.T}),
         FunctionItem('M convert_to_pdf', convert_to_pdf, kwargs={'layout':PdfLayout.a3lp, 'app_type': AppType.M}),
     ]

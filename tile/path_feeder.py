@@ -59,15 +59,12 @@ class PathFeeder:
 		for dy in range(monthrange(self.year, self.month)[1]):
 			if dy in self.days:
 				stem = self.stem_gen(dy, delim=delim)
-				input_fullpath = self.input_path / (stem + self.input_type.value.ext) # ''.join([s for s in stem if s!= delim])
+				input_fullpath = self.input_path / (stem + self.input_type.value.ext)
 				if not padding and not input_fullpath.exists():
 					raise FileNotFoundError(f"{input_fullpath=} does not exist!")
 				yield dy, stem
 			else:
 				yield dy, '' #stem if input_fullpath.exists() else ''
-		'''else:
-			stems = [f.stem for f in self.input_path.glob("??" + self.input_type.value.ext)]
-			yield from sorted(stems)'''
 
 	@property
 	def first_name(self): #-> str:
@@ -80,7 +77,9 @@ class PathFeeder:
 		stem = None
 		for day, stem in self.feed(padding=False):
 			break
-		return self.dir / (stem + self.ext) if stem else None
+		if stem:
+			# return self.input_path / (stem + self.input_type.value.ext)
+			return self.input_path / (stem + self.ext)
 
 from contextlib import closing
 import txt_lines_db
@@ -88,7 +87,7 @@ class DbPathFeeder(PathFeeder):
 	from app_type import AppType
 	img_file_ext = '.png'
 
-	def __init__(self, year=0, month=0, days=-1, input_type = FileExt.PNG, input_dir=get_input_dir_root(), type_dir=False, app_type=AppType.T, config=config, db_fullpath=txt_lines_db.sqlite_fullpath()):
+	def __init__(self, year=0, month=0, days=-1, input_type = FileExt.PNG, input_dir=get_input_dir_root(), type_dir=True, app_type=AppType.T, config=config, db_fullpath=txt_lines_db.sqlite_fullpath()):
 		super().__init__(year, month, days, input_type, input_dir, type_dir, config)
 		self.app_type = app_type
 		self.conn = txt_lines_db.connect(db_fullpath=db_fullpath)
