@@ -13,7 +13,7 @@ from returns.result import safe, Result, Failure, Success
 import pandas
 
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(override=True)
 from PIL import Image, ImageDraw, ImageEnhance
 import pyocr
 import pyocr.builders
