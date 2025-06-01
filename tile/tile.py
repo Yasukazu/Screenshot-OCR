@@ -129,24 +129,6 @@ def save_qpng_pages(app_type=AppType.T, ext_dir=FileExt.QPNG,
         fullpath = save_dir / f"{hdr}-{pg + 1}{ext_dir.value.ext}"
         img.save(fullpath) #, 'PNG')
 
-from input_dir import get_year_month
-def check_png_files(year=0, month=0)-> set[str]:
-    date = get_year_month(year, month)
-    year = date.year
-    month = date.month
-    f_feeder = PathFeeder(input_type=FileExt.PNG, type_dir=True, year=year, month=month)
-    if not f_feeder.dir.exists():
-        raise ValueError(f"Directory {f_feeder.dir} does not exist!")
-    if not f_feeder.dir.is_dir():
-        raise ValueError(f"Path {f_feeder.dir} is not a directory!")
-    img_file_set = set([f.stem for f in f_feeder.dir.iterdir() if f.is_file() and f.suffix == FileExt.PNG.value.ext])
-    # just check stems
-    db_stems = set()
-    app_type_list = [app_type for app_type in list(AppType) if app_type != AppType.NUL]
-    for app_type in app_type_list:
-        db_feeder = DbPathFeeder(app_type=app_type, year=year, month=month)
-        db_stems.update([f for d, f in db_feeder.feed()])
-    return img_file_set - db_stems
 
 
 

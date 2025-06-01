@@ -3,17 +3,14 @@ from contextlib import closing
 from enum import IntEnum
 from types import MappingProxyType
 import re
+from enum import Enum
 from typing import Sequence, Callable, Any
 from pprint import pp
 from pathlib import Path
 from dataclasses import dataclass
 from collections import defaultdict
 import pickle
-import sys
-
-import pandas
-from dotenv import load_dotenv
-load_dotenv()
+import unicodedata
 from PIL import Image, ImageDraw, ImageEnhance
 import pyocr
 import pyocr.builders
@@ -25,7 +22,8 @@ logger = logging.getLogger(__file__)
 
 from app_type import AppType
 from get_checksum import get_checksum
-
+from path_feeder import PathFeeder, DbPathFeeder, FileExt
+from input_dir import get_year_month, get_input_dir_root
 @dataclass
 class Date:
     month: int
@@ -82,12 +80,21 @@ class MDateError(OCRError):
 
     def __str__(self):
         return f"MDateError: {self.args[0]}"
+
+class DateTimePattern(Enum):
+    DATE = re.compile(r"(\d+)/(\d+)")
+    TIME = re.compile(r"(\d\d):(\d\d)")
+
+@dataclass
+class PatternMatch:
+    pattern: DateTimePattern
+    match: re.Match
+
 class MyOcr:
     tools = pyocr.get_available_tools()
     tool = tools[0]
     assert tool is not None, "No OCR tool found!"
-
-    #input_dir = input_dir # Path(os.environ['SCREEN_BASE_DIR'])
+    INPUT_EXT = '.png'
     delim = ' '
 
     @classmethod
@@ -127,13 +134,40 @@ class MyOcr:
     M_DATE_PATT = [re.compile(r"(\d\d:\d\d)"),
         re.compile(r"(\d+?)/(\d+?)"),
         re.compile(r"時\s*間$")]
+
+    @classmethod
+    def check_date_time(cls, app_type: AppType, txt_lines: Sequence[str]) -> tuple[int, Date|None, Sequence[str]]:    
+                        word_match_list: list[PatternMatch] = []
+                        for word_box in txt_line:
+                            word = unicodedata.normalize('NFKC', word_box)
+                            for dt_pattern in list(DateTimePattern):
+                                mt = dt_pattern.value.match(word)
+                                if mt:
+                                    word_match_list.append(PatternMatch(dt_pattern, mt))
+                        if len(word_match_list) > 0:
+                            date = None
+                            hours = []
+                            for word_match in word_match_list:
+                                if word_match.pattern == DateTimePattern.DATE:
+                                    grps = word_match.match.groups()
+                                    date = Date(int(grps[0]), int(grps[1]))
+                                elif word_match.pattern == DateTimePattern.TIME:
+                                    hours.append(grps[0])
+                                    hours.append(grps[1])
+                            return len(word_match_list), date, hours
     @classmethod
     def check_date(cls, app_type: AppType, txt_lines: Sequence[LineBox|str])->tuple[int, Date|None,Sequence[str]]:
         match app_type:
             case AppType.M:
-                for n in range(len(txt_lines)):
-                    cntnt = txt_lines[n].content if isinstance(txt_lines[n], LineBox) else txt_lines[n] #.content.replace(' ', '') 
-                    if MyOcr.M_DATE_PATT[-1].search(cntnt):
+                if isinstance(txt_lines[0], LineBox):
+                    for txt_line in txt_lines:
+
+
+                else:
+                    cntnt = txt_lines[n].content if isinstance(txt_lines[n], LineBox) else txt_lines[n]
+                    joined = ''.join(cntnt.split())
+                    normalized = unicodedata.normalize('NFKC', joined)
+                    if MyOcr.M_DATE_PATT[-1].search(normalized): # if cntnt.endswith('時間'):
                       if (hours:=MyOcr.M_DATE_PATT[0].findall(cntnt)):
                         m_d = MyOcr.M_DATE_PATT[1].match(cntnt)
                         if m_d:
@@ -185,7 +219,7 @@ class MyOcr:
         self.image: Image.Image | None = None
     @property
     def input_dir(self):
-        return MyOcr.input_dir_root / str(self.date.year) / f'{self.date.month:02}' / 'png'
+        return get_input_dir_root() / str(self.date.year) / f'{self.date.month:02}' / 'png'
     '''def each_path_set(self):
         for stem in self.path_feeder.feed(delim=self.delim, padding=False):
             yield PathSet(self.path_feeder.dir, stem, self.path_feeder.ext)'''
@@ -465,11 +499,15 @@ class Main:
                     app_type = stem_end_to_app_type[stem_end]
                     app_type_to_stems[app_type].add(stem)
         if glob:
-            for app_type in stem_end_to_app_type.values():
-                glob_patt = '*' + APP_TYPE_TO_STEM_END[app_type] + '.png'
+            new_png_files = get_new_png_files()
+            for stem_end, app_type in stem_end_to_app_type.items():
+                for stem in new_png_files:
+                    if stem.endswith(stem_end):
+                        app_type_to_stems[app_type].add(stem)
+                '''glob_patt = '*' + APP_TYPE_TO_STEM_END[app_type] + '.png'
                 for file in self.my_ocr.input_dir.glob(glob_patt):
                     stem = file.stem
-                    app_type_to_stems[app_type].add(stem)
+                    app_type_to_stems[app_type].add(stem)'''
             
         assert limit > 0 
         with closing(self.conn.cursor()) as cur:
@@ -563,6 +601,7 @@ class Main:
         self.conn.commit()
 
     def save_as_csv(self):
+        import pandas
         #conn = sqlite3.connect(db_file, isolation_level=None, detect_types=sqlite3.PARSE_COLNAMES)
         table = f"text_lines-{self.my_ocr.date.month:02}"
         sql = f"SELECT * FROM `{table}`"
@@ -618,6 +657,27 @@ def edit_wages(month: int, app=AppType.T):
                     assert row[0] == wages
                     print(f"Wages of {day=} is Updated as {wages=} in table `{table=}`.")
                     feeder.conn.commit()
+
+def get_new_png_files(year=0, month=0)-> set[str]:
+    '''returns a set of PNG file names that are not in the database for the given year and month.'''
+    date = get_year_month(year, month)
+    year = date.year
+    month = date.month
+    f_feeder = PathFeeder(input_type=FileExt.PNG, type_dir=True, year=year, month=month)
+    if not f_feeder.dir.exists():
+        raise ValueError(f"Directory {f_feeder.dir} does not exist!")
+    if not f_feeder.dir.is_dir():
+        raise ValueError(f"Path {f_feeder.dir} is not a directory!")
+    img_file_set = set([f.stem for f in f_feeder.dir.iterdir() if f.is_file() and f.suffix == FileExt.PNG.value.ext])
+    # just check stems
+    db_stems = set()
+    app_type_list = [app_type for app_type in list(AppType) if app_type != AppType.NUL]
+    for app_type in app_type_list:
+        db_feeder = DbPathFeeder(app_type=app_type, year=year, month=month)
+        db_stems.update([f for d, f in db_feeder.feed()])
+    return img_file_set - db_stems
+
+
 def run_ocr(month: str, limit=62):
     m = int(month)
     my_ocr = MyOcr(month=m)
@@ -646,17 +706,21 @@ def get_options(month=0):
     my_ocr = MyOcr(month=month) 
     main = Main(my_ocr=my_ocr)
     return [
-        FunctionItem('None', None),
+        FunctionItem('Exit', None),
         FunctionItem('save OCR result into DB', main.ocr_result_into_db),
 
     ]
 def run_main(options: Sequence[FunctionItem]):#=get_options(int(input("Month?:") or '0'))):
     for n, option in enumerate(options):
         print(f"{n}. {option.title}")
-    choice = int(input(f"Choose(0 to {len(options)}):"))
+    choice = int(input(f"Choose(0 to {len(options)-1}):"))
     if choice:
         options[choice].exec()
 if __name__ == '__main__':
-    import sys
-    cli()
-    sys.exit(0)
+    options = get_options(int(input("Month?:(Just hit Enter if current)") or '0'))
+    run_main(options)
+    #cli()
+    #run_ocr('01')
+    #edit_title(1, 1)
+    #edit_wages(1, AppType.T)
+    #edit_wages(1, AppType.M)
