@@ -100,11 +100,12 @@ def get_year_month(year=0, month=0, config=config)-> date: # tuple[int, int]:
 	year = year or int(config[SCREEN_YEAR])
 	# if isinstance(SCREEN_MONTH, int) and SCREEN_MONTH > 0:
 	month = month or int(config[SCREEN_MONTH])
-	last_month = get_last_month()
-	if not year:
-		year = last_month.year
-	if not month:
-		month = last_month.month
+	if not year or not month:
+		last_month = get_last_month()
+		if not year:
+			year = last_month.year
+		if not month:
+			month = last_month.month
 	return date(year, month, 1)
 
 def get_ymstr(year=0, month=0, sep=False)-> str:

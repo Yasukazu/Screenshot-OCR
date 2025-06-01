@@ -350,7 +350,6 @@ def main(options=get_options()):
     for n, option in enumerate(options):
         print(f"{n}. {option.title}")
     choice = int(input(f"Choose(0 to {len(options)}):"))
-    breakpoint()
     if choice:
         options[choice].exec()
 
