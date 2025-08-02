@@ -116,7 +116,7 @@ def load_tools():
             print('status:', proc.stdout.readline().decode().strip())
 
 class MyOcr:
-    from path_feeder import input_dir_root, input_ext
+    from path_feeder import input_dir_root # input_ext
     tools = pyocr.get_available_tools()
 
     if len(tools) == 0:
