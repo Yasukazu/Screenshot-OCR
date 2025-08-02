@@ -3,16 +3,18 @@ name = "taimi-screen"
 version = "1.1.1"
 description = "generate PDF from taimi screenshots"
 authors = [{ name = "Yasukazu ", email = "yasukazu@makyno.jp" }]
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 readme = "README.md"
 dependencies = [
+    "click>=8.2.2",
     "img2pdf>=0.5.1,<0.6.0",
+    "logbook>=1.8.2",
     "numpy>=2.0.2",
     "pandas>=2.2.3",
     "pillow>=11.1.0",
     "pyocr>=0.8.5",
     "python-dotenv>=1.1.0",
-    "
+    "returns>=0.26.0",
 ]
 
 [dependency-groups]
@@ -23,13 +25,3 @@ build-backend = "hatchling.build"
 
 [tool.uv]
 package = false
-
-opencv-contrib-python
-python-dotenv
-pytesseract
-pyocr
-returns
-ipdb
-loguru
-logbook
-img2pdf
