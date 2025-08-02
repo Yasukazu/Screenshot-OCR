@@ -61,9 +61,9 @@ def get_last_month_path(dir: Path=input_dir_root, year=0, month=0)-> Path:
 from datetime import date
 from screen_base import config_dict
 def get_year_month(year=0, month=0, config=config_dict)-> date: # tuple[int, int]:
-	year = year or int(config[SCREEN_YEAR])
+	year = year or int(config['SCREEN_YEAR'])
 	# if isinstance(SCREEN_MONTH, int) and SCREEN_MONTH > 0:
-	month = month or int(config[SCREEN_MONTH])
+	month = month or int(config['SCREEN_MONTH'])
 	last_month = get_last_month(year=year)
 	if not year:
 		year = last_month.year

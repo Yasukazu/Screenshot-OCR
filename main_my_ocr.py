@@ -237,11 +237,11 @@ class Main:
                             ttxt_lines = TTxtLines(txt_lines, path_set, self.my_ocr)
                         case _:
                             raise NotImplementedError(f"Undefined AppType: {app_type}!")
-                    n, date = ttxt_lines.get_date(path_set, self.my_ocr)
+                    date = ttxt_lines.get_date() # path_set, self.my_ocr)
                     if date.month != self.month:
                         raise ValueError(f"{date.month=} != {self.month=} in {path_set}")
                     wages = ttxt_lines.wages()
-                    title = ttxt_lines.title(n)
+                    title = ttxt_lines.title()
                     sql = f"INSERT INTO `{self.tbl_name}` VALUES (?, ?, ?, ?, ?, ?, ?)"
                     pkl = pickle.dumps(txt_lines)
                     from checksum import calculate_checksum

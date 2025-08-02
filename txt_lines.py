@@ -94,7 +94,8 @@ class TTxtLines(TxtLines):
         date_position = date_position[0] + date_position[1]
 
         img_path = self.img_pathset #.parent / (self.img_pathset.stem + self.img_pathset.ext)
-        date_image = Image.open(str(img_path)).crop(date_position)
+        abs_img_path = img_path.resolve()
+        date_image = Image.open(abs_img_path).crop(date_position)
 
         date_image_dir = self.img_pathset.parent.parent / 'TMP'
         date_image_dir.mkdir(parents=True, exist_ok=True)

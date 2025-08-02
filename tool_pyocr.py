@@ -75,6 +75,8 @@ class PathSet:
         return (self.parent / (self.stem_without_delim('') + self.ext)).open()
     def to_path(self):
         return self.parent / (self.stem_without_delim('') + self.ext)
+    def resolve(self):
+        return self.to_path()
 
 
 APP_TYPE_TO_STEM_END = MappingProxyType({
@@ -217,18 +219,19 @@ class MyOcr:
             case _:
                 raise ValueError("Undefined AppType!")
 
-    def __init__(self, month=0, year=0):
+    def __init__(self, month=0, year=0, ext_dir='png', input_ext='.png'):
         from path_feeder import get_year_month
         self.date = get_year_month(year=year, month=month)
         #self.month = month
-        #self.input_dir = MyOcr.input_dir_root
+        self.ext_dir = ext_dir
+        self.input_ext = input_ext
         #from path_feeder import PathFeeder
         #self.path_feeder = PathFeeder(input_dir=MyOcr.input_dir_root, type_dir=False, month=month)
         self.txt_lines: Sequence[pyocr.builders.LineBox] | None = None
         self.image: Image.Image | None = None
     @property
     def input_dir(self):
-        return MyOcr.input_dir_root / str(self.date.year) / f'{self.date.month:02}' / 'png'
+        return MyOcr.input_dir_root / str(self.date.year) / f'{self.date.month:02}' / self.ext_dir
     '''def each_path_set(self):
         for stem in self.path_feeder.feed(delim=self.delim, padding=False):
             yield PathSet(self.path_feeder.dir, stem, self.path_feeder.ext)'''
