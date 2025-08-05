@@ -1,4 +1,4 @@
-from typing import Sequence, Union
+from typing import Sequence, override
 from contextlib import closing
 from enum import IntEnum
 from types import MappingProxyType
@@ -22,7 +22,7 @@ from pyocr.builders import LineBoxBuilder, TextBuilder, DigitLineBoxBuilder, Dig
 from returns.pipeline import is_successful, UnwrapFailedError
 from loguru import logger
 logger.remove()
-logger.add(sys.stderr, level='WARNING', format="{time} | {level} | {message} | {extra}")
+logger.add(sys.stderr, level='INFO', format="{time} | {level} | {message} | {extra}")
 # import logbook
 # logbook.StreamHandler(sys.stdout,
 #	format_string='{record.time:%Y-%m-%d %H:%M:%S.%f} {record.level_name} {record.filename}:{record.lineno}: {record.message}').push_application()
@@ -37,11 +37,11 @@ from checksum import calculate_checksum
 
 class Main:
     import txt_lines_db
-    def __init__(self, app_type=AppType.NUL, db_fullpath: Path|Callable[[], Path]=txt_lines_db.sqlite_fullpath, my_ocr=MyOcr, tbl_ver=1):  
+    def __init__(self, app_type=AppType.NUL, db_fullpath: Path|Callable[[], Path]=txt_lines_db.sqlite_fullpath, my_ocr:None|MyOcr=None, tbl_ver=1):  
 
         if callable(db_fullpath):
             db_fullpath = db_fullpath()
-        self.my_ocr = my_ocr() if callable(my_ocr) else my_ocr
+        self.my_ocr = my_ocr or MyOcr()
         self.app = app_type
         self.conn = Main.txt_lines_db.connect(db_fullpath=db_fullpath)
         self.tbl_name = Main.txt_lines_db.get_table_name(self.my_ocr.date.month, version=tbl_ver)
@@ -441,14 +441,21 @@ class Main:
         """Replace the stem of the file with the new stem."""
         return file.parent / (new_stem + file.suffix)
 
-    def save_as_csv(self):
+    def save_as_csv(self, dir='csv', ext='.csv'):
         """Save the DB to a CSV file."""
-        sql = f"SELECT app, day, wages, title, stem, checksum FROM `{self.tbl_name}` ORDER BY day"
+        sql = f"SELECT app, day, wages, title, stem, checksum FROM `{self.tbl_name}` ORDER BY day, app"
         db_df = pandas.read_sql_query(sql, self.conn)
-        output_path = self.img_dir.parent / 'csv'
+        output_path = self.img_dir.parent / dir
         output_path.mkdir(parents=True, exist_ok=True)
-        output_fullpath = output_path / (self.tbl_name + '.csv')
+        output_fullpath = output_path / (self.tbl_name + ext)
         db_df.to_csv(str(output_fullpath), index=False)
+        logger.info("Wrote DB `{}` to file '{}'", db=self.tbl_name, file=str(output_fullpath))
+
+    def convert_to_html(self):
+        """Convert the DB into HTML format."""
+        sql = f"SELECT app, day, wages, title, stem, checksum FROM `{self.tbl_name}` ORDER BY day, app"
+        db_df = pandas.read_sql_query(sql, self.conn)
+        return db_df.to_html(index=False)
 
     def check_DB_T0(self, month: int, day_check_only=False):
         """Check the DB for the given month of AppType.T"""
@@ -724,13 +731,17 @@ def run_main_func(func, month=0, app_typ=AppType.T):
   return run_main_wrapper
 
 class RunMain:
-    def __init__(self, month=0,app_type=AppType.NUL):
+    def __init__(self, month=0, app_type=AppType.NUL):
             my_ocr = MyOcr(month=month)
-            main = Main(my_ocr=my_ocr, app_type=app_type)
+            self.main = Main(my_ocr=my_ocr, app_type=app_type)
     def run(self):
         pass
 
-class RunSaveAsCsv(RunMain):
+class SaveAsCsv(RunMain):
+    def __init__(self, month=0, app_type=AppType.NUL):
+        super().__init__(month=month, app_type=app_type)
+
+    @override
     def run(self):
         self.main.save_as_csv()
 
@@ -771,25 +782,32 @@ class FunctionItem:
         self.kwargs = kwargs
     def exec(self):
         if self.func:
-            self.func(**self.kwargs) #if self.kwargs else self.func()
+            s = self.func(**self.kwargs) #if self.kwargs else self.func()
+            if isinstance(s, str):
+                print(s)
 def get_options(month=0):
     my_ocr = MyOcr(month=month) 
     main = Main(my_ocr=my_ocr)
     return [
-        FunctionItem('None', None),
+        FunctionItem('Exit', None),
         FunctionItem('save OCR result into DB', main.ocr_result_into_db),
-
+        FunctionItem('Convert DB to HTML', main.convert_to_html),
     ]
-def run_main(options: Sequence[FunctionItem]):#=get_options(int(input("Month?:") or '0'))):
+
+def run_main(options: Sequence[FunctionItem]|None=None, month=0):
+    options = options or get_options(month=month)
     for n, option in enumerate(options):
         print(f"{n}. {option.title}")
-    choice = int(input(f"Choose(0 to {len(options)}):"))
+    choice = int(input(f"Choose(0 to {len(options) - 1}):"))
     if choice:
         options[choice].exec()
+
 if __name__ == '__main__':
-    import sys
-    month = int(sys.argv[1])
-    run_save_as_csv(month=month)
+    from sys import argv
+    month = int(argv[1]) if len(argv) > 1 else int(input("Month for Data?:") or '0')
+    run_main(month=month)
+    #month = int(sys.argv[1])
+    #run_save_as_csv(month=month)
     #run_fix_title(day)
     #art = sys.argv[2][0].upper()
     #app_type = {'T':AppType.T, 'M':AppType.M}[art]
