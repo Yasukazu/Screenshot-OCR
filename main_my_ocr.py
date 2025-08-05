@@ -20,14 +20,14 @@ import pyocr
 import pyocr.builders
 from pyocr.builders import LineBoxBuilder, TextBuilder, DigitLineBoxBuilder, DigitBuilder, LineBox, Box, WordBoxBuilder
 from returns.pipeline import is_successful, UnwrapFailedError
-
-import logbook
-
-logbook.StreamHandler(sys.stdout,
-	format_string='{record.time:%Y-%m-%d %H:%M:%S.%f} {record.level_name} {record.filename}:{record.lineno}: {record.message}').push_application()
-
-logger = logbook.Logger(__file__)
-logger.level = logbook.INFO
+from loguru import logger
+logger.remove()
+logger.add(sys.stderr, level='WARNING', format="{time} | {level} | {message} | {extra}")
+# import logbook
+# logbook.StreamHandler(sys.stdout,
+#	format_string='{record.time:%Y-%m-%d %H:%M:%S.%f} {record.level_name} {record.filename}:{record.lineno}: {record.message}').push_application()
+# logger = logbook.Logger(__file__)
+# logger.level = logbook.INFO
 
 from tool_pyocr import PathSet, MyOcr, MonthDay, APP_TYPE_TO_STEM_END
 from app_type import AppType
@@ -37,9 +37,11 @@ from checksum import calculate_checksum
 
 class Main:
     import txt_lines_db
-    def __init__(self, app_type=AppType.NUL, db_fullpath=txt_lines_db.sqlite_fullpath(), my_ocr=MyOcr(), tbl_ver=1):  
+    def __init__(self, app_type=AppType.NUL, db_fullpath: Path|Callable[[], Path]=txt_lines_db.sqlite_fullpath, my_ocr=MyOcr, tbl_ver=1):  
 
-        self.my_ocr = my_ocr
+        if callable(db_fullpath):
+            db_fullpath = db_fullpath()
+        self.my_ocr = my_ocr() if callable(my_ocr) else my_ocr
         self.app = app_type
         self.conn = Main.txt_lines_db.connect(db_fullpath=db_fullpath)
         self.tbl_name = Main.txt_lines_db.get_table_name(self.my_ocr.date.month, version=tbl_ver)
@@ -709,7 +711,7 @@ def edit_wages(month: int, app=AppType.T):
                     print(f"Wages of {day=} is Updated as {wages=} in table `{table=}`.")
                     feeder.conn.commit()
 from functools import wraps    
-def run_main(month=0, app_typ=AppType.T):
+def run_main_func(func, month=0, app_typ=AppType.T):
   def run_main_wrapper(func):
     @wraps(func)
     def Inner(*args, **kwargs):

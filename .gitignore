@@ -1,7 +1,10 @@
 **/*.pyc
+**/*~
 /BASE
 /DATA
 **/__pycache__/
+/2025
+/font
 
 **/.*
 .env
