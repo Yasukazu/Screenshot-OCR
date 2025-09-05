@@ -111,6 +111,15 @@ class TTxtLines(TxtLines):
                     month, day = mt.groups()
                     date = MonthDay(int(month), int(day))
                     return date
+                else:
+                    import unicodedata
+                    normalized_value = unicodedata.normalize('NFKC', no_spc_value)
+                    mt = re.match(r"(\d+)月(\d+)日", normalized_value)
+                    if mt and len(mt.groups()) == 2:
+                        month, day = mt.groups()
+                        date = MonthDay(int(month), int(day))
+                        return date
+                    raise ValueError("No match string of date!")
             case Failure(_):
                 logger.error("No date found in txt_lines for stem: {}", self.img_pathset.stem)
                 raise ValueError(f"No date found in txt_lines for stem: {self.img_pathset.stem}")

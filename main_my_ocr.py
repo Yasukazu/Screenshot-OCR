@@ -251,7 +251,7 @@ class Main:
                     prm = (app_type.value, date.day, wages, title, file.stem, pkl, chksum)
                     cur.execute(sql, prm)
                     self.conn.commit()
-                    logger.info("Saved into DB:  app:{}, day:{}, wages:{}, title:{}, stem:{}", *prm[:-3])
+                    logger.info("Saved into DB:  app:{}, day:{}, wages:{}, title:{}, stem:{}", *prm[:-2])
                             
 
 
