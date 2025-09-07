@@ -441,15 +441,18 @@ class Main:
         """Replace the stem of the file with the new stem."""
         return file.parent / (new_stem + file.suffix)
 
-    def save_as_csv(self, dir='csv', ext='.csv'):
+    def save_as_csv(self, dir='csv', ext='.csv', index=False):
         """Save the DB to a CSV file."""
         sql = f"SELECT app, day, wages, title, stem, checksum FROM `{self.tbl_name}` ORDER BY day, app"
         db_df = pandas.read_sql_query(sql, self.conn)
-        output_path = self.img_dir.parent / dir
-        output_path.mkdir(parents=True, exist_ok=True)
+        if dir:
+            output_path = self.img_dir.parent / dir
+            output_path.mkdir(parents=True, exist_ok=True)
+        else:
+            output_path = self.img_dir.parent
         output_fullpath = output_path / (self.tbl_name + ext)
-        db_df.to_csv(str(output_fullpath), index=False)
-        logger.info("Wrote DB `{}` to file '{}'", db=self.tbl_name, file=str(output_fullpath))
+        db_df.to_csv(str(output_fullpath), index=index)
+        logger.info("Wrote DB `{}` to file '{}'") #, db=self.tbl_name, file=str(output_fullpath))
 
     def convert_to_html(self):
         """Convert the DB into HTML format."""
@@ -764,6 +767,12 @@ def run_ocr(month: int=0, limit=62, app_type: AppType = AppType.NUL, test=False,
     main = Main(my_ocr=my_ocr, app_type=app_type, tbl_ver=tbl_ver)
 
     main.ocr_result_into_db(limit=limit, app_type_list=app_type, test=test)
+
+def save_as_csv(month: int=0, app_type: AppType = AppType.NUL, tbl_ver=1):
+    """Run OCR and save result into DB."""
+    my_ocr = MyOcr(month=month)
+    main = Main(my_ocr=my_ocr, app_type=app_type, tbl_ver=tbl_ver)
+    main.save_as_csv()
 
 import click
 @click.group()

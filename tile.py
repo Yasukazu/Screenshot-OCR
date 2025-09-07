@@ -382,7 +382,7 @@ class FunctionItem:
         self.kwargs = kwargs
     def exec(self):
         self.func(**self.kwargs)
-from main_my_ocr import run_ocr
+from main_my_ocr import run_ocr, save_as_csv
 def get_options():
         return [
         FunctionItem('Exit', None),
@@ -395,6 +395,7 @@ def get_options():
 #        FunctionItem('save_pages_as_TIFF', save_pages_as_tiff),
         FunctionItem('T convert_to_pdf', convert_to_pdf, kwargs={'layout':PdfLayout.a3lp, 'app_type': AppType.T}),
         FunctionItem('M convert_to_pdf', convert_to_pdf, kwargs={'layout':PdfLayout.a3lp, 'app_type': AppType.M}),
+        FunctionItem('save_as_csv', save_as_csv, kwargs={}),
     ]
 def main(options=get_options()):
     choice = None
