@@ -25,42 +25,44 @@ def main(filename: str):
 	upper_blue = np.array([180, 38, 255])
 	mask = cv2.inRange(hsv, lower_blue, upper_blue)
 	result = cv2.bitwise_and(src, src, mask=mask)
-	b, g, r = cv2.split(result)
-	cv2.imshow('Blue', b)
+	img_b, g, r = cv2.split(result)
+	cv2.imshow('Blue', img_b)
 	cv2.waitKey(0)
 
 	# CLAHE
-	clh = clahe(b, 4, (8, 8))
+	"""clh = clahe(b, 4, (8, 8))
 	cv2.imshow('CLAHE', clh)
-	cv2.waitKey(0)
+	cv2.waitKey(0)"""
 	# Blur
 	'''img_blur = cv2.blur(clh, (9, 9))
 	cv2.imshow('Blur', img_blur)
 	cv2.waitKey(0)'''
 	# Adaptive Thresholding to isolate the bed
-	img_th = cv2.adaptiveThreshold(clh, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+	img_th = cv2.adaptiveThreshold(img_b, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
 								cv2.THRESH_BINARY, 51, 2)
 	cv2.imshow('Threshhold', img_th)
 	cv2.waitKey(0)
 	contours, hierarchy = cv2.findContours(img_th,
 											cv2.RETR_LIST,
-											cv2.CHAIN_APPROX_SIMPLE)#RETR_CCOMP,TC89_L1)
+											cv2.CHAIN_APPROX_TC89_L1)#RETR_CCOMP,)SIMPLE
 
 	if not len(contours):
 		raise ValueError("No contours detected!")
 	logger.info("%s contours detected.", len(contours))
 	# Filter contours with enough area
-	area_thresh = np.prod(src.shape[:2]) // 64
+	area_thresh = np.prod(src.shape[:2]) // 128
 	logger.info("area_thresh is set to %d", area_thresh)
 	contours = list(filter(lambda x: cv2.contourArea(x) > area_thresh, contours))
 	logger.info("%s contours remains after filtering.", len(contours))
 	# Filter the rectangle by choosing only the big ones
 	# and choose the brightest rectangle as the bed
 	max_brightness = 0
-	BRIGHT_LIST_SIZE = 4
+	BGR_LIST = [(0, 0, 0), (255, 0, 0), (0, 255, 0), (0, 0, 255),
+				(255, 255, 0), (0, 255, 255), (255, 0, 255), (255, 255, 255)]
+	BRIGHT_LIST_SIZE = len(BGR_LIST)
 	b_que = deque([], maxlen=BRIGHT_LIST_SIZE)
 	brightest_rectangle = None
-	src_whr = np.prod(src.shape[:2]) // 8
+	src_whr = np.prod(src.shape[:2]) // 16
 	logger.info("src_whr is set to %d", src_whr)
 	# cropped_dict = {}
 	for cnt in contours:
@@ -79,7 +81,6 @@ def main(filename: str):
 	# for rect in b_que: 
 	# 	cv2.imshow("Cropped", cropped_dict[rect])
 	# 	kbd = cv2.waitKey(0)
-	BGR_LIST = [(0, 0, 0), (255, 0, 0), (0, 255, 0), (0, 0, 255)]
 	canvas = src.copy()
 	for n, rect in enumerate(b_que): # if brightest_rectangle:
 		x, y, w, h = rect # brightest_rectangle
