@@ -1,14 +1,14 @@
 from collections import deque
-from dataclasses import dataclass
+from typing import NamedTuple
+# from dataclasses import dataclass
 from logging.config import fileConfig
-from logging import getLogger, INFO
+from logging import getLogger, INFO, DEBUG
 import cv2
 import numpy as np
 
 fileConfig("logging-debug.conf")
 logger = getLogger(__name__)
-logger.setLevel(INFO)
-from typing import NamedTuple
+logger.setLevel(DEBUG)
 class Rect(NamedTuple):
 	x: int
 	y: int
@@ -35,7 +35,7 @@ def main(filename: str):
 
 	contours, hierarchy = cv2.findContours(img_th,
 											cv2.RETR_CCOMP,
-											cv2.CHAIN_APPROX_TC89_L1)
+											cv2.CHAIN_APPROX_SIMPLE)#TC89_L1)
 
 	if not len(contours):
 		raise ValueError("No contours detected!")
@@ -45,34 +45,42 @@ def main(filename: str):
 	max_brightness = 0
 	BRIGHT_LIST_SIZE = 4
 	b_que = deque([], maxlen=BRIGHT_LIST_SIZE)
-	canvas = src.copy()
 	brightest_rectangle = None
 	src_whr = np.prod(src.shape[:2]) // 8
 	logger.info("src_whr is set to %d", src_whr)
-	cropped_dict = {}
+	# cropped_dict = {}
 	for cnt in contours:
 		x, y, w, h = rect = Rect(*cv2.boundingRect(cnt))
 		if (wh:=w*h) > src_whr: # 40000:
-			mask = np.zeros(src.shape, np.uint8)
-			mask[y:y+h, x:x+w] = cropped = src[y:y+h, x:x+w]
-			# brightness = np.sum(mask)
+			# mask = np.zeros(src.shape, np.uint8)
+			# mask[y:y+h, x:x+w] = cropped = src[y:y+h, x:x+w]
+			brightness = np.sum(src[y:y+h, x:x+w])
 			if wh > max_brightness:
 				brightest_rectangle = rect
 				b_que.appendleft(rect)
 				max_brightness = wh # brightness
-				cropped_dict[rect] = cropped
+				# cropped_dict[rect] = cropped
 			# cv2.imshow("mask", mask)
 	logger.info("%d cropped rects are found.", len(b_que))
-	for rect in b_que: 
-		cv2.imshow("cropped", cropped_dict[rect])
-		cv2.waitKey(0)
+	# for rect in b_que: 
+	# 	cv2.imshow("Cropped", cropped_dict[rect])
+	# 	kbd = cv2.waitKey(0)
 	BGR_LIST = [(0, 0, 0), (255, 0, 0), (0, 255, 0), (0, 0, 255)]
+	canvas = src.copy()
 	for n, rect in enumerate(b_que): # if brightest_rectangle:
 		x, y, w, h = rect # brightest_rectangle
 		cv2.rectangle(canvas, (x, y), (x+w, y+h), BGR_LIST[n], 2) # (0, 255, 0), 2)
-	cv2.imshow("Canvas [KBGR]", canvas)
+	for n, rect in enumerate(b_que):
+		ganvas = canvas.copy()
+		x, y, w, h = rect # brightest_rectangle
+		cv2.rectangle(ganvas, (x, y), (x+w, y+h), BGR_LIST[n], 8) # (0, 255, 0), 2)
+		cv2.imshow("Hit 's' to save:", ganvas) # [KBGR:0123]
 		# cv2.imwrite("result.jpg", canvas)
-	cv2.waitKey(0)
+		kbd = cv2.waitKey(0)
+		if kbd == ord('s'):
+			crop_filename = filename.rsplit('.', 1)[0] + '-crop.png'
+			logger.debug("'%s' as crop filename.", crop_filename)
+			cv2.imwrite(crop_filename, src[y:y+h, x:x+w])
 
 def clahe(img, clip_limit=4, grid_size=(8,8)):
 	clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=grid_size)
