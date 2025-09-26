@@ -26,20 +26,34 @@ def main(filename: str):
 	mask = cv2.inRange(hsv, lower_blue, upper_blue)
 	result = cv2.bitwise_and(src, src, mask=mask)
 	b, g, r = cv2.split(result)
-	clh = clahe(g, 4, (8, 8))
+	cv2.imshow('Blue', b)
+	cv2.waitKey(0)
 
+	# CLAHE
+	clh = clahe(b, 4, (8, 8))
+	cv2.imshow('CLAHE', clh)
+	cv2.waitKey(0)
+	# Blur
+	'''img_blur = cv2.blur(clh, (9, 9))
+	cv2.imshow('Blur', img_blur)
+	cv2.waitKey(0)'''
 	# Adaptive Thresholding to isolate the bed
-	img_blur = cv2.blur(clh, (9, 9))
-	img_th = cv2.adaptiveThreshold(img_blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+	img_th = cv2.adaptiveThreshold(clh, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
 								cv2.THRESH_BINARY, 51, 2)
-
+	cv2.imshow('Threshhold', img_th)
+	cv2.waitKey(0)
 	contours, hierarchy = cv2.findContours(img_th,
-											cv2.RETR_CCOMP,
-											cv2.CHAIN_APPROX_SIMPLE)#TC89_L1)
+											cv2.RETR_LIST,
+											cv2.CHAIN_APPROX_SIMPLE)#RETR_CCOMP,TC89_L1)
 
 	if not len(contours):
 		raise ValueError("No contours detected!")
 	logger.info("%s contours detected.", len(contours))
+	# Filter contours with enough area
+	area_thresh = np.prod(src.shape[:2]) // 64
+	logger.info("area_thresh is set to %d", area_thresh)
+	contours = list(filter(lambda x: cv2.contourArea(x) > area_thresh, contours))
+	logger.info("%s contours remains after filtering.", len(contours))
 	# Filter the rectangle by choosing only the big ones
 	# and choose the brightest rectangle as the bed
 	max_brightness = 0
