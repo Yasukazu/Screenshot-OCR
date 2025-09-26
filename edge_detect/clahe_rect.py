@@ -1,3 +1,4 @@
+from collections import deque
 import cv2
 import numpy as np
 
@@ -25,24 +26,28 @@ def main(filename: str):
     # Filter the rectangle by choosing only the big ones
     # and choose the brightest rectangle as the bed
     max_brightness = 0
+    brighter_len = 4
     canvas = src.copy()
     brightest_rectangle = None
+    src_whr = src.shape[1] * src.shape[0] / 8
     for cnt in contours:
         rect = cv2.boundingRect(cnt)
         x, y, w, h = rect
-        if w*h > 40000:
+        if w*h > src_whr: # 40000:
             mask = np.zeros(src.shape, np.uint8)
             mask[y:y+h, x:x+w] = src[y:y+h, x:x+w]
+            cropped = src[y:y+h, x:x+w]
             brightness = np.sum(mask)
             if brightness > max_brightness:
                 brightest_rectangle = rect
                 max_brightness = brightness
-            cv2.imshow("mask", mask)
+            # cv2.imshow("mask", mask)
+            cv2.imshow("cropped", cropped)
             cv2.waitKey(0)
 
     if brightest_rectangle:
         x, y, w, h = brightest_rectangle
-        cv2.rectangle(canvas, (x, y), (x+w, y+h), (0, 255, 0), 1)
+        cv2.rectangle(canvas, (x, y), (x+w, y+h), (0, 255, 0), 2)
         cv2.imshow("canvas", canvas)
         cv2.imwrite("result.jpg", canvas)
     cv2.waitKey(0)
