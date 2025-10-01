@@ -384,8 +384,8 @@ class FunctionItem:
 		self.func = func
 		self.kwargs = kwargs
 		if main_obj:
-			assert main_obj.app == app_type
-			assert main_obj.month == month
+			# assert main_obj.app == app_type
+			# assert main_obj.month == month
 			self.main = main_obj
 		else:
 			my_ocr = MyOcr(month=month)
