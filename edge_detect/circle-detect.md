@@ -6,4 +6,4 @@ Other detected circles are noise caused by characters or non-circle figures in t
 
 ## Reference of HoughCircles
 
-[Detect circles by OpenCV with Python](https://www.codevace.com/py-opencv-houghcircles/)
+[Detect circles by OpenCV with Python | CodeVace](https://www.codevace.com/py-opencv-houghcircles/)
