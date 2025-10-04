@@ -1,8 +1,12 @@
 # The result of circle_detect.py
 
-Succeeded to detect the target circle, the only visible clear circle figure in the image.
+The good thing is that this script succeeded to detect the target circle, the only complete circle shape in the image.
 The list returned by `HoughCircles()` started with the target circle.
-Other detected circles are noise caused by characters or non-circle figures in the image.
+Other detected circles are noise caused by characters or partial circular figures in the image.
+
+## Speed
+
+About 20 seconds to find the target circle.
 
 ## Reference of HoughCircles
 
