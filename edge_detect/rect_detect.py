@@ -25,6 +25,7 @@ class Rect(NamedTuple):
 
 def main(filename: str | Path, cutoff=0.3, BGR='B', image_area=(0, 0), image_aspect=10.0):
 	logger.info("main started.")
+	logger.debug("%f image_aspect", image_aspect)
 	# Load the image 
 	image = cv2.imread(str(filename)) # 'path/to/your/image.jpg') 
 	if image is None:
@@ -45,14 +46,14 @@ def main(filename: str | Path, cutoff=0.3, BGR='B', image_area=(0, 0), image_asp
 			#green = src_f[i, j, 1]
 			#red = src_f[i, j, 2]
 			luminosity_result[i, j] = src_f[i, j, bgr_pos] # 0.02126*red + 0.5152*green + 0.722*blue
-	cv2.imshow('Luminosity result', luminosity_result)
-	cv2.waitKey(0) 
+	# cv2.imshow('Luminosity result', luminosity_result)
+	# cv2.waitKey(0) 
 	# gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) 
 	
 	# Apply Gaussian blur to reduce noise and improve edge detection 
-	blurred = cv2.GaussianBlur(luminosity_result, (7, 7), 3) # medianBlur
-	cv2.imshow('Blur', blurred)
-	cv2.waitKey(0) 
+	blurred = cv2.GaussianBlur(luminosity_result, (17, 17), 3) # medianBlur
+	# cv2.imshow('Blur', blurred)
+	# cv2.waitKey(0) 
 
 	""" # Sobel filter
 	sobel_x = cv2.Sobel(blurred, cv2.CV_32F, 1, 0) # X
@@ -68,10 +69,11 @@ def main(filename: str | Path, cutoff=0.3, BGR='B', image_area=(0, 0), image_asp
 	cv2.waitKey(0) 
 	"""
 	# Binarize
-	ret, binarized = cv2.threshold(blurred, 200, 255,cv2.THRESH_BINARY)
+	ret, binarized = cv2.threshold(blurred, 240, 255, cv2.THRESH_BINARY)
 	# binarized = cv2.adaptiveThreshold(blurred, 255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,11,2)
 	cv2.imshow('Binarized', binarized)
-	cv2.waitKey(0)
+	# cv2.waitKey(0)
+	# exit(0)
 	
 	# Perform edge detection 
 	canny_edges = cv2.Canny(binarized, 50, 150) 
@@ -90,14 +92,15 @@ def main(filename: str | Path, cutoff=0.3, BGR='B', image_area=(0, 0), image_asp
 	# logger.info("%s contours limited.", len(limited_cont))
 	# image_cutoff = floor(image_min * cutoff) # / 16) or 4
 	# Loop over the contours 
-	limit = 16
+	limit = 80
 	added = 0
 	# bounding_rect_contours = [cv2.boundingRect(contour) for contour in sorted_contours[:limit]] 
 	bounding_rect_contours = []
 	for contour in sorted_contours[:limit]: 
 		rect = Rect(*cv2.boundingRect(contour))
 		aspect_ratio = max(rect.w / rect.h, rect.h / rect.w)
-		if aspect_ratio < max_aspect_ratio:
+		if aspect_ratio < image_aspect:
+			logger.info("aspect_ratio: %f", aspect_ratio)
 			bounding_rect_contours.append(contour)
 		# Approximate the contour to a polygon 
 		# epsilon = 0.02 * cv2.arcLength(contour, True) 
@@ -161,7 +164,7 @@ if __name__ == '__main__':
 		if not img_path.exists():
 			print(f"Image file {img_path} does not exist!")
 			exit(1)
-	max_aspect_ratio = 10.0
+	max_aspect_ratio = -1
 	try:
 		for opt, arg in opts:
 			match opt:
@@ -180,7 +183,12 @@ if __name__ == '__main__':
 	IMAGE_AREA_DICT = config.get("image-area") or {}
 	image_area = IMAGE_AREA_DICT.get(img_path.stem) or (0, 0)
 	IMAGE_ASPECT_DICT = config.get("image-aspect") or {}
-	image_aspect_dict = IMAGE_ASPECT_DICT.get(img_path.stem) 
-	image_aspect = image_aspect_dict.get('ratio') if image_aspect_dict else 10.0
+	if max_aspect_ratio < 0:
+		image_aspect_dict = IMAGE_ASPECT_DICT.get(img_path.stem) 
+		image_aspect = image_aspect_dict.get('ratio') if image_aspect_dict else 10.0
+	else:
+		image_aspect = max_aspect_ratio
+	logger.info("max_aspect_ratio: %f", image_aspect)
 	main(img_path, cutoff=max_aspect_ratio, image_area=image_area, image_aspect=image_aspect)
+
 	# if len(argv) < 2: print("Rectangle detector. Needs filespec.") exit(1) main(argv[1], cutoff=float(argv[2]))
