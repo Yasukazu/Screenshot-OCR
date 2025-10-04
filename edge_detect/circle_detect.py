@@ -15,9 +15,12 @@ logger.addHandler(stdout_handler)
 config_filename = __file__.rsplit('.', 1)[0] + '.toml'
 with open(config_filename,'rb') as file:
 	config = load_toml_file(file)
-IMAGE_AREA_DICT = config["image-area"]
+# IMAGE_AREA_DICT = config["image-area"]
+IMAGE_PATH_DICT = config["image-path"]
 from sys import exit
 from pathlib import Path
+def empty(x):
+	pass
 def main(filename: str | Path, cutoff: int=5, BGR='B'):
 	if cutoff < 1:
 		logger.error("cutoff must be greater than 0!")
@@ -25,7 +28,7 @@ def main(filename: str | Path, cutoff: int=5, BGR='B'):
 	logger.info("main started.")
 	# Load the image 
 	image = cv2.imread(str(filename)) # 'path/to/your/image.jpg')
-	if not image:
+	if image is None:
 		logger.error("Failed to load image: %s", filename)
 		exit(1)
 	image_h, image_w, _ = image.shape 
@@ -35,8 +38,7 @@ def main(filename: str | Path, cutoff: int=5, BGR='B'):
 	min_radius = min_image_size * cutoff // 100 // 2
 	logger.debug("image_h: %d, image_w: %d, min_radius: %d", image_h, image_w, min_radius)
 	# Parameters window
-	def empty(x):
-		pass
+
 
 	PARAMS = 'Parameters'
 	cv2.namedWindow(PARAMS)
@@ -52,9 +54,9 @@ def main(filename: str | Path, cutoff: int=5, BGR='B'):
 
 
 	while True:
-		src_f = image.astype(np.float64).copy()
+		img_dst = image.astype(np.float64).copy()
 		# Convert to grayscale 
-		luminosity_result = np.zeros((image_h, image_w), np.uint8)
+		img_gray = np.zeros((image_h, image_w), np.uint8)
 		# ルミナンス法（Luminosity Method）
 		bgr_pos = 'BGR'.index(BGR)
 		for i in range(image_h):
@@ -62,15 +64,15 @@ def main(filename: str | Path, cutoff: int=5, BGR='B'):
 				#blue = src_f[i, j, 0]
 				#green = src_f[i, j, 1]
 				#red = src_f[i, j, 2]
-				luminosity_result[i, j] = src_f[i, j, bgr_pos] # 0.02126*red + 0.5152*green + 0.722*blue
-		cv2.imshow('Luminosity result', luminosity_result)
-		cv2.waitKey(0) 
+				img_gray[i, j] = img_dst[i, j, bgr_pos] # 0.02126*red + 0.5152*green + 0.722*blue
+		# cv2.imshow('Luminosity result', img_gray)
+		# cv2.waitKey(0) 
 		# gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) 
 		
 		# Apply Gaussian blur to reduce noise and improve edge detection 
-		blurred = cv2.GaussianBlur(luminosity_result, (7, 7), 3) # medianBlur
-		cv2.imshow('Blur', blurred)
-		cv2.waitKey(0) 
+		# blurred = cv2.GaussianBlur(img_gray, (7, 7), 3) # medianBlur
+		# cv2.imshow('Blur', blurred)
+		# cv2.waitKey(0) 
 		kernel = cv2.getTrackbarPos("k_size_set", "Parameters")
 		kernel = (kernel * 2) + 1
 		img_blur = cv2.GaussianBlur(img_gray, (kernel, kernel), None)
@@ -93,54 +95,49 @@ def main(filename: str | Path, cutoff: int=5, BGR='B'):
 		cv2.waitKey(0)
 		"""
 		# Canny edge detection 
-		image_edges = cv2.Canny(blurred, 50, 150) 
-		cv2.imshow('Detected edges', image_edges)
-		cv2.waitKey(0) 
-		# Find contours in the edged image 
-		contours, _ = cv2.findContours(image_edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE) 
-		if not len(contours):
-			raise ValueError("No contours detected!")
-		logger.info("%s contours detected.", len(contours))
-		#limit = 4 # len(contours) // 32
-		#limited_cont = []
-		sorted_contours = sorted(contours, key=cv2.contourArea, reverse=True) #[:limit] # (limit // 2):limit] 
-		# if len(ct) == 4: limited_cont.append(ct) if len(limited_cont) >= limit: break
-		# logger.info("%s contours limited.", len(limited_cont))
-		# image_cutoff = floor(image_min * cutoff) # / 16) or 4
-		# Loop over the contours 
-		limit = 16
-		added = 0
-		for contour in sorted_contours: 
-			# Approximate the contour to a polygon 
-			epsilon = 0.02 * cv2.arcLength(contour, True) 
-			approx_cont = cv2.approxPolyDP(contour, epsilon, True) 
-			# Check if the approximated contour has 4 points (rectangle) 
-			# if len(approx_cont) == 4:
-				# min_dist = get_min_distance(approx_cont)
-				# if min_dist > image_cutoff: 
-					# Draw the rectangle on the original image 
-			cv2.drawContours(image, [approx_cont], -1, (0xff, 0, 0), 2) 
-			cv2.imshow('Detected Rectangles', image) 
-			cv2.waitKey(20) 
-			added += 1
-				# if added >= limit: break
+		thres1_val = cv2.getTrackbarPos('canny_1st', 'Parameters')
+		thres2_val = cv2.getTrackbarPos('canny_2nd', 'Parameters')
+		img_edges = cv2.Canny(img_blur, threshold1=thres1_val, threshold2=thres2_val)
 		
-		# Display the result 
-		cv2.waitKey(0) 
+		# image_edges = cv2.Canny(blurred, 50, 150) 
+		# cv2.imshow('Detected edges', image_edges)
+		# cv2.waitKey(0) 
+		# Find contours in the edged image 
+		circles = cv2.HoughCircles(img_edges, cv2.HOUGH_GRADIENT,
+						dp=1,
+						minDist=cv2.getTrackbarPos('minDist_set', 'Parameters'),
+						param1=cv2.getTrackbarPos('param1_set', 'Parameters'),
+						param2=cv2.getTrackbarPos('param2_set', 'Parameters'),
+						minRadius=cv2.getTrackbarPos('minRadius_set', 'Parameters'),
+						maxRadius=cv2.getTrackbarPos('maxRadius_set', 'Parameters'),
+						)
+	
+		try:
+			circles = np.uint16(np.around(circles))
 
-def get_min_distance(cont: ndarray) -> int: # Sequence[Sequence[int]]) -> int:
-	dist_list = []
-	for i in range(4):
-		p = cont[i, 0] # - cont[i, 0, 0]
-		q = cont[(i + 1) % 4, 0] # - cont[i, 0, 0]
-		d = floor(dist(p, q))
-		if not d:
-			return 0
-		dist_list.append(d)
-		# if d == 0: return 0
-		# dw = cont[(i + 1) % 4, 0, 1] - cont[i, 0, 1]
-		# dhdw = dh^2 + dw^2
-	return min(dist_list)
+			for circle in circles[0, :]:
+				# 円周を描画する
+				cv2.circle(img_dst, (circle[0], circle[1]), circle[2], (0, 165, 255), 5)
+				print('radius')
+				print(circle[2])
+
+				# 中心点を描画する
+				cv2.circle(img_dst, (circle[0], circle[1]), 2, (0, 0, 255), 3)
+				print('center')
+				print(circle[0], circle[1])
+				
+			# 4. Plotting
+			cv2.imshow('result', img_dst)
+			
+		except:
+			pass
+
+		# qを押すと止まる。
+		if cv2.waitKey(1) & 0xFF == ord('q'):
+			break
+		cv2.destroyAllWindows()
+
+
 
 if __name__ == '__main__':
 	from getopt import getopt
@@ -152,9 +149,11 @@ if __name__ == '__main__':
 		exit(1)
 	img_path = Path(args[0])
 	if not img_path.exists():
-		print(f"Image file {img_path} does not exist!")
-		exit(1)
-	min_diameter_percentage = 1
+		img_path = Path(IMAGE_PATH_DICT['dir']) / img_path
+		if not img_path.exists():
+			print(f"Image file {img_path} does not exist!")
+			exit(1)
+	min_diameter_percentage = 4
 	for opt, arg in opts:
 		match opt:
 			case "-h":
