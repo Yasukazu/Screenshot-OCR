@@ -63,10 +63,10 @@ def main(filename: str | Path, cutoff: int=5, BGR='B'):
 			#red = src_f[i, j, 2]
 			img_gray[i, j] = image[i, j, bgr_pos] 
 
-	cv2.imshow('Gray image', img_gray)
-	cv2.waitKey(0) 
 	while True:
-		# img_dst = image.copy() # astype(np.float64).
+		img_dst = img_gray.copy() # astype(np.float64).
+		cv2.imshow('dst image', img_dst)
+		cv2.waitKey(0) 
 # 0.02126*red + 0.5152*green + 0.722*blue
 		# cv2.imshow('Luminosity result', img_gray)
 		# cv2.waitKey(0) 
@@ -78,7 +78,7 @@ def main(filename: str | Path, cutoff: int=5, BGR='B'):
 		# cv2.waitKey(0) 
 		kernel = cv2.getTrackbarPos("k_size_set", "Parameters")
 		kernel = (kernel * 2) + 1
-		img_blur = cv2.GaussianBlur(img_gray, (kernel, kernel), None)
+		img_blur = cv2.GaussianBlur(img_dst, (kernel, kernel), None)
 		""" # Sobel filter
 		sobel_x = cv2.Sobel(blurred, cv2.CV_32F, 1, 0) # X
 		sobel_y = cv2.Sobel(blurred, cv2.CV_32F, 0, 1) # Y
@@ -117,19 +117,23 @@ def main(filename: str | Path, cutoff: int=5, BGR='B'):
 	
 		try:
 			circles = np.uint16(np.around(circles))
+			cv2.imshow('before curcle draw', img_dst)
+			cv2.waitKey(0)
 
-			for circle in circles[0, :]:
-				logger.info("Radius: %d, center:%d, %d", circle[0], circle[1], circle[2])
+			for n, circle in enumerate(circles[0, :]):
+				logger.info("%03d. Radius: %d, center:%d, %d", n, circle[0], circle[1], circle[2])
 				# 円周を描画する
-				cv2.circle(img_gray, (circle[0], circle[1]), circle[2], (0, 165, 255), 5)
+				cv2.circle(img_dst, (circle[0], circle[1]), circle[2], (0, 165, 255), 5)
+				cv2.imshow('first circle', img_dst)
+				cv2.waitKey(0)
 				# print('radius')
 				# print(circle[2])
 				# 中心点を描画する
-				cv2.circle(img_gray, (circle[0], circle[1]), 2, (0, 0, 255), 3)
+				cv2.circle(img_dst, (circle[0], circle[1]), 2, (0, 0, 255), 3)
 				# print('center')
 				# print(circle[0], circle[1])
 			# 4. Plotting
-			cv2.imshow('result', img_gray)
+			cv2.imshow('result', img_dst)
 			cv2.waitKey(0)
 			
 		except:
