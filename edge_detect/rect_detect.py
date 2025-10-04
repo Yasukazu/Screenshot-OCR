@@ -1,22 +1,39 @@
+from tomllib import load as load_toml_file
 from math import sqrt, floor, dist
 from typing import Sequence
 from sys import argv, exit, stdout
 import cv2 
 import numpy as np 
 from numpy import ndarray
-from logging import getLogger, INFO, StreamHandler
+from logging import getLogger, INFO, StreamHandler, DEBUG
 logger = getLogger(__name__)
-logger.setLevel(INFO)
+logger.setLevel(DEBUG)
 stdout_handler = StreamHandler(stdout)
-stdout_handler.setLevel(INFO)
+stdout_handler.setLevel(DEBUG)
 logger.addHandler(stdout_handler)
 
-def main(filename: str, cutoff=0.3, BGR='B'):
+from pathlib import Path
+from typing import NamedTuple
+
+class Rect(NamedTuple):
+	x: int
+	y: int
+	w: int
+	h: int
+
+# def get_aspect_ratio(cont: ndarray) -> float: rect = cv2.minAreaRect(cont)
+
+def main(filename: str | Path, cutoff=0.3, BGR='B', image_area=(0, 0), image_aspect=10.0):
 	logger.info("main started.")
 	# Load the image 
-	image = cv2.imread(filename) # 'path/to/your/image.jpg') 
+	image = cv2.imread(str(filename)) # 'path/to/your/image.jpg') 
+	if image is None:
+		logger.error("Failed to load image: %s", filename)
+		exit(1)
 	image_h, image_w, _ = image.shape 
-	image_min = min([image_h, image_w])
+	logger.debug("image_h: %d, image_w: %d", image_h, image_w)
+	# image_min = min([image_h, image_w])
+
 	src_f = image.astype(np.float64)
 	# Convert to grayscale 
 	luminosity_result = np.zeros((image_h, image_w), np.uint8)
@@ -67,6 +84,7 @@ def main(filename: str, cutoff=0.3, BGR='B'):
 	logger.info("%s contours detected.", len(contours))
 	#limit = 4 # len(contours) // 32
 	#limited_cont = []
+	# aspect_limited_contours = [ct for ct in contours if cv2.con]
 	sorted_contours = sorted(contours, key=cv2.contourArea, reverse=True) #[:limit] # (limit // 2):limit] 
 	# if len(ct) == 4: limited_cont.append(ct) if len(limited_cont) >= limit: break
 	# logger.info("%s contours limited.", len(limited_cont))
@@ -74,20 +92,27 @@ def main(filename: str, cutoff=0.3, BGR='B'):
 	# Loop over the contours 
 	limit = 16
 	added = 0
-	for contour in sorted_contours: 
+	# bounding_rect_contours = [cv2.boundingRect(contour) for contour in sorted_contours[:limit]] 
+	bounding_rect_contours = []
+	for contour in sorted_contours[:limit]: 
+		rect = Rect(*cv2.boundingRect(contour))
+		aspect_ratio = max(rect.w / rect.h, rect.h / rect.w)
+		if aspect_ratio < max_aspect_ratio:
+			bounding_rect_contours.append(contour)
 		# Approximate the contour to a polygon 
-		epsilon = 0.02 * cv2.arcLength(contour, True) 
-		approx_cont = cv2.approxPolyDP(contour, epsilon, True) 
+		# epsilon = 0.02 * cv2.arcLength(contour, True) 
+		# approx_cont = cv2.approxPolyDP(contour, epsilon, True) 
 		# Check if the approximated contour has 4 points (rectangle) 
 		# if len(approx_cont) == 4:
 			# min_dist = get_min_distance(approx_cont)
 			# if min_dist > image_cutoff: 
 				# Draw the rectangle on the original image 
-		cv2.drawContours(image, [approx_cont], -1, (0xff, 0, 0), 2) 
-		cv2.imshow('Detected Rectangles', image) 
-		cv2.waitKey(20) 
-		added += 1
-			# if added >= limit: break
+			# cv2.drawContours(image, contours, -1, (0xff, 0, 0), 2) 
+			cv2.drawContours(image, [contour], -1, (0xff, 0, 0), 2) 
+			cv2.imshow('Detected bounding rectangles', image) 
+			cv2.waitKey(20) 
+			added += 1
+				# if added >= limit: break
 	
 	# Display the result 
 	cv2.waitKey(0) 
@@ -107,7 +132,55 @@ def get_min_distance(cont: ndarray) -> int: # Sequence[Sequence[int]]) -> int:
 	return min(dist_list)
 
 if __name__ == '__main__':
-	if len(argv) < 2:
-		print("Rectangle detector. Needs filespec.")
+	config_filename = __file__.rsplit('.')[0] + '.toml'
+	try:
+		with open(config_filename,'rb') as file:
+			config = load_toml_file(file)
+		IMAGE_PATH_DICT = config["image-path"]
+		dirname = IMAGE_PATH_DICT['dir']
+	except FileNotFoundError:
+		print(f"Config file {config_filename} does not exist!")
 		exit(1)
-	main(argv[1], cutoff=float(argv[2]))
+	except KeyError:
+		print(f"Image dir not specified in {config_filename} as 'dir=<dirname>' in section '[image-path]'!")
+		exit(1)
+
+	from getopt import getopt
+	opts, args = getopt(argv[1:], "ha:", ["help", "max_aspect_ratio="]) 
+	HELP_OPTION = "-h"
+	HELP_TEXT = "Rectangle detector. Needs filespec. Options:: -h: help, -a<float>: max_axpect_ratio(default=10)"
+	if not len(args):
+		print(HELP_TEXT)
+		exit(1)
+	filename = args[0]
+	if len(args) > 1:
+		print(f"Only the first file '{filename}' is specified.")
+	img_path = Path(filename)
+	if not img_path.exists() and 'dir' in IMAGE_PATH_DICT :
+		img_path = Path(IMAGE_PATH_DICT['dir']) / img_path
+		if not img_path.exists():
+			print(f"Image file {img_path} does not exist!")
+			exit(1)
+	max_aspect_ratio = 10.0
+	try:
+		for opt, arg in opts:
+			match opt:
+				case "-h":
+					print(HELP_TEXT)
+					exit(0)
+				case "-a":
+					max_aspect_ratio = float(arg)	
+				case _:
+					logger.error("Invalid option: %s", opt)
+					exit(1)
+	except ValueError:
+		print(f"Invalid max_aspect_ratio value: {max_aspect_ratio}")
+		exit(1)
+
+	IMAGE_AREA_DICT = config.get("image-area") or {}
+	image_area = IMAGE_AREA_DICT.get(img_path.stem) or (0, 0)
+	IMAGE_ASPECT_DICT = config.get("image-aspect") or {}
+	image_aspect_dict = IMAGE_ASPECT_DICT.get(img_path.stem) 
+	image_aspect = image_aspect_dict.get('ratio') if image_aspect_dict else 10.0
+	main(img_path, cutoff=max_aspect_ratio, image_area=image_area, image_aspect=image_aspect)
+	# if len(argv) < 2: print("Rectangle detector. Needs filespec.") exit(1) main(argv[1], cutoff=float(argv[2]))
