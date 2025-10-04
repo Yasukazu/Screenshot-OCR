@@ -49,22 +49,25 @@ def main(filename: str | Path, cutoff: int=5, BGR='B'):
 	cv2.createTrackbar('minDist_set', PARAMS, 100, 200, empty)
 	cv2.createTrackbar('param1_set', PARAMS, 100, 300, empty) #100
 	cv2.createTrackbar('param2_set', PARAMS, 30, 300, empty) #30
-	cv2.createTrackbar('minRadius_set', PARAMS, min_radius, min_image_size, empty) #250
-	cv2.createTrackbar('maxRadius_set', PARAMS, 0, min_image_size, empty ) #500
+	cv2.createTrackbar('minRadius_set', PARAMS, min_radius, min_image_size // 2, empty) #250
+	cv2.createTrackbar('maxRadius_set', PARAMS, min_image_size // 2, min_image_size // 2, empty ) #500
 
+	# Convert to grayscale 
+	img_gray = np.zeros((image_h, image_w), np.uint8)
+	# ルミナンス法（Luminosity Method）
+	bgr_pos = 'BGR'.index(BGR)
+	for i in range(image_h):
+		for j in range(image_w):
+			#blue = src_f[i, j, 0]
+			#green = src_f[i, j, 1]
+			#red = src_f[i, j, 2]
+			img_gray[i, j] = image[i, j, bgr_pos] 
 
+	cv2.imshow('Gray image', img_gray)
+	cv2.waitKey(0) 
 	while True:
-		img_dst = image.astype(np.float64).copy()
-		# Convert to grayscale 
-		img_gray = np.zeros((image_h, image_w), np.uint8)
-		# ルミナンス法（Luminosity Method）
-		bgr_pos = 'BGR'.index(BGR)
-		for i in range(image_h):
-			for j in range(image_w):
-				#blue = src_f[i, j, 0]
-				#green = src_f[i, j, 1]
-				#red = src_f[i, j, 2]
-				img_gray[i, j] = img_dst[i, j, bgr_pos] # 0.02126*red + 0.5152*green + 0.722*blue
+		# img_dst = image.copy() # astype(np.float64).
+# 0.02126*red + 0.5152*green + 0.722*blue
 		# cv2.imshow('Luminosity result', img_gray)
 		# cv2.waitKey(0) 
 		# gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) 
@@ -100,7 +103,7 @@ def main(filename: str | Path, cutoff: int=5, BGR='B'):
 		img_edges = cv2.Canny(img_blur, threshold1=thres1_val, threshold2=thres2_val)
 		
 		# image_edges = cv2.Canny(blurred, 50, 150) 
-		# cv2.imshow('Detected edges', image_edges)
+		# cv2.imshow('Detected edges', img_edges)
 		# cv2.waitKey(0) 
 		# Find contours in the edged image 
 		circles = cv2.HoughCircles(img_edges, cv2.HOUGH_GRADIENT,
@@ -116,18 +119,18 @@ def main(filename: str | Path, cutoff: int=5, BGR='B'):
 			circles = np.uint16(np.around(circles))
 
 			for circle in circles[0, :]:
+				logger.info("Radius: %d, center:%d, %d", circle[0], circle[1], circle[2])
 				# 円周を描画する
-				cv2.circle(img_dst, (circle[0], circle[1]), circle[2], (0, 165, 255), 5)
-				print('radius')
-				print(circle[2])
-
+				cv2.circle(img_gray, (circle[0], circle[1]), circle[2], (0, 165, 255), 5)
+				# print('radius')
+				# print(circle[2])
 				# 中心点を描画する
-				cv2.circle(img_dst, (circle[0], circle[1]), 2, (0, 0, 255), 3)
-				print('center')
-				print(circle[0], circle[1])
-				
+				cv2.circle(img_gray, (circle[0], circle[1]), 2, (0, 0, 255), 3)
+				# print('center')
+				# print(circle[0], circle[1])
 			# 4. Plotting
-			cv2.imshow('result', img_dst)
+			cv2.imshow('result', img_gray)
+			cv2.waitKey(0)
 			
 		except:
 			pass
