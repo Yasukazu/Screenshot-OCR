@@ -65,8 +65,7 @@ def main(filename: str | Path, cutoff: int=5, BGR='B'):
 
 	while True:
 		img_dst = img_gray.copy() # astype(np.float64).
-		cv2.imshow('dst image', img_dst)
-		cv2.waitKey(0) 
+		# cv2.imshow('dst image', img_dst) cv2.waitKey(0) 
 # 0.02126*red + 0.5152*green + 0.722*blue
 		# cv2.imshow('Luminosity result', img_gray)
 		# cv2.waitKey(0) 
@@ -117,19 +116,18 @@ def main(filename: str | Path, cutoff: int=5, BGR='B'):
 	
 		try:
 			circles = np.uint16(np.around(circles))
-			cv2.imshow('before curcle draw', img_dst)
-			cv2.waitKey(0)
-
+			# cv2.imshow('before curcle draw', img_dst) cv2.waitKey(0)
 			for n, circle in enumerate(circles[0, :]):
-				logger.info("%03d. Radius: %d, center:%d, %d", n, circle[0], circle[1], circle[2])
+				logger.info("%d. Radius: %d, center: (%d, %d)", n + 1, circle[2], circle[0], circle[1])
 				# 円周を描画する
-				cv2.circle(img_dst, (circle[0], circle[1]), circle[2], (0, 165, 255), 5)
+				cv2.circle(img_dst, (circle[0], circle[1]), circle[2], 0, 4) # (0, 165, 255), 5)
+				cv2.rectangle(img_dst, (0, 0), (circle[0] + circle[2], circle[1] + circle[2]), 0, 4)
 				cv2.imshow('first circle', img_dst)
 				cv2.waitKey(0)
 				# print('radius')
 				# print(circle[2])
 				# 中心点を描画する
-				cv2.circle(img_dst, (circle[0], circle[1]), 2, (0, 0, 255), 3)
+				# draw rectangle to cut circle
 				# print('center')
 				# print(circle[0], circle[1])
 			# 4. Plotting
