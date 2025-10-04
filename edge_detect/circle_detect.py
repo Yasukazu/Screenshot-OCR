@@ -146,9 +146,10 @@ def main(filename: str | Path, cutoff: int=5, BGR='B'):
 
 if __name__ == '__main__':
 	from getopt import getopt
+	default_min_diameter_percentage = 4
 	opts, args = getopt(argv[1:], "hi:", ["help", "min_diameter_percentage="]) 
 	HELP_OPTION = "-h"
-	HELP_TEXT = "Circle detector. Needs filespec. Options:: -h: help, -i<int>: min_diameter_percentage>"
+	HELP_TEXT = f"Circle detector. Needs filespec. Options:: -h: help, -i<int>: min_diameter_percentage(default={default_min_diameter_percentage})"
 	if not len(args):
 		print(HELP_TEXT)
 		exit(1)
@@ -158,7 +159,7 @@ if __name__ == '__main__':
 		if not img_path.exists():
 			print(f"Image file {img_path} does not exist!")
 			exit(1)
-	min_diameter_percentage = 4
+	min_diameter_percentage = default_min_diameter_percentage
 	for opt, arg in opts:
 		match opt:
 			case "-h":
