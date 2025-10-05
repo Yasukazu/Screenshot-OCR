@@ -7,9 +7,9 @@ import numpy as np
 from numpy import ndarray
 from logging import getLogger, INFO, StreamHandler, DEBUG
 logger = getLogger(__name__)
-logger.setLevel(DEBUG)
+logger.setLevel(INFO)
 stdout_handler = StreamHandler(stdout)
-stdout_handler.setLevel(DEBUG)
+stdout_handler.setLevel(INFO)
 logger.addHandler(stdout_handler)
 
 from pathlib import Path
