@@ -78,7 +78,7 @@ def main(filename: str | Path, threshold_ratio=0.5, BGR='B', image_area=(0, 0), 
 
 	cv2.imshow('Source image', image)
 	cv2.imshow('Histogram', histImage)
-	cv2.waitKey()
+	# cv2.waitKey()
 
 	plt.rcParams["figure.figsize"] = [12,3.8]                        # 表示領域のアスペクト比を設定
 	plt.subplots_adjust(left=0.05, right=0.95, bottom=0.15, top=0.9) # 余白を設定
