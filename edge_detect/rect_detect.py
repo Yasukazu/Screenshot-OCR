@@ -2,9 +2,12 @@ from tomllib import load as load_toml_file
 from math import sqrt, floor, dist
 from typing import Sequence
 from sys import argv, exit, stdout
+
 import cv2 
 import numpy as np 
 from numpy import ndarray
+import matplotlib.pyplot as plt
+
 from logging import getLogger, INFO, StreamHandler, DEBUG
 logger = getLogger(__name__)
 logger.setLevel(INFO)
@@ -23,9 +26,10 @@ class Rect(NamedTuple):
 
 # def get_aspect_ratio(cont: ndarray) -> float: rect = cv2.minAreaRect(cont)
 
-def main(filename: str | Path, threshold_ratio=0.5, BGR='B', image_area=(0, 0), max_rect_aspect=10.0):
+def main(filename: str | Path, threshold_ratio=0.5, BGR='B', image_area=(0, 0), max_rect_aspect=10.0, vertical_crop_ratio=1.0):
 	logger.debug("%f max_rect_aspect", max_rect_aspect)
-	logger.debug("%f threshold_ratio", threshold_ratio)
+	logger.info("%f threshold_ratio:level %f", threshold_ratio, threshold_ratio * 255)
+	logger.info("%f vartical_crop_ratio", vertical_crop_ratio)
 	# Load the image 
 	image = cv2.imread(str(filename)) # 'path/to/your/image.jpg') 
 	if image is None:
@@ -33,6 +37,10 @@ def main(filename: str | Path, threshold_ratio=0.5, BGR='B', image_area=(0, 0), 
 		exit(1)
 	image_h, image_w, _ = image.shape 
 	logger.debug("image_h: %d, image_w: %d", image_h, image_w)
+	if vertical_crop_ratio < 1.0:
+		image_h = floor(image_h * vertical_crop_ratio)
+		image = image[:image_h]
+		logger.info("image_h is cropped by: %f", vertical_crop_ratio)
 	# image_min = min([image_h, image_w])
 
 	src_f = image.astype(np.float64)
@@ -52,8 +60,37 @@ def main(filename: str | Path, threshold_ratio=0.5, BGR='B', image_area=(0, 0), 
 	
 	# Apply Gaussian blur to reduce noise and improve edge detection 
 	blurred = cv2.GaussianBlur(luminosity_result, (17, 17), 3) # medianBlur
+	# Show histogram
+	histSize = 256
+	histRange = [0, 256]
+	histogram = cv2.calcHist([blurred], [0], None, [histSize], histRange, accumulate=False)
+	# ヒストグラムの可視化
+	hist_w = 512
+	hist_h = 400
+	bin_w = int(round( hist_w/histSize ))
+	histImage = np.zeros((hist_h, hist_w, 3), dtype=np.uint8)
+	cv2.normalize(histogram, histogram, alpha=0, beta=hist_h, norm_type=cv2.NORM_MINMAX)
+
+	for i in range(1, histSize):
+		cv2.line(histImage, ( bin_w*(i-1), hist_h - int(histogram[i-1]) ),
+				( bin_w*(i), hist_h - int(histogram[i]) ),
+				( 255, 0, 0), thickness=2)
+
+	cv2.imshow('Source image', image)
+	cv2.imshow('Histogram', histImage)
+	cv2.waitKey()
+
+	plt.rcParams["figure.figsize"] = [12,3.8]                        # 表示領域のアスペクト比を設定
+	plt.subplots_adjust(left=0.05, right=0.95, bottom=0.15, top=0.9) # 余白を設定
+	plt.subplot(121)                                                 # 1行2列の1番目の領域にプロットを設定
+	plt.imshow(image, cmap='gray')                                   # 画像をグレースケールで表示
+	plt.axis("off")                                                  # 軸目盛、軸ラベルを消す
+	plt.subplot(122)                                                 # 1行2列の2番目の領域にプロットを設定
+	plt.plot(histogram)                                              # ヒストグラムのグラフを表示
+	plt.xlabel('Brightness')                                         # x軸ラベル(明度)
+	plt.ylabel('Count')                                              # y軸ラベル(画素の数)
+	plt.show()
 	# cv2.imshow('Blur', blurred)
-	# cv2.waitKey(0) 
 
 	""" # Sobel filter
 	sobel_x = cv2.Sobel(blurred, cv2.CV_32F, 1, 0) # X
@@ -93,15 +130,17 @@ def main(filename: str | Path, threshold_ratio=0.5, BGR='B', image_area=(0, 0), 
 	# logger.info("%s contours limited.", len(limited_cont))
 	# image_cutoff = floor(image_min * cutoff) # / 16) or 4
 	# Loop over the contours 
-	limit = 80
+	# contour_limit_rate = 0.9
+	contour_limit = 80 # int(len(sorted_contours) * contour_limit_rate)
+	logger.info("contour_limit: %d", contour_limit)
 	added = 0
 	# bounding_rect_contours = [cv2.boundingRect(contour) for contour in sorted_contours[:limit]] 
 	bounding_rect_contours = []
-	for contour in sorted_contours[:limit]: 
+	for contour in sorted_contours[:contour_limit]: 
 		rect = Rect(*cv2.boundingRect(contour))
 		aspect_ratio = max(rect.w / rect.h, rect.h / rect.w)
 		if aspect_ratio < max_rect_aspect:
-			logger.info("aspect_ratio: %f", aspect_ratio)
+			logger.debug("rect aspect_ratio: %f", aspect_ratio)
 			bounding_rect_contours.append(contour)
 		# Approximate the contour to a polygon 
 		# epsilon = 0.02 * cv2.arcLength(contour, True) 
@@ -154,6 +193,7 @@ if __name__ == '__main__':
 	parser.add_option('-f', "--filespec", help="file to process")
 	parser.add_option("-a", "--max_aspect_ratio", type="float", default=10.0, help="max aspect ratio")
 	parser.add_option("-t", "--threshold", type="float", default=0.5, help="threshold")
+	parser.add_option("-v", "--vertical_crop_ratio", type="float", default=1.0, help="vertical crop ratio")
 	# parser.add_option("-h", "--help", action="store_true", help="show this help message and exit")
 	opts, args = parser.parse_args() # getopt(argv[1:], "ha:t:", ["help", "max_aspect_ratio=", "threshold="]) 
 	HELP_OPTION = "-h"
@@ -172,7 +212,7 @@ if __name__ == '__main__':
 			exit(1)
 	opt_threshold_ratio = opts.threshold or 0.5
 	opt_aspect_ratio = opts.max_aspect_ratio or 10.0
-
+	vertical_crop_ratio = opts.vertical_crop_ratio or 1.0
 
 	IMAGE_AREA_DICT = config.get("image-area") or {}
 	image_area = IMAGE_AREA_DICT.get(img_path.stem) or (0, 0)
@@ -184,6 +224,6 @@ if __name__ == '__main__':
 		param_aspect = opt_aspect_ratio
 	logger.info("max_aspect_ratio: %f", param_aspect)
 	logger.info("threshold_ratio: %f", opt_threshold_ratio)
-	main(img_path, threshold_ratio=opt_threshold_ratio, image_area=image_area, max_rect_aspect=param_aspect)
+	main(img_path, threshold_ratio=opt_threshold_ratio, image_area=image_area, max_rect_aspect=param_aspect, vertical_crop_ratio=vertical_crop_ratio)
 
 	# if len(argv) < 2: print("Rectangle detector. Needs filespec.") exit(1) main(argv[1], cutoff=float(argv[2]))
