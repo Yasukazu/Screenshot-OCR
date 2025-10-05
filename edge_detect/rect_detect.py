@@ -65,6 +65,7 @@ def main(filename: str | Path, threshold_ratio=0.5, BGR='B', image_area=(0, 0), 
 	histRange = [0, 256]
 	histogram = cv2.calcHist([blurred], [0], None, [histSize], histRange, accumulate=False)
 	# ヒストグラムの可視化
+	"""
 	hist_w = 512
 	hist_h = 400
 	bin_w = int(round( hist_w/histSize ))
@@ -89,7 +90,7 @@ def main(filename: str | Path, threshold_ratio=0.5, BGR='B', image_area=(0, 0), 
 	plt.plot(histogram)                                              # ヒストグラムのグラフを表示
 	plt.xlabel('Brightness')                                         # x軸ラベル(明度)
 	plt.ylabel('Count')                                              # y軸ラベル(画素の数)
-	plt.show()
+	plt.show() """
 	# cv2.imshow('Blur', blurred)
 
 	""" # Sobel filter
