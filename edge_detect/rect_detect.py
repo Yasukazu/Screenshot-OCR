@@ -23,9 +23,9 @@ class Rect(NamedTuple):
 
 # def get_aspect_ratio(cont: ndarray) -> float: rect = cv2.minAreaRect(cont)
 
-def main(filename: str | Path, cutoff=0.3, BGR='B', image_area=(0, 0), image_aspect=10.0):
-	logger.info("main started.")
-	logger.debug("%f image_aspect", image_aspect)
+def main(filename: str | Path, threshold_ratio=0.5, BGR='B', image_area=(0, 0), max_rect_aspect=10.0):
+	logger.debug("%f max_rect_aspect", max_rect_aspect)
+	logger.debug("%f threshold_ratio", threshold_ratio)
 	# Load the image 
 	image = cv2.imread(str(filename)) # 'path/to/your/image.jpg') 
 	if image is None:
@@ -69,7 +69,7 @@ def main(filename: str | Path, cutoff=0.3, BGR='B', image_area=(0, 0), image_asp
 	cv2.waitKey(0) 
 	"""
 	# Binarize
-	ret, binarized = cv2.threshold(blurred, 240, 255, cv2.THRESH_BINARY)
+	ret, binarized = cv2.threshold(blurred, int(threshold_ratio * 255), 255, cv2.THRESH_BINARY)
 	# binarized = cv2.adaptiveThreshold(blurred, 255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,11,2)
 	cv2.imshow('Binarized', binarized)
 	# cv2.waitKey(0)
@@ -80,7 +80,8 @@ def main(filename: str | Path, cutoff=0.3, BGR='B', image_area=(0, 0), image_asp
 	cv2.imshow('Cunny edged', canny_edges)
 	cv2.waitKey(0) 
 	# Find contours in the edged image 
-	contours, _ = cv2.findContours(canny_edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE) 
+	contours, _ = cv2.findContours(canny_edges, cv2.RETR_EXTERNAL, #TREE, 
+	cv2.CHAIN_APPROX_SIMPLE) 
 	if not len(contours):
 		raise ValueError("No contours detected!")
 	logger.info("%s contours detected.", len(contours))
@@ -99,7 +100,7 @@ def main(filename: str | Path, cutoff=0.3, BGR='B', image_area=(0, 0), image_asp
 	for contour in sorted_contours[:limit]: 
 		rect = Rect(*cv2.boundingRect(contour))
 		aspect_ratio = max(rect.w / rect.h, rect.h / rect.w)
-		if aspect_ratio < image_aspect:
+		if aspect_ratio < max_rect_aspect:
 			logger.info("aspect_ratio: %f", aspect_ratio)
 			bounding_rect_contours.append(contour)
 		# Approximate the contour to a polygon 
@@ -148,8 +149,13 @@ if __name__ == '__main__':
 		print(f"Image dir not specified in {config_filename} as 'dir=<dirname>' in section '[image-path]'!")
 		exit(1)
 
-	from getopt import getopt
-	opts, args = getopt(argv[1:], "ha:", ["help", "max_aspect_ratio="]) 
+	from optparse import OptionParser
+	parser = OptionParser()
+	parser.add_option('-f', "--filespec", help="file to process")
+	parser.add_option("-a", "--max_aspect_ratio", type="float", default=10.0, help="max aspect ratio")
+	parser.add_option("-t", "--threshold", type="float", default=0.5, help="threshold")
+	# parser.add_option("-h", "--help", action="store_true", help="show this help message and exit")
+	opts, args = parser.parse_args() # getopt(argv[1:], "ha:t:", ["help", "max_aspect_ratio=", "threshold="]) 
 	HELP_OPTION = "-h"
 	HELP_TEXT = "Rectangle detector. Needs filespec. Options:: -h: help, -a<float>: max_axpect_ratio(default=10)"
 	if not len(args):
@@ -164,31 +170,20 @@ if __name__ == '__main__':
 		if not img_path.exists():
 			print(f"Image file {img_path} does not exist!")
 			exit(1)
-	max_aspect_ratio = -1
-	try:
-		for opt, arg in opts:
-			match opt:
-				case "-h":
-					print(HELP_TEXT)
-					exit(0)
-				case "-a":
-					max_aspect_ratio = float(arg)	
-				case _:
-					logger.error("Invalid option: %s", opt)
-					exit(1)
-	except ValueError:
-		print(f"Invalid max_aspect_ratio value: {max_aspect_ratio}")
-		exit(1)
+	opt_threshold_ratio = opts.threshold or 0.5
+	opt_aspect_ratio = opts.max_aspect_ratio or 10.0
+
 
 	IMAGE_AREA_DICT = config.get("image-area") or {}
 	image_area = IMAGE_AREA_DICT.get(img_path.stem) or (0, 0)
 	IMAGE_ASPECT_DICT = config.get("image-aspect") or {}
-	if max_aspect_ratio < 0:
+	if opt_aspect_ratio is None:
 		image_aspect_dict = IMAGE_ASPECT_DICT.get(img_path.stem) 
-		image_aspect = image_aspect_dict.get('ratio') if image_aspect_dict else 10.0
+		param_aspect = image_aspect_dict.get('ratio') if image_aspect_dict else 10.0
 	else:
-		image_aspect = max_aspect_ratio
-	logger.info("max_aspect_ratio: %f", image_aspect)
-	main(img_path, cutoff=max_aspect_ratio, image_area=image_area, image_aspect=image_aspect)
+		param_aspect = opt_aspect_ratio
+	logger.info("max_aspect_ratio: %f", param_aspect)
+	logger.info("threshold_ratio: %f", opt_threshold_ratio)
+	main(img_path, threshold_ratio=opt_threshold_ratio, image_area=image_area, max_rect_aspect=param_aspect)
 
 	# if len(argv) < 2: print("Rectangle detector. Needs filespec.") exit(1) main(argv[1], cutoff=float(argv[2]))
