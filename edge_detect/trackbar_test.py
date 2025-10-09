@@ -8,6 +8,7 @@ import cv2 as cv
 import numpy as np 
 from numpy import ndarray
 import matplotlib.pyplot as plt
+import tomlkit
 
 from logging import getLogger, INFO, StreamHandler, DEBUG
 logger = getLogger(__name__)
@@ -27,7 +28,7 @@ class Rect(NamedTuple):
 
 # def get_aspect_ratio(cont: ndarray) -> float: rect = cv2.minAreaRect(cont)
 
-def main(filename: str | Path, threshold_ratio=0.5, BGR='B', image_area=(0, 0), max_rect_aspect=10.0, vertical_crop_ratio=1.0,
+def main(filename: Path, threshold_ratio=0.5, BGR='B', image_area=(0, 0), max_rect_aspect=10.0, vertical_crop_ratio=1.0,
 trackbar_slider_max = 100,
 title_window = 'Tracbar test'):
 
@@ -45,20 +46,48 @@ title_window = 'Tracbar test'):
 
 	crop_ratio = 1.0
 	def on_trackbar(ratio):
-		global crop_ratio
 		assert image is not None
+		nonlocal crop_ratio
 		crop_ratio = ratio / trackbar_slider_max
+		logger.debug("crop_ratio: %f", crop_ratio)
 		cv.imshow(title_window, image[:floor(image_h * crop_ratio)])
 
 	cv.namedWindow(title_window)
-	trackbar_name = 'Crop ratio percent [max: %d] | Hit q to terminate the program' % trackbar_slider_max
-	cv.createTrackbar(trackbar_name, title_window , 0, trackbar_slider_max, on_trackbar)
-	on_trackbar(trackbar_slider_max)
+	trackbar_name = "Crop H ratio percent [max: %d] | Hit: 'q' to exit; 's' to save config" % trackbar_slider_max
+	cv.createTrackbar(trackbar_name, title_window , 100, trackbar_slider_max, on_trackbar)
+	# on_trackbar(trackbar_slider_max)
 	key = cv2.waitKey(0)
 	if key in (ord('q'), ord('Q')):
 		logger.info("Terminated by user. crop_ratio: %f", crop_ratio)
 		exit(0)
+	if key in (ord('s'), ord('S')):
+		config_filename = filename.parent / (filename.stem + '.toml')
+		if config_filename.exists():
+			logger.info("Loading config..: %s", config_filename)
+			with open(config_filename, 'r') as f:
+				config_doc = tomlkit.load(f)
+			logger.info("Loaded config items: %d ", len(config_doc))
+			try:
+				config_doc[f'image-area.{filename.stem}']['h_crop_r'] = crop_ratio
+				logger.debug("config_doc: %s", config_doc[f'image-area.{filename.stem}'])
+				with open(config_filename, 'w') as f:
+					tomlkit.dump(config_doc, f)
+					logger.info("config is saved for 'h_crop_r' as %s", config_filename)
+			except KeyError as err:
+				logger.error("config_doc key error[image-area]: %s", err)
+				raise
+		else:
+			config_doc = tomlkit.table()
+			logger.info("Config is newly created since config file not found: %s", config_filename)
+			crop_tbl = tomlkit.table()
+			crop_tbl.add('h_crop_r', crop_ratio)
+			cfg_tbl = tomlkit.table()
+			cfg_tbl.add(f'image-area.{filename.stem}', crop_tbl)
+			with open(config_filename, 'w') as f:
+				tomlkit.dump(cfg_tbl, f)
+			logger.info("Saved config as: %s", config_filename)
 
+		exit(0)
 	if vertical_crop_ratio < 1.0:
 		image_h = floor(image_h * vertical_crop_ratio)
 		image = image[:image_h]
