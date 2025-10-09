@@ -30,7 +30,7 @@ class Rect(NamedTuple):
 
 def main(filename: Path, threshold_ratio=0.5, BGR='B', image_area=(0, 0), max_rect_aspect=10.0, vertical_crop_ratio=1.0,
 trackbar_slider_max = 100,
-title_window = 'Tracbar test'):
+title_window = 'Tracbar test', config_dir='Data'):
 
 	logger.debug("%f max_rect_aspect", max_rect_aspect)
 	logger.info("%f threshold_ratio:level %f", threshold_ratio, threshold_ratio * 255)
@@ -61,31 +61,46 @@ title_window = 'Tracbar test'):
 		logger.info("Terminated by user. crop_ratio: %f", crop_ratio)
 		exit(0)
 	if key in (ord('s'), ord('S')):
-		config_filename = filename.parent / (filename.stem + '.toml')
+		config_path = filename.parent / config_dir
+		config_path.mkdir(exist_ok=True)
+		config_filename = config_path / (filename.stem + '.toml')
 		if config_filename.exists():
 			logger.info("Loading config..: %s", config_filename)
 			with open(config_filename, 'r') as f:
 				config_doc = tomlkit.load(f)
-			logger.info("Loaded config items: %d ", len(config_doc))
+			logger.info("Loaded %d config items.", len(config_doc))
+			image_area_key = f'image-area.{filename.stem}'
+			h_crop_key = 'h_crop_r'
+			breakpoint()
+			try: # config_doc.update(image_area_key, {h_crop_key: crop_ratio})
+				image_area_tbl = config_doc[image_area_key]
+				logger.debug('config_doc[%s] exists as %s', image_area_key, image_area_tbl)
+				image_area_tbl[h_crop_key] = crop_ratio
+			except KeyError as k:
+				logger.debug("config_doc key error[image-area]: %s", k.args[0])
+				config_doc.add(image_area_key, {h_crop_key: crop_ratio})
+				# image_area_tbl = tomlkit.table()
+				# image_area_tbl.add(image_area_key, {h_crop_key: crop_ratio})
+			# image_area_tbl.update()
 			try:
-				config_doc[f'image-area.{filename.stem}']['h_crop_r'] = crop_ratio
-				logger.debug("config_doc: %s", config_doc[f'image-area.{filename.stem}'])
+				# config_doc[f'image-area.{filename.stem}']['h_crop_r'] = crop_ratio
+				# logger.debug("config_doc: %s", config_doc[f'image-area.{filename.stem}'])
 				with open(config_filename, 'w') as f:
 					tomlkit.dump(config_doc, f)
-					logger.info("config is saved for 'h_crop_r' as %s", config_filename)
+					logger.info("config is saved for crop_ratio in [%s] as file: '%s'", image_area_key, config_filename)
 			except KeyError as err:
 				logger.error("config_doc key error[image-area]: %s", err)
 				raise
 		else:
 			config_doc = tomlkit.table()
-			logger.info("Config is newly created since config file not found: %s", config_filename)
 			crop_tbl = tomlkit.table()
 			crop_tbl.add('h_crop_r', crop_ratio)
 			cfg_tbl = tomlkit.table()
 			cfg_tbl.add(f'image-area.{filename.stem}', crop_tbl)
 			with open(config_filename, 'w') as f:
 				tomlkit.dump(cfg_tbl, f)
-			logger.info("Saved config as: %s", config_filename)
+			logger.info("Config file is newly created as: %s", config_filename)
+			# logger.info("Saved config as: %s", config_filename)
 
 		exit(0)
 	if vertical_crop_ratio < 1.0:
@@ -277,6 +292,6 @@ if __name__ == '__main__':
 		param_aspect = opt_aspect_ratio
 	logger.info("max_aspect_ratio: %f", param_aspect)
 	logger.info("threshold_ratio: %f", opt_threshold_ratio)
-	main(img_path, threshold_ratio=opt_threshold_ratio, image_area=image_area, max_rect_aspect=param_aspect, vertical_crop_ratio=vertical_crop_ratio)
+	main(img_path, threshold_ratio=opt_threshold_ratio, image_area=image_area, max_rect_aspect=param_aspect, vertical_crop_ratio=vertical_crop_ratio, config_dir='Data')
 
 	# if len(argv) < 2: print("Rectangle detector. Needs filespec.") exit(1) main(argv[1], cutoff=float(argv[2]))
