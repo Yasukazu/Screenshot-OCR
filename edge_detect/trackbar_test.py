@@ -46,8 +46,8 @@ def main(filepath: Path, threshold_ratio=0.5, BGR='B', max_rect_aspect=10.0,
 		raise ValueError("Failed to load image: %s", filepath)
 	image_h, image_w, _ = image.shape 
 	logger.debug("image_h: %d, image_w: %d", image_h, image_w)
-	mask = get_image_mask(image, filepath)
-	logger.debug("mask: %s", mask)
+	mask_ratio = get_image_mask(image, filepath)
+	logger.debug("mask: %s", mask_ratio)
 """
 		if config_filename.exists():
 			logger.info("Start to load config from a file: %s", config_filename)
@@ -218,7 +218,7 @@ def get_image_mask(image: ndarray,
 	trackbar_slider_max = 100,
 	title_window = 'Image mask', 
 	config_dir='Data',
-	crop_ratio: CropRatio = CropRatio(0.0, 0.0)) -> CropRatio | None: 
+	crop_ratio: CropRatio = CropRatio(0.0, 0.0)) -> CropRatio : 
 	image_h, image_w = image.shape[:2]
 	# crop_ratio_h = crop_ratio_hw[0]
 	# crop_ratio_w = crop_ratio_hw[1]
@@ -266,16 +266,17 @@ def get_image_mask(image: ndarray,
 	cv.createTrackbar(trackbar_name.format(HW='H', max=trackbar_slider_max), title_window , int(crop_ratio.h * trackbar_slider_max), trackbar_slider_max, on_trackbar_h)
 	cv.createTrackbar(trackbar_name.format(HW='W', max=trackbar_slider_max), title_window , int(crop_ratio.w * trackbar_slider_max), trackbar_slider_max, on_trackbar_w)
 	# on_trackbar(trackbar_slider_max)
-	cv.rectangle(image, (0, 0), (int(crop_ratio.w * image_w), int(crop_ratio.h * image_h)), (0, 0, 255), 4)
-	cv.imshow(title_window, image)
+	image2 = image.copy()
+	cv.rectangle(image2, (0, 0), (int(crop_ratio.w * image_w), int(crop_ratio.h * image_h)), (0, 0, 255), 4)
+	cv.imshow(title_window, image2)
 	key = cv2.waitKey(0)
 	if key in (ord('q'), ord('Q')):
 		logger.debug("Terminated by user. crop_ratios[h/w]: %s", crop_ratio)
-		return None
+		return crop_ratio
 	if key in (ord('s'), ord('S')):
 		if (old_crop_ratio_h is not None and old_crop_ratio_h == crop_ratio.h) and (old_crop_ratio_w is not None and old_crop_ratio_w == crop_ratio.w):
 			logger.debug("crop_ratios are not changed.")
-			return
+			return crop_ratio
 		config_doc.update({image_area_key: {'h_crop_r': crop_ratio.h, 'w_crop_r': crop_ratio.w}})
 		# image_area_config['h_crop_r'] = crop_ratio
 		# image_area_config['w_crop_r'] = crop_ratio_w
