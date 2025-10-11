@@ -1,3 +1,4 @@
+from typing import NamedTuple
 from tomllib import load as load_toml_file
 from math import sqrt, floor, dist
 from typing import Sequence
@@ -26,80 +27,28 @@ class Rect(NamedTuple):
 	w: int
 	h: int
 
+from dataclasses import dataclass
+@dataclass
+class CropRatio:
+	h: float
+	w: float
+
 # def get_aspect_ratio(cont: ndarray) -> float: rect = cv2.minAreaRect(cont)
 
-def main(filename: Path, threshold_ratio=0.5, BGR='B', image_area=(0, 0), max_rect_aspect=10.0, vertical_crop_ratio=1.0,
-trackbar_slider_max = 100,
-title_window = 'Tracbar test', config_dir='Data'):
-
+def main(filepath: Path, threshold_ratio=0.5, BGR='B', max_rect_aspect=10.0,
+	vertical_crop_ratio=1.0): # title_window = 'Tracbar test', config_dir='Data'):
+	logger.debug("%f threshold_ratio:level %f", threshold_ratio, threshold_ratio * 255)
 	logger.debug("%f max_rect_aspect", max_rect_aspect)
-	logger.info("%f threshold_ratio:level %f", threshold_ratio, threshold_ratio * 255)
 	logger.info("%f vartical_crop_ratio", vertical_crop_ratio)
-	# Load the image 
-	image = cv2.imread(str(filename)) # 'path/to/your/image.jpg') 
+	image = cv2.imread(str(filepath))
 	if image is None:
-		logger.error("Failed to load image: %s", filename)
-		exit(1)
-
+		logger.error("Failed to load image: %s", filepath)
+		raise ValueError("Failed to load image: %s", filepath)
 	image_h, image_w, _ = image.shape 
 	logger.debug("image_h: %d, image_w: %d", image_h, image_w)
-
-	crop_ratio = 1.0
-	crop_ratio_w = 1.0
-	def on_trackbar(ratio):
-		assert image is not None
-		nonlocal crop_ratio
-		crop_ratio = ratio / trackbar_slider_max
-		logger.debug("crop_ratio: %f", crop_ratio)
-		cv.imshow(title_window, image[:floor(image_h * crop_ratio), :floor(image_w * crop_ratio_w)])
-	def on_trackbar_w(ratio):
-		assert image is not None
-		nonlocal crop_ratio_w
-		crop_ratio_w = ratio / trackbar_slider_max
-		logger.debug("crop_ratio_w: %f", crop_ratio_w)
-		cv.imshow(title_window, image[:floor(image_h * crop_ratio), :floor(image_w * crop_ratio_w)])
-	cv.namedWindow(title_window)
-	trackbar_name = "Crop {HW} ratio percent [max: {max}] | Hit: 'q' to exit; 's' to save config" # % trackbar_slider_max
-	cv.createTrackbar(trackbar_name.format(HW='H', max=trackbar_slider_max), title_window , 100, trackbar_slider_max, on_trackbar)
-	cv.createTrackbar(trackbar_name.format(HW='W', max=trackbar_slider_max), title_window , 100, trackbar_slider_max, on_trackbar_w)
-	# on_trackbar(trackbar_slider_max)
-	key = cv2.waitKey(0)
-	if key in (ord('q'), ord('Q')):
-		logger.info("Terminated by user. crop_ratio: %f", crop_ratio)
-		exit(0)
-	if key in (ord('s'), ord('S')):
-		config_path = filename.parent / config_dir
-		config_path.mkdir(exist_ok=True)
-		config_filename = config_path / (filename.stem + '.toml')
-		from tomlkit.toml_file import TOMLFile
-		from tomlkit import TOMLDocument	
-		toml_file = TOMLFile(config_filename)
-		try:
-			config_doc = toml_file.read()
-		except FileNotFoundError:
-			config_doc = TOMLDocument()
-		image_area_key = f'image-area.{filename.stem}'
-		image_area_config = config_doc.get(image_area_key) 
-		breakpoint()
-		if image_area_config is None:
-			image_area_config = config_doc.add(image_area_key, tomlkit.table())
-		old_crop_ratio = image_area_config.get('h_crop_r')
-		old_crop_ratio_w = image_area_config.get('w_crop_r')
-		if (old_crop_ratio is not None and old_crop_ratio == crop_ratio) and (old_crop_ratio_w is not None and old_crop_ratio_w == crop_ratio_w):
-			if old_crop_ratio == crop_ratio and old_crop_ratio_w == crop_ratio_w:
-				logger.debug("crop_ratios are not changed")
-				return
-		breakpoint()
-		config_doc.update({image_area_key: {'h_crop_r': crop_ratio, 'w_crop_r': crop_ratio_w}})
-		# image_area_config['h_crop_r'] = crop_ratio
-		# image_area_config['w_crop_r'] = crop_ratio_w
-		try:
-			toml_file.write(config_doc)
-			logger.info("Config is saved for crop_ratio as [%s] into file: '%s'", image_area_config, config_filename)
-		except IOError as e:
-			logger.error("Failed to write config to file: %s", e)
-			exit(1)
-		return
+	mask = get_image_mask(image, filepath)
+	logger.debug("mask: %s", mask)
+"""
 		if config_filename.exists():
 			logger.info("Start to load config from a file: %s", config_filename)
 			with open(config_filename, 'r') as f:
@@ -133,7 +82,7 @@ title_window = 'Tracbar test', config_dir='Data'):
 			crop_tbl = tomlkit.table()
 			crop_tbl.add('h_crop_r', crop_ratio)
 			cfg_tbl = tomlkit.table()
-			cfg_tbl.add(f'image-area.{filename.stem}', crop_tbl)
+			cfg_tbl.add(f'image-area.{filepath.stem}', crop_tbl)
 			with open(config_filename, 'w') as f:
 				tomlkit.dump(cfg_tbl, f)
 			logger.info("Config file is newly created as: %s", config_filename)
@@ -168,7 +117,6 @@ title_window = 'Tracbar test', config_dir='Data'):
 	histRange = [0, 256]
 	histogram = cv2.calcHist([blurred], [0], None, [histSize], histRange, accumulate=False)
 	# ヒストグラムの可視化
-	"""
 	hist_w = 512
 	hist_h = 400
 	bin_w = int(round( hist_w/histSize ))
@@ -193,10 +141,10 @@ title_window = 'Tracbar test', config_dir='Data'):
 	plt.plot(histogram)                                              # ヒストグラムのグラフを表示
 	plt.xlabel('Brightness')                                         # x軸ラベル(明度)
 	plt.ylabel('Count')                                              # y軸ラベル(画素の数)
-	plt.show() """
+	plt.show()
 	# cv2.imshow('Blur', blurred)
 
-	""" # Sobel filter
+	# Sobel filter
 	sobel_x = cv2.Sobel(blurred, cv2.CV_32F, 1, 0) # X
 	sobel_y = cv2.Sobel(blurred, cv2.CV_32F, 0, 1) # Y
 
@@ -208,7 +156,6 @@ title_window = 'Tracbar test', config_dir='Data'):
 	sobel_xy = cv2.add(sobel_x, sobel_y)
 	cv2.imshow('Sobel filtered', sobel_xy)
 	cv2.waitKey(0) 
-	"""
 	# Binarize
 	ret, binarized = cv2.threshold(blurred, int(threshold_ratio * 255), 255, cv2.THRESH_BINARY)
 	# binarized = cv2.adaptiveThreshold(blurred, 255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,11,2)
@@ -264,6 +211,81 @@ title_window = 'Tracbar test', config_dir='Data'):
 	
 	# Display the result 
 	cv2.waitKey(0) 
+"""
+
+def get_image_mask(image: ndarray,
+	filepath: Path,
+	trackbar_slider_max = 100,
+	title_window = 'Image mask', 
+	config_dir='Data',
+	crop_ratio: CropRatio = CropRatio(0.0, 0.0)) -> CropRatio | None: 
+	image_h, image_w = image.shape[:2]
+	# crop_ratio_h = crop_ratio_hw[0]
+	# crop_ratio_w = crop_ratio_hw[1]
+	def show_rect_image():
+		image2 = image.copy()
+		cv.rectangle(image2, (0, 0), (crop_ratio.w * image_w, crop_ratio.h * image_h), (255, 0, 0), 4)
+		cv.imshow(title_window, image2)
+	def on_trackbar(slider_pos: int, h_w: str):
+		assert 0 <= slider_pos <= trackbar_slider_max
+		match h_w:
+			case 'h':
+				crop_ratio.h = slider_pos / trackbar_slider_max
+			case 'w':
+				crop_ratio.w = slider_pos / trackbar_slider_max
+			case _:
+				raise ValueError('Undefined h_w: %s', h_w)
+		show_rect_image()
+	def on_trackbar_h(slider_pos: int):
+		on_trackbar(slider_pos, h_w='h')
+	def on_trackbar_w(slider_pos: int):
+		on_trackbar(slider_pos, h_w='w')
+	config_path = filepath.parent / config_dir
+	config_path.mkdir(exist_ok=True)
+	config_filename = config_path / (filepath.stem + '.toml')
+	from tomlkit.toml_file import TOMLFile
+	from tomlkit import TOMLDocument	
+	toml_file = TOMLFile(config_filename)
+	try:
+		config_doc = toml_file.read()
+	except FileNotFoundError:
+		config_doc = TOMLDocument()
+	image_area_key = f'image-area.{filepath.stem}'
+	image_area_config = config_doc.get(image_area_key) 
+	if image_area_config is None:
+		image_area_config = config_doc.add(image_area_key, tomlkit.table())
+	# old_crop_ratios = CropRatio(image_area_config.get('h_crop_r') or crop_ratio.h, image_area_config.get('w_crop_r') or crop_ratio.w)
+	old_crop_ratio_h = image_area_config.get('h_crop_r')
+	if old_crop_ratio_h is not None:
+		crop_ratio.h = old_crop_ratio_h
+	old_crop_ratio_w = image_area_config.get('w_crop_r')
+	if old_crop_ratio_w is not None:
+		crop_ratio.w = old_crop_ratio_w
+	cv.namedWindow(title_window)
+	trackbar_name = "Crop {HW} ratio percent [max: {max}] | Hit: 'q' to exit; 's' to save config" # % trackbar_slider_max
+	cv.createTrackbar(trackbar_name.format(HW='H', max=trackbar_slider_max), title_window , int(crop_ratio.h * trackbar_slider_max), trackbar_slider_max, on_trackbar_h)
+	cv.createTrackbar(trackbar_name.format(HW='W', max=trackbar_slider_max), title_window , int(crop_ratio.w * trackbar_slider_max), trackbar_slider_max, on_trackbar_w)
+	# on_trackbar(trackbar_slider_max)
+	cv.rectangle(image, (0, 0), (int(crop_ratio.w * image_w), int(crop_ratio.h * image_h)), (255, 0, 0), 4)
+	cv.imshow(title_window, image)
+	key = cv2.waitKey(0)
+	if key in (ord('q'), ord('Q')):
+		logger.debug("Terminated by user. crop_ratios[h/w]: %s", crop_ratio)
+		return None
+	if key in (ord('s'), ord('S')):
+		if (old_crop_ratio_h is not None and old_crop_ratio_h == crop_ratio.h) and (old_crop_ratio_w is not None and old_crop_ratio_w == crop_ratio.w):
+			logger.debug("crop_ratios are not changed.")
+			return
+		config_doc.update({image_area_key: {'h_crop_r': crop_ratio.h, 'w_crop_r': crop_ratio.w}})
+		# image_area_config['h_crop_r'] = crop_ratio
+		# image_area_config['w_crop_r'] = crop_ratio_w
+		try:
+			toml_file.write(config_doc)
+			logger.info("Config is saved for crop_ratio as [%s] into file: '%s'", image_area_config, config_filename)
+		except IOError as e:
+			logger.error("Failed to write config to file: %s", e)
+			exit(1)
+		return crop_ratio
 
 def get_min_distance(cont: ndarray) -> int: # Sequence[Sequence[int]]) -> int:
 	dist_list = []
@@ -329,6 +351,6 @@ if __name__ == '__main__':
 		param_aspect = opt_aspect_ratio
 	logger.info("max_aspect_ratio: %f", param_aspect)
 	logger.info("threshold_ratio: %f", opt_threshold_ratio)
-	main(img_path, threshold_ratio=opt_threshold_ratio, image_area=image_area, max_rect_aspect=param_aspect, vertical_crop_ratio=vertical_crop_ratio, config_dir='Data')
-
+	main(img_path, threshold_ratio=opt_threshold_ratio, max_rect_aspect=param_aspect, vertical_crop_ratio=vertical_crop_ratio)
+# image_area=image_area, 
 	# if len(argv) < 2: print("Rectangle detector. Needs filespec.") exit(1) main(argv[1], cutoff=float(argv[2]))
