@@ -224,7 +224,7 @@ def get_image_mask(image: ndarray,
 	# crop_ratio_w = crop_ratio_hw[1]
 	def show_rect_image():
 		image2 = image.copy()
-		cv.rectangle(image2, (0, 0), (crop_ratio.w * image_w, crop_ratio.h * image_h), (255, 0, 0), 4)
+		cv.rectangle(image2, (0, 0), (int(crop_ratio.w * image_w), int(crop_ratio.h * image_h)), (255, 0, 0), 4)
 		cv.imshow(title_window, image2)
 	def on_trackbar(slider_pos: int, h_w: str):
 		assert 0 <= slider_pos <= trackbar_slider_max
@@ -266,7 +266,7 @@ def get_image_mask(image: ndarray,
 	cv.createTrackbar(trackbar_name.format(HW='H', max=trackbar_slider_max), title_window , int(crop_ratio.h * trackbar_slider_max), trackbar_slider_max, on_trackbar_h)
 	cv.createTrackbar(trackbar_name.format(HW='W', max=trackbar_slider_max), title_window , int(crop_ratio.w * trackbar_slider_max), trackbar_slider_max, on_trackbar_w)
 	# on_trackbar(trackbar_slider_max)
-	cv.rectangle(image, (0, 0), (int(crop_ratio.w * image_w), int(crop_ratio.h * image_h)), (255, 0, 0), 4)
+	cv.rectangle(image, (0, 0), (int(crop_ratio.w * image_w), int(crop_ratio.h * image_h)), (0, 0, 255), 4)
 	cv.imshow(title_window, image)
 	key = cv2.waitKey(0)
 	if key in (ord('q'), ord('Q')):
