@@ -32,11 +32,15 @@ from dataclasses import dataclass
 class CropRatio:
 	h: float
 	w: float
+	def as_size(self, image_h, image_w):
+		return int(image_h * self.h), int(image_w * self.w)
+	def as_shape(self, image_h, image_w):
+		return tuple(reversed(self.as_size(image_h, image_w)))
 
 # def get_aspect_ratio(cont: ndarray) -> float: rect = cv2.minAreaRect(cont)
 
 def main(filepath: Path, threshold_ratio=0.5, BGR='B', max_rect_aspect=10.0,
-	vertical_crop_ratio=1.0): # title_window = 'Tracbar test', config_dir='Data'):
+	vertical_crop_ratio=1.0, manual_mask=False): # title_window = 'Tracbar test', config_dir='Data'):
 	logger.debug("%f threshold_ratio:level %f", threshold_ratio, threshold_ratio * 255)
 	logger.debug("%f max_rect_aspect", max_rect_aspect)
 	logger.info("%f vartical_crop_ratio", vertical_crop_ratio)
@@ -46,8 +50,13 @@ def main(filepath: Path, threshold_ratio=0.5, BGR='B', max_rect_aspect=10.0,
 		raise ValueError("Failed to load image: %s", filepath)
 	image_h, image_w, _ = image.shape 
 	logger.debug("image_h: %d, image_w: %d", image_h, image_w)
-	mask_ratio = get_image_mask(image, filepath)
+	mask_ratio = get_image_mask(image, filepath, manual=manual_mask)
 	logger.debug("mask: %s", mask_ratio)
+	# mask_image = np.full((*mask_ratio.as_size(image_h, image_w), 3), (255, 255, 255), dtype=np.uint8)
+	masked_image = image.copy() # np.bitwise_or(image, mask_image)
+	cv2.rectangle(masked_image, (0, 0), mask_ratio.as_shape(image_h, image_w), (255, 255, 255), cv2.FILLED)
+	cv2.imshow('Masked', masked_image)
+	cv2.waitKey(0)
 """
 		if config_filename.exists():
 			logger.info("Start to load config from a file: %s", config_filename)
@@ -218,28 +227,9 @@ def get_image_mask(image: ndarray,
 	trackbar_slider_max = 100,
 	title_window = 'Image mask', 
 	config_dir='Data',
-	crop_ratio: CropRatio = CropRatio(0.0, 0.0)) -> CropRatio : 
+	crop_ratio: CropRatio = CropRatio(0.0, 0.0),
+	manual = False) -> CropRatio : 
 	image_h, image_w = image.shape[:2]
-	# crop_ratio_h = crop_ratio_hw[0]
-	# crop_ratio_w = crop_ratio_hw[1]
-	def show_rect_image():
-		image2 = image.copy()
-		cv.rectangle(image2, (0, 0), (int(crop_ratio.w * image_w), int(crop_ratio.h * image_h)), (255, 0, 0), 4)
-		cv.imshow(title_window, image2)
-	def on_trackbar(slider_pos: int, h_w: str):
-		assert 0 <= slider_pos <= trackbar_slider_max
-		match h_w:
-			case 'h':
-				crop_ratio.h = slider_pos / trackbar_slider_max
-			case 'w':
-				crop_ratio.w = slider_pos / trackbar_slider_max
-			case _:
-				raise ValueError('Undefined h_w: %s', h_w)
-		show_rect_image()
-	def on_trackbar_h(slider_pos: int):
-		on_trackbar(slider_pos, h_w='h')
-	def on_trackbar_w(slider_pos: int):
-		on_trackbar(slider_pos, h_w='w')
 	config_path = filepath.parent / config_dir
 	config_path.mkdir(exist_ok=True)
 	config_filename = config_path / (filepath.stem + '.toml')
@@ -261,6 +251,27 @@ def get_image_mask(image: ndarray,
 	old_crop_ratio_w = image_area_config.get('w_crop_r')
 	if old_crop_ratio_w is not None:
 		crop_ratio.w = old_crop_ratio_w
+	if not manual:
+		return crop_ratio
+	def show_rect_image():
+		image2 = image.copy()
+		cv.rectangle(image2, (0, 0), (int(crop_ratio.w * image_w), int(crop_ratio.h * image_h)), (255, 0, 0), 4)
+		cv.imshow(title_window, image2)
+	def on_trackbar(slider_pos: int, h_w: str):
+		assert 0 <= slider_pos <= trackbar_slider_max
+		match h_w:
+			case 'h':
+				crop_ratio.h = slider_pos / trackbar_slider_max
+			case 'w':
+				crop_ratio.w = slider_pos / trackbar_slider_max
+			case _:
+				raise ValueError('Undefined h_w: %s', h_w)
+		show_rect_image()
+	def on_trackbar_h(slider_pos: int):
+		on_trackbar(slider_pos, h_w='h')
+	def on_trackbar_w(slider_pos: int):
+		on_trackbar(slider_pos, h_w='w')
+
 	cv.namedWindow(title_window)
 	trackbar_name = "Crop {HW} ratio percent [max: {max}] | Hit: 'q' to exit; 's' to save config" # % trackbar_slider_max
 	cv.createTrackbar(trackbar_name.format(HW='H', max=trackbar_slider_max), title_window , int(crop_ratio.h * trackbar_slider_max), trackbar_slider_max, on_trackbar_h)
@@ -322,6 +333,7 @@ if __name__ == '__main__':
 	parser.add_option("-a", "--max_aspect_ratio", type="float", default=10.0, help="max aspect ratio")
 	parser.add_option("-t", "--threshold", type="float", default=0.5, help="threshold")
 	parser.add_option("-v", "--vertical_crop_ratio", type="float", default=1.0, help="vertical crop ratio")
+	parser.add_option("-m", "--manual-mask", default=False, action="store_true", help="manually crop mask")
 	# parser.add_option("-h", "--help", action="store_true", help="show this help message and exit")
 	opts, args = parser.parse_args() # getopt(argv[1:], "ha:t:", ["help", "max_aspect_ratio=", "threshold="]) 
 	HELP_OPTION = "-h"
@@ -352,6 +364,6 @@ if __name__ == '__main__':
 		param_aspect = opt_aspect_ratio
 	logger.info("max_aspect_ratio: %f", param_aspect)
 	logger.info("threshold_ratio: %f", opt_threshold_ratio)
-	main(img_path, threshold_ratio=opt_threshold_ratio, max_rect_aspect=param_aspect, vertical_crop_ratio=vertical_crop_ratio)
+	main(img_path, threshold_ratio=opt_threshold_ratio, max_rect_aspect=param_aspect, vertical_crop_ratio=vertical_crop_ratio, manual_mask=opts.manual_mask)
 # image_area=image_area, 
 	# if len(argv) < 2: print("Rectangle detector. Needs filespec.") exit(1) main(argv[1], cutoff=float(argv[2]))
