@@ -45,16 +45,23 @@ title_window = 'Tracbar test', config_dir='Data'):
 	logger.debug("image_h: %d, image_w: %d", image_h, image_w)
 
 	crop_ratio = 1.0
+	crop_ratio_w = 1.0
 	def on_trackbar(ratio):
 		assert image is not None
 		nonlocal crop_ratio
 		crop_ratio = ratio / trackbar_slider_max
 		logger.debug("crop_ratio: %f", crop_ratio)
-		cv.imshow(title_window, image[:floor(image_h * crop_ratio)])
-
+		cv.imshow(title_window, image[:floor(image_h * crop_ratio), :floor(image_w * crop_ratio_w)])
+	def on_trackbar_w(ratio):
+		assert image is not None
+		nonlocal crop_ratio_w
+		crop_ratio_w = ratio / trackbar_slider_max
+		logger.debug("crop_ratio_w: %f", crop_ratio_w)
+		cv.imshow(title_window, image[:floor(image_h * crop_ratio), :floor(image_w * crop_ratio_w)])
 	cv.namedWindow(title_window)
-	trackbar_name = "Crop H ratio percent [max: %d] | Hit: 'q' to exit; 's' to save config" % trackbar_slider_max
-	cv.createTrackbar(trackbar_name, title_window , 100, trackbar_slider_max, on_trackbar)
+	trackbar_name = "Crop {HW} ratio percent [max: {max}] | Hit: 'q' to exit; 's' to save config" # % trackbar_slider_max
+	cv.createTrackbar(trackbar_name.format(HW='H', max=trackbar_slider_max), title_window , 100, trackbar_slider_max, on_trackbar)
+	cv.createTrackbar(trackbar_name.format(HW='W', max=trackbar_slider_max), title_window , 100, trackbar_slider_max, on_trackbar_w)
 	# on_trackbar(trackbar_slider_max)
 	key = cv2.waitKey(0)
 	if key in (ord('q'), ord('Q')):
@@ -64,13 +71,43 @@ title_window = 'Tracbar test', config_dir='Data'):
 		config_path = filename.parent / config_dir
 		config_path.mkdir(exist_ok=True)
 		config_filename = config_path / (filename.stem + '.toml')
+		from tomlkit.toml_file import TOMLFile
+		from tomlkit import TOMLDocument	
+		toml_file = TOMLFile(config_filename)
+		try:
+			config_doc = toml_file.read()
+		except FileNotFoundError:
+			config_doc = TOMLDocument()
+		image_area_key = f'image-area.{filename.stem}'
+		image_area_config = config_doc.get(image_area_key) 
+		breakpoint()
+		if image_area_config is None:
+			image_area_config = config_doc.add(image_area_key, tomlkit.table())
+		old_crop_ratio = image_area_config.get('h_crop_r')
+		old_crop_ratio_w = image_area_config.get('w_crop_r')
+		if (old_crop_ratio is not None and old_crop_ratio == crop_ratio) and (old_crop_ratio_w is not None and old_crop_ratio_w == crop_ratio_w):
+			if old_crop_ratio == crop_ratio and old_crop_ratio_w == crop_ratio_w:
+				logger.debug("crop_ratios are not changed")
+				return
+		breakpoint()
+		config_doc.update({image_area_key: {'h_crop_r': crop_ratio, 'w_crop_r': crop_ratio_w}})
+		# image_area_config['h_crop_r'] = crop_ratio
+		# image_area_config['w_crop_r'] = crop_ratio_w
+		try:
+			toml_file.write(config_doc)
+			logger.info("Config is saved for crop_ratio as [%s] into file: '%s'", image_area_config, config_filename)
+		except IOError as e:
+			logger.error("Failed to write config to file: %s", e)
+			exit(1)
+		return
 		if config_filename.exists():
-			logger.info("Loading config..: %s", config_filename)
+			logger.info("Start to load config from a file: %s", config_filename)
 			with open(config_filename, 'r') as f:
 				config_doc = tomlkit.load(f)
 			logger.info("Loaded %d config items.", len(config_doc))
-			image_area_key = f'image-area.{filename.stem}'
 			h_crop_key = 'h_crop_r'
+			h_crop_to_crop_ratio = {h_crop_key: crop_ratio}
+			config_doc |= h_crop_to_crop_ratio
 			breakpoint()
 			try: # config_doc.update(image_area_key, {h_crop_key: crop_ratio})
 				image_area_tbl = config_doc[image_area_key]
