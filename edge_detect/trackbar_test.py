@@ -57,6 +57,28 @@ def main(filepath: Path, threshold_ratio=0.5, BGR='B', max_rect_aspect=10.0,
 	cv2.rectangle(masked_image, (0, 0), mask_ratio.as_shape(image_h, image_w), (255, 255, 255), cv2.FILLED)
 	cv2.imshow('Masked', masked_image)
 	cv2.waitKey(0)
+	# custom_config = '--psm 6'#--oem 3 
+	import pytesseract
+	data = pytesseract.image_to_data(masked_image, lang='jpn') #, config='--psm 4')
+	import csv
+	import pandas
+	import io
+	df = pandas.read_csv(io.StringIO(data), sep='\t')
+	tsv = csv.DictReader(data.splitlines(), delimiter='\t')
+	tsv_key_names = '''level: レイアウト解析結果のレベル（ページ、ブロック、段落など）
+	page_num: ページ番号
+	block_num: ブロック番号
+	par_num: 段落番号
+	line_num: 行番号
+	word_num: 単語番号
+	left, top, width, height: 文字を囲むボックスの左上角の座標と幅、高さ
+	conf: 確からしさ
+	text: 認識結果の文字列'''
+	tsv_key_list = ['level', 'page_num', 'block_num', 'par_num', 'line_num', 'word_num', 'left', 'top', 'width', 'height', 'conf', 'text']
+	for row in tsv:
+		for key in tsv_key_list:
+			print(f"{key}: {row[key]}")
+	exit(0)
 """
 		if config_filename.exists():
 			logger.info("Start to load config from a file: %s", config_filename)
