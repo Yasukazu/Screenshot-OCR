@@ -32,8 +32,8 @@ class Rect(NamedTuple):
 from dataclasses import dataclass
 @dataclass
 class CropRatio:
-	h: float
-	w: float
+	h: float = 0.0
+	w: float = 0.0
 	def as_size(self, image_h, image_w):
 		return int(image_h * self.h), int(image_w * self.w)
 	def as_shape(self, image_h, image_w):
@@ -42,7 +42,9 @@ class CropRatio:
 # def get_aspect_ratio(cont: ndarray) -> float: rect = cv2.minAreaRect(cont)
 
 def main(filepath: Path, threshold_ratio=0.5, BGR='B', max_rect_aspect=10.0,
-	vertical_crop_ratio=1.0, manual_mask=False): # title_window = 'Tracbar test', config_dir='Data'):
+	vertical_crop_ratio=1.0, manual_mask=False, 
+	config_dir='config', app_name: str = ''):
+	# config_path: TOMLFile|Path|str|None = None): # title_window = 'Tracbar test', 
 	logger.debug("%f threshold_ratio:level %f", threshold_ratio, threshold_ratio * 255)
 	logger.debug("%f max_rect_aspect", max_rect_aspect)
 	logger.info("%f vartical_crop_ratio", vertical_crop_ratio)
@@ -52,7 +54,14 @@ def main(filepath: Path, threshold_ratio=0.5, BGR='B', max_rect_aspect=10.0,
 		raise ValueError("Failed to load image: %s", filepath)
 	image_h, image_w, _ = image.shape 
 	logger.debug("image_h: %d, image_w: %d", image_h, image_w)
-	mask_ratio = get_image_mask(image, filepath, manual=manual_mask)
+	config_toml_file = get_config_toml_file(filepath, config_dir=config_dir, app_name=app_name)
+	try:
+		config_doc = config_toml_file.read()
+	except (FileNotFoundError, IOError) as e:
+		logger.info("Config file not found or read error:%s", e)
+		config_doc = TOMLDocument()
+
+	mask_ratio = get_image_mask(image, app_name, manual=manual_mask, config_doc=config_doc)
 	logger.debug("mask: %s", mask_ratio)
 	# mask_image = np.full((*mask_ratio.as_size(image_h, image_w), 3), (255, 255, 255), dtype=np.uint8)
 	masked_image = image.copy() # np.bitwise_or(image, mask_image)
@@ -247,11 +256,12 @@ def main(filepath: Path, threshold_ratio=0.5, BGR='B', max_rect_aspect=10.0,
 """
 
 def get_image_mask(image: ndarray,
+	app_name: str, # application name of image (stem.rsplit('_', 1)[0] of "img1.screenshot.png"): stem_app.ext i.e. postfix of stem separated by '_'
 	trackbar_slider_max = 100,
 	title_window = 'Image mask', 
 	crop_ratio: Optional[CropRatio] = None,
 	config_doc: Optional[TOMLDocument] = None,
-	app_name: str, # application name of image (stem.rsplit('_', 1)[0] of "img1.screenshot.png"): stem_app.ext i.e. postfix of stem separated by '_'
+
 	manual = False) -> CropRatio: 
 	image_h, image_w = image.shape[:2]
 	image_area_key = f'image-area.{app_name}'
@@ -313,12 +323,15 @@ def get_image_mask(image: ndarray,
 			exit(1)
 		return crop_ratio"""
 
-
-def get_config(filepath: Path, config_dir='Data') -> tuple[TOMLFile, TOMLDocument]: 
-	config_path = filepath.parent / config_dir
-	config_path.mkdir(exist_ok=True)
-	config_filename = config_path / (filepath.stem + '.toml')
-	return (f:=TOMLFile(config_filename)), f.read()
+def get_config_toml_file(filepath: Path, config_dir:str='Data', app_name: str = '') -> TOMLFile: 
+	if not app_name:
+		app_name = filepath.stem.rsplit('_', 1)[0]
+	if config_dir:
+		config_fulldir = filepath.parent / config_dir
+		config_fulldir.mkdir(exist_ok=True)
+	else:
+		config_fulldir = filepath.parent
+	return TOMLFile(config_fulldir / (app_name + '.toml'))
 
 def save_config(toml_file: TOMLFile, config_doc: TOMLDocument, config_filename: Path):
 	try:
