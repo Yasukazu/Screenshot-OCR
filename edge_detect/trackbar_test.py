@@ -1,4 +1,4 @@
-from typing import NamedTuple
+from typing import NamedTuple, Optional
 from tomllib import load as load_toml_file
 from math import sqrt, floor, dist
 from typing import Sequence
@@ -10,6 +10,8 @@ import numpy as np
 from numpy import ndarray
 import matplotlib.pyplot as plt
 import tomlkit
+from tomlkit.toml_file import TOMLFile
+from tomlkit import TOMLDocument	
 
 from logging import getLogger, INFO, StreamHandler, DEBUG
 logger = getLogger(__name__)
@@ -245,34 +247,23 @@ def main(filepath: Path, threshold_ratio=0.5, BGR='B', max_rect_aspect=10.0,
 """
 
 def get_image_mask(image: ndarray,
-	filepath: Path,
 	trackbar_slider_max = 100,
 	title_window = 'Image mask', 
-	config_dir='Data',
-	crop_ratio: CropRatio = CropRatio(0.0, 0.0),
-	manual = False) -> CropRatio : 
+	crop_ratio: Optional[CropRatio] = None,
+	config_doc: Optional[TOMLDocument] = None,
+	app_name: str, # application name of image (stem.rsplit('_', 1)[0] of "img1.screenshot.png"): stem_app.ext i.e. postfix of stem separated by '_'
+	manual = False) -> CropRatio: 
 	image_h, image_w = image.shape[:2]
-	config_path = filepath.parent / config_dir
-	config_path.mkdir(exist_ok=True)
-	config_filename = config_path / (filepath.stem + '.toml')
-	from tomlkit.toml_file import TOMLFile
-	from tomlkit import TOMLDocument	
-	toml_file = TOMLFile(config_filename)
-	try:
-		config_doc = toml_file.read()
-	except FileNotFoundError:
-		config_doc = TOMLDocument()
-	image_area_key = f'image-area.{filepath.stem}'
-	image_area_config = config_doc.get(image_area_key) 
-	if image_area_config is None:
-		image_area_config = config_doc.add(image_area_key, tomlkit.table())
-	# old_crop_ratios = CropRatio(image_area_config.get('h_crop_r') or crop_ratio.h, image_area_config.get('w_crop_r') or crop_ratio.w)
-	old_crop_ratio_h = image_area_config.get('h_crop_r')
-	if old_crop_ratio_h is not None:
-		crop_ratio.h = old_crop_ratio_h
-	old_crop_ratio_w = image_area_config.get('w_crop_r')
-	if old_crop_ratio_w is not None:
-		crop_ratio.w = old_crop_ratio_w
+	image_area_key = f'image-area.{app_name}'
+	if not crop_ratio:
+		if config_doc is not None:
+			image_area_config = config_doc.get(image_area_key)
+			if image_area_config is not None:
+				crop_ratio = CropRatio(image_area_config.get('h_crop_r') or 0.0, image_area_config.get('w_crop_r') or 0.0)
+			else:
+				crop_ratio = CropRatio(0.0, 0.0)
+		else:
+			crop_ratio = CropRatio(0.0, 0.0)
 	if not manual:
 		return crop_ratio
 	def show_rect_image():
@@ -303,11 +294,12 @@ def get_image_mask(image: ndarray,
 	cv.rectangle(image2, (0, 0), (int(crop_ratio.w * image_w), int(crop_ratio.h * image_h)), (0, 0, 255), 4)
 	cv.imshow(title_window, image2)
 	key = cv2.waitKey(0)
-	if key in (ord('q'), ord('Q')):
+	return crop_ratio
+	"""if key in (ord('q'), ord('Q')):
 		logger.debug("Terminated by user. crop_ratios[h/w]: %s", crop_ratio)
 		return crop_ratio
 	if key in (ord('s'), ord('S')):
-		if (old_crop_ratio_h is not None and old_crop_ratio_h == crop_ratio.h) and (old_crop_ratio_w is not None and old_crop_ratio_w == crop_ratio.w):
+		if (cfg_crop_ratio_h is not None and cfg_crop_ratio_h == crop_ratio.h) and (cfg_crop_ratio_w is not None and cfg_crop_ratio_w == crop_ratio.w):
 			logger.debug("crop_ratios are not changed.")
 			return crop_ratio
 		config_doc.update({image_area_key: {'h_crop_r': crop_ratio.h, 'w_crop_r': crop_ratio.w}})
@@ -319,7 +311,22 @@ def get_image_mask(image: ndarray,
 		except IOError as e:
 			logger.error("Failed to write config to file: %s", e)
 			exit(1)
-		return crop_ratio
+		return crop_ratio"""
+
+
+def get_config(filepath: Path, config_dir='Data') -> tuple[TOMLFile, TOMLDocument]: 
+	config_path = filepath.parent / config_dir
+	config_path.mkdir(exist_ok=True)
+	config_filename = config_path / (filepath.stem + '.toml')
+	return (f:=TOMLFile(config_filename)), f.read()
+
+def save_config(toml_file: TOMLFile, config_doc: TOMLDocument, config_filename: Path):
+	try:
+		toml_file.write(config_doc)
+		logger.info("Config is saved into file: '%s'", config_filename)
+	except IOError as e:
+		logger.error("Failed to write config to file: %s", e)
+		exit(1)
 
 def get_min_distance(cont: ndarray) -> int: # Sequence[Sequence[int]]) -> int:
 	dist_list = []
