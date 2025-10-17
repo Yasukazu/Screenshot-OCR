@@ -70,7 +70,7 @@ sudo apt install tesseract-ocr-jpn -y
 
 0c. install python packages
 
-#### Synchronize `pyproject.toml` by `uv` command
+#### Synchronize `pyproGect.toml` by `uv` command
 
  - `uv sync`
 
@@ -124,3 +124,15 @@ ls font/misaki_gothic.png
 2. upload the pdf file onto Google Drive, then open and open-with-app:Document then download as markdown format.
 
 3. extract data from downloaded markdown file.
+
+## Jupyter notebook(aka *Jupyterlab*) in GCP(Google Cloud Platform):
+
+1. Make `.jupyter` directory and then copy `jupyter_lab_config.py` into it.
+
+2. Click "Web preview" icon (looks like Brazil national flag) in Cloud Shell Editor's top menu, changing port to 8888.
+
+3. In Jupyter page, click "iPython3" icon to open an `ipynb` notebook.
+
+3. Paste `matplotlib_draw.py` script into a cell of the `ipynb` notebook.
+
+4. Run the cell by clicking the *run* button (right-side-edge triangle icon) in the notebook(`*.ipynb`)'s top menu.
