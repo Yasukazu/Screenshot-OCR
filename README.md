@@ -137,11 +137,12 @@ c.ServerApp.password = ''
 c.ServerApp.allow_origin = '*'
 ```
 
+2. Run Python command with '-m jupyterlab' option to start *Jupyterlab* server: `python -m jupyterlab`
 
-2. Click "Web preview" icon (looks like Brazil national flag: a cirgle in 12-3-6-9 clock cornered rectangle as '[<o>]') in Cloud Shell Editor's top menu, changing port to 8888.
+2. Click "Web preview" icon (looks like Brazil national flag: a cirgle in an axis-aligned rectangle i.e. `[<o>]`) in Cloud Shell Editor's top menu, changing port to 8888.
 
 3. In Jupyter page, click "iPython3" icon to open an `ipynb` notebook.
 
 4. Paste `matplotlib_draw.py` script into a cell of the `ipynb` notebook.
 
-5. Run the cell by clicking the *run* button (right-edged triangle icon: '|>') in the notebook(`*.ipynb`)'s top menu.
+5. Run the cell by clicking the *run* button (right-edged triangle icon: `|>`) in the notebook(`*.ipynb`)'s top menu.
