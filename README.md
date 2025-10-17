@@ -127,7 +127,16 @@ ls font/misaki_gothic.png
 
 ## Jupyter notebook(aka *Jupyterlab*) in GCP(Google Cloud Platform):
 
-1. Make `.jupyter` directory and then copy `jupyter_lab_config.py` into it.
+1. Make `.jupyter` directory and then copy `jupyter_lab_config.py` into it. Notice: the configuration is not safe-bound but no problem in restricted environment like GCP.
+
+
+```python
+c.LabServerApp.open_browser = False
+c.ServerApp.token = ''
+c.ServerApp.password = ''
+c.ServerApp.allow_origin = '*'
+```
+
 
 2. Click "Web preview" icon (looks like Brazil national flag: a cirgle in 12-3-6-9 clock corner rectangle) in Cloud Shell Editor's top menu, changing port to 8888.
 
