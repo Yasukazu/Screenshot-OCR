@@ -2,6 +2,7 @@
 
 ## Original motivation: to organize screenshots of niche job apps as 「タイミー」 or 「メルカリハロ」
 
+
 ## command / scripts:
 
 - `tool_pyocr.py`: extract text from PNG (screenshot) files using OCR(_Tesseract_)
@@ -48,20 +49,31 @@
    D
 
 ## Extract Text from PNG image file:
+
 0. install Tesseract OCR
-0a. install tesseract-ocr language data
+
+0a. install Tesseract OCR and its development libraries and language data of Japanese
+
 ```
 sudo apt install tesseract-ocr -y
 sudo apt install libtesseract-dev -y
 sudo apt install tesseract-ocr-jpn -y
 ```
+
 0b. check tesseract-ocr version and language data
+
   - `tesseract --version`
   - `tesseract --list-langs`
   - `tesseract --print-parameters`
   - `tesseract --print-unlv`
   - `tesseract --print-tuning-params`
+
 0c. install python packages
+
+#### Synchronize `pyproject.toml` by `uv` command
+
+ - `uv sync`
+
   - `pip install pytesseract`
   - `pip install opencv-python`
   - `pip install opencv-python-headless`
