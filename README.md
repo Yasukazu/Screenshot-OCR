@@ -125,7 +125,9 @@ ls font/misaki_gothic.png
 
 3. extract data from downloaded markdown file.
 
-## Jupyter notebook(aka *Jupyterlab*) in GCP(Google Cloud Platform):
+## Development
+
+### Jupyter notebook(aka *Jupyterlab*) in GCP(Google Cloud Platform):
 
 1. Make `.jupyter` directory and then copy `jupyter_lab_config.py` into it. Notice: the configuration is not safe-bound but no problem in restricted environment like GCP.
 
@@ -137,12 +139,15 @@ c.ServerApp.password = ''
 c.ServerApp.allow_origin = '*'
 ```
 
+2. Activate a virtual environment of the folder as `. .venv/bin/activate`
+
+
 2. Run Python command with '-m jupyterlab' option to start *Jupyterlab* server: `python -m jupyterlab`
 
-2. Click "Web preview" icon (looks like Brazil national flag: a cirgle in an axis-aligned rectangle i.e. `[<o>]`) in Cloud Shell Editor's top menu, changing port to 8888.
+2. Click "Web preview" icon (looks like Brazil national flag, a cirgle in a rhombus or ascii figure: `[<o>]`) in Cloud Shell Editor's top menu, changing port to 8888.
 
 3. In Jupyter page, click "iPython3" icon to open an `ipynb` notebook.
 
-4. Paste `matplotlib_draw.py` script into a cell of the `ipynb` notebook.
+4. Paste a script (like `matplotlib_draw.py`) into a cell of the `ipynb` notebook.
 
 5. Run the cell by clicking the *run* button (right-edged triangle icon: `|>`) in the notebook(`*.ipynb`)'s top menu.
