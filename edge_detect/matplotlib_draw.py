@@ -25,7 +25,7 @@ for ln, y_coord in enumerate(y_coords[1:]):
         break
     else:
         last = y_coord
-cut_image = image[last + 1:, :]
+image = image[last + 1:, :]
 
 # mask image of a left-top circle as blank
 ## find the top block
@@ -33,24 +33,27 @@ cut_height = y_coords[ln + 1] - last
 assert cut_height > 0
 ### scan left-top area for a (non-white) shape
 for x, x_cd in enumerate(range(width)):
-    v_line = cut_image[:(cut_height - 1), x_cd]
+    v_line = image[:(cut_height - 1), x_cd]
     if len(np.unique(v_line)) > 1:
         break
 for x_cd in range(width - x):
-    v_line = cut_image[:(cut_height - 1), x_cd + x]
+    v_line = image[:(cut_height - 1), x_cd + x]
     if len(np.unique(v_line)) == 1 and (v_line == 255).all():
         break
 cut_x = x_cd + x
-mask = np.full((cut_height, width), 255, np.uint8)
+# draw a white rectangle
+cv2.rectangle(image, (0, 0), (cut_x, cut_height), (255, 255, 255), -1)
+# mask = np.full((cut_height, width), 255, np.uint8)
 # cv2.circle(mask, (width // 16, height // 16), width // 16, (255, 255, 255), -1)
 #cut_image = cv2.bitwise_and(cut_image, cut_image, mask=mask)
 # plt.imshow(cv2.cvtColor(cut_image, cv2.COLOR_BGR2RGB))
 fig, ax = plt.subplots()
 ax.invert_yaxis()
 ax.xaxis.tick_top()
-ax.imshow(cv2.cvtColor(cut_image, cv2.COLOR_BGR2RGB))
+ax.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
 plt.show()
-print(y_coords[last + 1:])
+input('Press Enter to exit:')
+# print(y_coords[last + 1:])
 # Result
 '''102
 103
