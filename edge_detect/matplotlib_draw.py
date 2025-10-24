@@ -2,12 +2,19 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-image_path = 'DATA/taimee-test.png'
-if not os.path.exists(image_path):
-    raise ValueError("Error: Could not load image: %s" % image_path)
-image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2GRAY)
+from pathlib import Path
+parent_dir = Path(__file__).resolve().parent.parent
+image_dir = parent_dir / 'DATA'
+if not image_dir.exists():
+    raise ValueError("Error: image dir not found: %s" % image_dir)
+filename = 'taimee-test.png'
+image_path = image_dir / filename
+if not image_path.exists():
+    raise ValueError("Error:    image file not found: %s" % image_path)
+image_fullpath = image_path.resolve()
+image = cv2.cvtColor(cv2.imread(image_fullpath), cv2.COLOR_BGR2GRAY)
 if image is None:
-    raise ValueError("Error: Could not load image: %s" % image_path)
+    raise ValueError("Error: Could not load image: %s" % image_fullpath)
 
 height, width = image.shape[:2]
 y_coords = []
