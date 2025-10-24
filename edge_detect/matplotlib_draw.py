@@ -1,8 +1,10 @@
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-
+import os
 image_path = 'DATA/taimee-test.png'
+if not os.path.exists(image_path):
+    raise ValueError("Error: Could not load image: %s" % image_path)
 image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2GRAY)
 if image is None:
     raise ValueError("Error: Could not load image: %s" % image_path)
