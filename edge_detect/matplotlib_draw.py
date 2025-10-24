@@ -4,7 +4,8 @@ import numpy as np
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-env_path = Path(__file__).resolve().parent / '.env'
+env_path = Path('edge_detect/.env')
+#env_path = Path(__file__).resolve().parent / '.env'
 if not env_path.exists():
     raise ValueError("Error: .env file not found: %s" % env_path)
 with env_path.open() as f:
