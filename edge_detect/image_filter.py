@@ -5,7 +5,7 @@ import numpy as np
 from pathlib import Path
 
 
-def taimee(image: UMat | Path | str) -> UMat:
+def taimee(image: UMat | Path | str, thresh_type: int=cv2.THRESH_OTSU, thresh_value: float=150.0, binarize=True) -> tuple[float, UMat]:
     image_fullpath = None
     match(image):
         case UMat():
@@ -20,7 +20,7 @@ def taimee(image: UMat | Path | str) -> UMat:
     if image is None:
         raise ValueError("Error: Could not load image: %s" % image_fullpath)
     height, width = image.shape[:2]
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    # image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     h_lines = []
     for y_coord in range(height):
         h_line = image[y_coord, :]
@@ -53,5 +53,8 @@ def taimee(image: UMat | Path | str) -> UMat:
     cut_x = x_cd + x
     # draw a white rectangle
     cv2.rectangle(image, (0, 0), (cut_x, cut_height), (255, 255, 255), -1)
-    ret, binary = cv2.threshold(image, 150, 255, cv2.THRESH_BINARY)
-    return binary
+    if not binarize:
+        return 0, image
+    else:
+        mono_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        return cv2.threshold(mono_image, thresh=thresh_value, maxval=255, type=thresh_type) 
