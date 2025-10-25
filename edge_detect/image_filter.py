@@ -14,8 +14,11 @@ def taimee(image: UMat | Path | str) -> UMat:
             image_fullpath = image.resolve()
         case str():
             image_fullpath = Path(image).resolve()
-    if image_fullpath:
+    if image_fullpath is not None:
         image = cv2.imread(image_fullpath)
+    assert isinstance(image, np.ndarray)
+    if image is None:
+        raise ValueError("Error: Could not load image: %s" % image_fullpath)
     height, width = image.shape[:2]
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     h_lines = []
