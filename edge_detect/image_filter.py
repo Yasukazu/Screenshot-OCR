@@ -53,4 +53,5 @@ def taimee(image: UMat | Path | str) -> UMat:
     cut_x = x_cd + x
     # draw a white rectangle
     cv2.rectangle(image, (0, 0), (cut_x, cut_height), (255, 255, 255), -1)
-    return image
+    ret, binary = cv2.threshold(image, 150, 255, cv2.THRESH_BINARY)
+    return binary
