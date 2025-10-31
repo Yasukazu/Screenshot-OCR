@@ -21,7 +21,7 @@ image_path = Path(image_dir) / filename
 if not image_path.exists():
     raise ValueError("Error: image file not found: %s" % image_path)
 image_fullpath = image_path.resolve()
-image = cv2.cvtColor(cv2.imread(image_fullpath), cv2.COLOR_BGR2GRAY)
+image = cv2.imread(image_fullpath) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
 if image is None:
     raise ValueError("Error: Could not load image: %s" % image_fullpath)
 from image_filter import taimee
