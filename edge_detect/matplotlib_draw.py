@@ -42,6 +42,8 @@ ax.xaxis.tick_top()
 ax.imshow(fixed_image)
 def press(event):
     print(event.key)
+    if event.key == 'q':
+        plt.close()
 fig.canvas.mpl_connect('key_press_event', press)
 plt.show()
 print(threshold)
