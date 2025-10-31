@@ -3,7 +3,7 @@ name = "taimi-screen"
 version = "1.1.1"
 description = "generate PDF from taimi screenshots"
 authors = [{ name = "Yasukazu ", email = "yasukazu@makyno.jp" }]
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 readme = "README.md"
 dependencies = [
     "console-menu>=0.8.0",
@@ -27,6 +27,7 @@ dev = [
     "python-dotenv[cli]>=1.1.0",
     "ruff>=0.13.2",
     "jupyterlab>=4.4.9",
+    "xeus-python>=0.17.6",
 ]
 
 [build-system]
