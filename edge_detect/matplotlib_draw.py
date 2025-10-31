@@ -1,6 +1,6 @@
 import cv2
 import matplotlib.pyplot as plt
-# import numpy as np
+import numpy as np
 import os
 from pathlib import Path
 from dotenv import dotenv_values
@@ -34,19 +34,39 @@ image = cv2.imread(image_fullpath) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
 if image is None:
     raise ValueError("Error: Could not load image: %s" % image_fullpath)
 from image_filter import taimee
-threshold, fixed_image = taimee(image)
+h_lines, filtered_image = taimee(image, binarize=False)
+mono_image = cv2.cvtColor(filtered_image, cv2.COLOR_BGR2GRAY)
+text_image = cv2.threshold(mono_image, thresh=161, maxval=255, type=cv2.THRESH_BINARY)[1]
+negative_mono_image = cv2.bitwise_not(mono_image)
+text_border_image = cv2.threshold(negative_mono_image, thresh=16, maxval=255, type=cv2.THRESH_BINARY)[1]
+# negative_text_image = cv2.bitwise_not(text_image)
+# negative_text_border_image = cv2.bitwise_not(text_border_image)
+border_image = cv2.bitwise_and(text_border_image, text_image)
+fig, ax = plt.subplots(1, 5)
+for r in range(3):
+    ax[r].invert_yaxis()
+    ax[r].xaxis.tick_top()
+ax[0].imshow(filtered_image)
+ax[1].imshow(text_image)
+ax[2].imshow(text_border_image)
+ax[3].imshow(border_image)
 
-fig, ax = plt.subplots()
-ax.invert_yaxis()
-ax.xaxis.tick_top()
-ax.imshow(fixed_image)
+r = np.array(negative_mono_image)[:, :].flatten()
+bins_range = range(0, 257, 8)
+xtics_range = range(0, 257, 32)
+# fig, (ax0, ax1, ax2) = plt.subplots(nrows=3, ncols=1, sharex=True, sharey=True)
+
+ax[4].hist(r, bins=bins_range, color='r')
+plt.setp((ax[4],), xticks=xtics_range, xlim=(0, 256))
+ax[4].grid(True)
+
 def press(event):
     print(event.key)
     if event.key == 'q':
         plt.close()
 fig.canvas.mpl_connect('key_press_event', press)
 plt.show()
-print(threshold)
+print(h_lines)
 # print(cut_x, cut_height)
 # print(y_coords[last + 1:])
 # Result
@@ -64,4 +84,7 @@ print(threshold)
 829
 830
 
-x,x_cd=(28,168)'''
+x,x_cd=(28,168)
+
+thresh_value=161
+'''

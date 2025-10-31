@@ -3,9 +3,9 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
+from typing import Sequence
 
-
-def taimee(image: UMat | Path | str, thresh_type: int=cv2.THRESH_OTSU, thresh_value: float=150.0, binarize=True) -> tuple[float, UMat]:
+def taimee(image: UMat | Path | str, thresh_type: int=cv2.THRESH_OTSU, thresh_value: float=150.0, binarize=True) -> tuple[float | Sequence[int], UMat]:
     image_fullpath = None
     match(image):
         case UMat():
@@ -35,7 +35,8 @@ def taimee(image: UMat | Path | str, thresh_type: int=cv2.THRESH_OTSU, thresh_va
             break
         else:
             last = y_coord
-    image = image[last + 1:, :]
+    heading_height = last + 1
+    image = image[heading_height:, :]
 
     # mask image of a left-top circle as blank
     ## find the top block
@@ -54,7 +55,7 @@ def taimee(image: UMat | Path | str, thresh_type: int=cv2.THRESH_OTSU, thresh_va
     # draw a white rectangle
     cv2.rectangle(image, (0, 0), (cut_x, cut_height), (255, 255, 255), -1)
     if not binarize:
-        return 0, image
+        return h_lines[heading_height:], image
     else:
         mono_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         return cv2.threshold(mono_image, thresh=thresh_value, maxval=255, type=thresh_type) 
