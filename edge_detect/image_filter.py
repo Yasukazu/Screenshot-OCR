@@ -36,8 +36,8 @@ class ImageDictKey(Enum):
     heading = "heading"
     hours = "hours"
     rest_hours = "rest_hours"
-    time_from = "time_from"
-    time_to = "time_to"
+    hours_from = "hours_from"
+    hours_to = "hours_to"
     salary = "salary"
     other = "other"
 
@@ -118,10 +118,32 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_OTSU, 
     if x_cd == -1 or not blank_area_found:
         raise ValueError("No blank area found at the right side of the heading shape!")
     cut_x = x_cd + x
+    ## erase unwanted h_lines
+    for ypos in erase_ypos_list:
+        image[ypos, :] = 255
+    for ypos in ypos_list:
+        image[ypos, :] = 255
+    ## get area of hours_from / hours_to
+    xpos = -1
+    for xpos in reversed(range(width // 2)):
+        v_line = image[ypos_list[0]:ypos_list[1], xpos]
+        if len(np.unique(v_line)) == 1 and bool((v_line == 255).all()):
+            break
+    if xpos == -1:
+        raise ValueError("No blank area found at the left side of the hours area center!")
+    xpos2 = -1
+    for xpos2 in range(width // 2, width):
+        v_line = image[ypos_list[0]:ypos_list[1], xpos2]
+        if len(np.unique(v_line)) == 1 and bool((v_line == 255).all()):
+            break
+    if xpos2 == -1:
+        raise ValueError("No blank area found at the right side of the hours area center!")
     # add the heading area to the dict
     if image_dict is not None:
         image_dict[ImageDictKey.heading] = h_image[:, cut_x + 1:]
         image_dict[ImageDictKey.hours] = image[ypos_list[0]:ypos_list[1], :]
+        image_dict[ImageDictKey.hours_from] = image[ypos_list[0]:ypos_list[1], :xpos]
+        image_dict[ImageDictKey.hours_to] = image[ypos_list[0]:ypos_list[1], xpos2:]
         image_dict[ImageDictKey.rest_hours] = image[ypos_list[1]:ypos_list[-1], :]
         image_dict[ImageDictKey.other] = image[ypos_list[-1]:, :]
     # draw a white rectangle

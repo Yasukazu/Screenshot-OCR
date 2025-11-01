@@ -43,23 +43,24 @@ text_border_image = cv2.threshold(negative_mono_image, thresh=16, maxval=255, ty
 # negative_text_image = cv2.bitwise_not(text_image)
 # negative_text_border_image = cv2.bitwise_not(text_border_image)
 border_image = cv2.bitwise_and(text_border_image, text_image)
-fig, ax = plt.subplots(1, 6)
-for r in range(5):
+fig, ax = plt.subplots(1, 7)
+for r in range(6):
     ax[r].invert_yaxis()
     ax[r].xaxis.tick_top()
 ax[0].imshow(filtered_image)
 ax[1].imshow(image_dict[ImageDictKey.heading])
-ax[2].imshow(image_dict[ImageDictKey.hours])
-ax[3].imshow(image_dict[ImageDictKey.rest_hours])
-ax[4].imshow(image_dict[ImageDictKey.other])
+ax[2].imshow(image_dict[ImageDictKey.hours_from])
+ax[3].imshow(image_dict[ImageDictKey.hours_to])
+ax[4].imshow(image_dict[ImageDictKey.rest_hours])
+ax[5].imshow(image_dict[ImageDictKey.other])
 r = np.array(negative_mono_image)[:, :].flatten()
 bins_range = range(0, 257, 8)
 xtics_range = range(0, 257, 32)
 # fig, (ax0, ax1, ax2) = plt.subplots(nrows=3, ncols=1, sharex=True, sharey=True)
 
-ax[5].hist(r, bins=bins_range, color='r')
-plt.setp((ax[5],), xticks=xtics_range, xlim=(0, 256))
-ax[5].grid(True)
+ax[6].hist(r, bins=bins_range, color='r')
+plt.setp((ax[6],), xticks=xtics_range, xlim=(0, 256))
+ax[6].grid(True)
 
 def press(event):
     print(event.key)
