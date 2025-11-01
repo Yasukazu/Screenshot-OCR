@@ -55,11 +55,18 @@ ax[3].imshow(image_dict[ImageDictKey.hours_to])
 ax[4].imshow(image_dict[ImageDictKey.rest_hours])
 ax[5].imshow(image_dict[ImageDictKey.other])
 heading_image = Image.fromarray(image_dict[ImageDictKey.heading])
+from tempfile import TemporaryDirectory
+from pytesseract import pytesseract, image_to_data, Output
 from pyocr import get_available_tools, builders
 ocr = get_available_tools()[1]
-def get_lines(heading_image: Image, from_: int = 0, to_: int | None = None):
-    heading_lines = ocr.image_to_string(heading_image, lang="jpn", builder=builders.LineBoxBuilder())
-    return [t.content.replace(' ','') for t in (heading_lines[from_:to_] if to_ is not None else heading_lines[from_:])]
+def get_lines(image: np.ndarray, from_: int = 0, to_: int | None = None, conf_min=80):
+    pytesseract.tesseract_cmd = '/usr/bin/tesseract'
+    # with TemporaryDirectory() as tmpdirname: tmp_img_path = '/'.join([tmpdirname, 'test.png']) cv2.imwrite(tmp_img_path, image) text, boxes, tsv = pytesseract.run_and_get_multiple_output(tmp_img_path, extensions=['txt', 'box', 'tsv'])
+    data = image_to_data(image, lang="jpn", output_type=Output.DICT)
+    # boxes = image_to_boxes(image, lang="jpn", output_type=Output.DICT)
+    less_conf_data = [(i,data['text'][i]) for i,c in enumerate(data['conf']) if 0 < c < conf_min]
+    lines = ocr.image_to_string(Image.fromarray(image), lang="jpn", builder=builders.LineBoxBuilder())
+    return [t.content.replace(' ','') for t in (lines[from_:to_] if to_ is not None else lines[from_:])], less_conf_data if len(less_conf_data) > 0 else None, data if len(less_conf_data) > 0 else None
 lines_to_dict = {
     ImageDictKey.heading: -1,
     ImageDictKey.hours_from: None,
@@ -68,10 +75,11 @@ lines_to_dict = {
     ImageDictKey.other: None
 }
 for key, to_ in lines_to_dict.items():
-    lines = get_lines(Image.fromarray(image_dict[key]), to_=to_)
+    lines, confs, data= get_lines((image_dict[key]), to_=to_) # Image.fromarray
     text = '\t'.join(lines)
     print(f"{key.name}: {text}")
-
+    print(confs) if confs else None
+    print(data) if data else None
 r = np.array(negative_mono_image)[:, :].flatten()
 bins_range = range(0, 257, 8)
 xtics_range = range(0, 257, 32)
