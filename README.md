@@ -60,6 +60,18 @@ sudo apt install libtesseract-dev -y
 sudo apt install tesseract-ocr-jpn -y
 ```
 
+0a2. Download better data set and set environment variables
+
+```
+mkdir -p ~/.local/share/tessdata/best
+```
+
+Visit "https://github.com/tesseract-ocr/tessdata_best/tree/main" and download "jpn.traineddata" then copy it to `~/.local/share/tessdata/best/`.
+
+```
+export TESSDATA_PREFIX=~/.local/share/tessdata/best
+```
+
 0b. check tesseract-ocr version and language data
 
   - `tesseract --version`
