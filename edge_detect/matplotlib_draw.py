@@ -33,16 +33,17 @@ image_fullpath = image_path.resolve()
 image = cv2.imread(image_fullpath) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
 if image is None:
     raise ValueError("Error: Could not load image: %s" % image_fullpath)
-from image_filter import taimee
-h_lines, filtered_image = taimee(image, binarize=False)
-mono_image = cv2.cvtColor(filtered_image, cv2.COLOR_BGR2GRAY)
-text_image = cv2.threshold(mono_image, thresh=161, maxval=255, type=cv2.THRESH_BINARY)[1]
-negative_mono_image = cv2.bitwise_not(mono_image)
+from image_filter import taimee, ImageDictKey
+image_dict = {}
+h_lines, filtered_image = taimee(image, binarize=False, cvt_color=cv2.COLOR_BGR2GRAY, image_dict=image_dict)
+# mono_image = cv2.cvtColor(filtered_image, cv2.COLOR_BGR2GRAY)
+text_image = cv2.threshold(filtered_image, thresh=161, maxval=255, type=cv2.THRESH_BINARY)[1]
+negative_mono_image = cv2.bitwise_not(filtered_image)
 text_border_image = cv2.threshold(negative_mono_image, thresh=16, maxval=255, type=cv2.THRESH_BINARY)[1]
 # negative_text_image = cv2.bitwise_not(text_image)
 # negative_text_border_image = cv2.bitwise_not(text_border_image)
 border_image = cv2.bitwise_and(text_border_image, text_image)
-fig, ax = plt.subplots(1, 5)
+fig, ax = plt.subplots(1, 6)
 for r in range(3):
     ax[r].invert_yaxis()
     ax[r].xaxis.tick_top()
@@ -50,15 +51,15 @@ ax[0].imshow(filtered_image)
 ax[1].imshow(text_image)
 ax[2].imshow(text_border_image)
 ax[3].imshow(border_image)
-
+ax[4].imshow(image_dict[ImageDictKey.heading])
 r = np.array(negative_mono_image)[:, :].flatten()
 bins_range = range(0, 257, 8)
 xtics_range = range(0, 257, 32)
 # fig, (ax0, ax1, ax2) = plt.subplots(nrows=3, ncols=1, sharex=True, sharey=True)
 
-ax[4].hist(r, bins=bins_range, color='r')
-plt.setp((ax[4],), xticks=xtics_range, xlim=(0, 256))
-ax[4].grid(True)
+ax[5].hist(r, bins=bins_range, color='r')
+plt.setp((ax[5],), xticks=xtics_range, xlim=(0, 256))
+ax[5].grid(True)
 
 def press(event):
     print(event.key)
@@ -69,22 +70,3 @@ plt.show()
 print(h_lines)
 # print(cut_x, cut_height)
 # print(y_coords[last + 1:])
-# Result
-'''102
-103
-105
-106
-107
-108
-109
-334
-335
-603
-604
-829
-830
-
-x,x_cd=(28,168)
-
-thresh_value=161
-'''
