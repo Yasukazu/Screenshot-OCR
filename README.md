@@ -60,7 +60,7 @@ sudo apt install libtesseract-dev -y
 sudo apt install tesseract-ocr-jpn -y
 ```
 
-0a2. Download better data set and set environment variables
+0a2. Download a better(just a bit more accurate) data and set its environment variable
 
 ```
 mkdir -p ~/.local/share/tessdata/best
@@ -82,7 +82,7 @@ export TESSDATA_PREFIX=~/.local/share/tessdata/best
 
 0c. install python packages
 
-#### Synchronize `pyproGect.toml` by `uv` command
+#### Synchronize `pyproject.toml` by `uv` command
 
  - `uv sync`
 
