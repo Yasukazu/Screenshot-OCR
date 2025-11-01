@@ -34,6 +34,8 @@ class ImageFilterResult:
 
 class ImageDictKey(Enum):
     heading = "heading"
+    hours = "hours"
+    rest_hours = "rest_hours"
     time_from = "time_from"
     time_to = "time_to"
     salary = "salary"
@@ -72,15 +74,25 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_OTSU, 
             last_ypos = ypos
     assert h_cur >= 0
     # heading_ypos = last_ypos + 1
-    image = image[last_ypos + 1:, :] # remove pre-heading area
-    h_line_ypos_list = np.array(h_line_ypos_list[h_cur + 1:]) - last_ypos
-    # h_line_ypos_array -= last_ypos
-    # h_line_ypos_list = h_line_ypos_list[h_cur + 1:] # remove pre-heading area
-    ## prepare image dict
+    image = image[last_ypos + 1:, :] # remove pre-heading area and its closing border
+    h_line_ypos_array = np.array(h_line_ypos_list[h_cur + 1:]) - (last_ypos + 1)
+    last_ypos = h_line_ypos_array[0]
+    ypos_list: list[int] =[last_ypos]
+    ypos = h_cur = -1
+    erase_ypos_list = []
+    for h_cur, ypos in enumerate(h_line_ypos_array[1:]):
+        if ypos > ypos_list[-1] + 1:
+            ypos_list.append(ypos)
+        else:
+            last_ypos = ypos
+            erase_ypos_list.append(ypos)
+    if len(ypos_list) == 1: # h_cur < 0 or ypos < 0:
+        raise ValueError("Failed to find the next ypos!")
+
     
     # mask image of a left-top circle as blank
     ## find the top block
-    cut_height = h_line_ypos_list[0] # h_cur + 1] - last_ypos
+    cut_height = h_line_ypos_array[0] # h_cur + 1] - last_ypos
     assert cut_height > 0
     h_image = image[:cut_height - 1, :]
     ### scan left-top area for a (non-white) shape
@@ -109,10 +121,13 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_OTSU, 
     # add the heading area to the dict
     if image_dict is not None:
         image_dict[ImageDictKey.heading] = h_image[:, cut_x + 1:]
+        image_dict[ImageDictKey.hours] = image[ypos_list[0]:ypos_list[1], :]
+        image_dict[ImageDictKey.rest_hours] = image[ypos_list[1]:ypos_list[-1], :]
+        image_dict[ImageDictKey.other] = image[ypos_list[-1]:, :]
     # draw a white rectangle
     cv2.rectangle(image, (0, 0), (cut_x, cut_height), (255, 255, 255), -1)
     if not binarize:
-        return h_line_ypos_list, image
+        return ypos_list, image
     else:
         return cv2.threshold(image, thresh=thresh_value, maxval=255, type=thresh_type) 
 # Result
