@@ -55,15 +55,20 @@ ax[3].imshow(image_dict[ImageDictKey.hours_to])
 ax[4].imshow(image_dict[ImageDictKey.rest_hours])
 ax[5].imshow(image_dict[ImageDictKey.other])
 heading_image = Image.fromarray(image_dict[ImageDictKey.heading])
-from tempfile import TemporaryDirectory
-from pytesseract import pytesseract, image_to_data, Output
+#from tempfile import TemporaryDirectory
+from os import environ
+from pytesseract import pytesseract, image_to_data, image_to_boxes, Output
 from pyocr import get_available_tools, builders
 ocr = get_available_tools()[1]
 def get_lines(image: np.ndarray, from_: int = 0, to_: int | None = None, conf_min=80):
     pytesseract.tesseract_cmd = '/usr/bin/tesseract'
     # with TemporaryDirectory() as tmpdirname: tmp_img_path = '/'.join([tmpdirname, 'test.png']) cv2.imwrite(tmp_img_path, image) text, boxes, tsv = pytesseract.run_and_get_multiple_output(tmp_img_path, extensions=['txt', 'box', 'tsv'])
-    data = image_to_data(image, lang="jpn", output_type=Output.DICT)
-    # boxes = image_to_boxes(image, lang="jpn", output_type=Output.DICT)
+    user_home_dir_path = Path('~').expanduser()
+    tessdata_dir = user_home_dir_path / '.local' / 'share' / 'tessdata' / 'best'
+    tessdata_dir_config = r'--tessdata-dir "%s"' % str(tessdata_dir)
+    environ['TESSDATA_PREFIX'] = str(tessdata_dir)
+    data = image_to_data(image, lang="jpn", output_type=Output.DICT, config=tessdata_dir_config)
+    boxes = image_to_boxes(image, lang="jpn", output_type=Output.DICT, config=tessdata_dir_config)
     less_conf_data = [(i,data['text'][i]) for i,c in enumerate(data['conf']) if 0 < c < conf_min]
     lines = ocr.image_to_string(Image.fromarray(image), lang="jpn", builder=builders.LineBoxBuilder())
     return [t.content.replace(' ','') for t in (lines[from_:to_] if to_ is not None else lines[from_:])], less_conf_data if len(less_conf_data) > 0 else None, data if len(less_conf_data) > 0 else None

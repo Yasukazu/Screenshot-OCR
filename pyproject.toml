@@ -17,6 +17,7 @@ dependencies = [
     "pick>=2.4.0",
     "pillow>=11.1.0",
     "pyocr>=0.8.5",
+    "pytesseract>=0.3.13",
     "python-dotenv>=1.1.0",
     "returns>=0.23.0",
 ]
