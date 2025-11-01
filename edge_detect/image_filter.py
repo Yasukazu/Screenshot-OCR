@@ -136,7 +136,7 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_OTSU, 
         v_line = image[ypos_list[0]:ypos_list[1], xpos2]
         if len(np.unique(v_line)) == 1 and bool((v_line == 255).all()):
             break
-    if xpos2 == -1:
+    if xpos2 == -1 or xpos2 == width or xpos2 <= xpos:
         raise ValueError("No blank area found at the right side of the hours area center!")
     # add the heading area to the dict
     if image_dict is not None:

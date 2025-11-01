@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from dotenv import dotenv_values
 import tomllib
+from PIL import Image
 
 FILTER_TOML_PATH_STR = "FILTER_TOML_PATH"
 filter_toml_path = None 
@@ -53,6 +54,24 @@ ax[2].imshow(image_dict[ImageDictKey.hours_from])
 ax[3].imshow(image_dict[ImageDictKey.hours_to])
 ax[4].imshow(image_dict[ImageDictKey.rest_hours])
 ax[5].imshow(image_dict[ImageDictKey.other])
+heading_image = Image.fromarray(image_dict[ImageDictKey.heading])
+from pyocr import get_available_tools, builders
+ocr = get_available_tools()[1]
+def get_lines(heading_image: Image, from_: int = 0, to_: int | None = None):
+    heading_lines = ocr.image_to_string(heading_image, lang="jpn", builder=builders.LineBoxBuilder())
+    return [t.content.replace(' ','') for t in (heading_lines[from_:to_] if to_ is not None else heading_lines[from_:])]
+lines_to_dict = {
+    ImageDictKey.heading: -1,
+    ImageDictKey.hours_from: None,
+    ImageDictKey.hours_to: None,
+    ImageDictKey.rest_hours: None,
+    ImageDictKey.other: None
+}
+for key, to_ in lines_to_dict.items():
+    lines = get_lines(Image.fromarray(image_dict[key]), to_=to_)
+    text = '\t'.join(lines)
+    print(f"{key.name}: {text}")
+
 r = np.array(negative_mono_image)[:, :].flatten()
 bins_range = range(0, 257, 8)
 xtics_range = range(0, 257, 32)
