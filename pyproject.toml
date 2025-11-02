@@ -7,6 +7,7 @@ requires-python = ">=3.11"
 readme = "README.md"
 dependencies = [
     "console-menu>=0.8.0",
+    "flask>=3.1.2",
     "img2pdf>=0.5.1,<0.6.0",
     "logbook>=1.8.2",
     "loguru>=0.7.3",

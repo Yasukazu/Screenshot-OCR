@@ -1,3 +1,4 @@
 [image-path]
 dir = "DATA"
+[image-path.taimee]
 filename = 'taimee-test.png'

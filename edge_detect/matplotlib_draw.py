@@ -6,7 +6,7 @@ from pathlib import Path
 from dotenv import dotenv_values
 import tomllib
 from PIL import Image
-
+APP_STR = "taimee"
 FILTER_TOML_PATH_STR = "FILTER_TOML_PATH"
 filter_toml_path = None 
 if not filter_toml_path:
@@ -18,15 +18,14 @@ if not filter_toml_path:
         filter_toml_path = os.environ[FILTER_TOML_PATH_STR]
 if not filter_toml_path:
     raise ValueError("Error: `filter_toml_path` is empty!")
-config_file = Path(filter_toml_path)
-with config_file.open('rb') as f:
+with open(filter_toml_path, 'rb') as f:
     config = tomllib.load(f)
 # parent_dir = Path(__file__).resolve().parent.parent
 image_path_config = config['image-path']
 image_dir = Path(image_path_config['dir'])
 if not image_dir.exists():
     raise ValueError("Error: image_dir not found: %s" % image_dir)
-filename = image_path_config['filename']
+filename = image_path_config[APP_STR]['filename']
 image_path = Path(image_dir) / filename
 if not image_path.exists():
     raise ValueError("Error: image_path not found: %s" % image_path)
@@ -34,9 +33,13 @@ image_fullpath = image_path.resolve()
 image = cv2.imread(image_fullpath) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
 if image is None:
     raise ValueError("Error: Could not load image: %s" % image_fullpath)
-from image_filter import taimee, ImageDictKey
+from image_filter import ImageDictKey
+import image_filter
+app_func = getattr(image_filter, APP_STR)
+if not app_func:
+    raise ValueError(f"Error: Failed to load `app_func` : '{APP_STR}' in 'image_filter'")
 image_dict = {}
-h_lines, filtered_image = taimee(image, binarize=False, cvt_color=cv2.COLOR_BGR2GRAY, image_dict=image_dict)
+h_lines, filtered_image = app_func(image, binarize=False, cvt_color=cv2.COLOR_BGR2GRAY, image_dict=image_dict)
 # mono_image = cv2.cvtColor(filtered_image, cv2.COLOR_BGR2GRAY)
 text_image = cv2.threshold(filtered_image, thresh=161, maxval=255, type=cv2.THRESH_BINARY)[1]
 negative_mono_image = cv2.bitwise_not(filtered_image)
@@ -60,15 +63,14 @@ from os import environ
 from pytesseract import pytesseract, image_to_data, image_to_boxes, Output
 from pyocr import get_available_tools, builders
 ocr = get_available_tools()[1]
-def get_lines(image: np.ndarray, from_: int = 0, to_: int | None = None, conf_min=80):
-    pytesseract.tesseract_cmd = '/usr/bin/tesseract'
+def ocr_lines(image: np.ndarray, from_: int = 0, to_: int | None = None, conf_min=80, tessdata_dir = "~/.local/share/tessdata/best", tesseract_cmd = '/usr/bin/tesseract'):
+    pytesseract.tesseract_cmd = tesseract_cmd
     # with TemporaryDirectory() as tmpdirname: tmp_img_path = '/'.join([tmpdirname, 'test.png']) cv2.imwrite(tmp_img_path, image) text, boxes, tsv = pytesseract.run_and_get_multiple_output(tmp_img_path, extensions=['txt', 'box', 'tsv'])
-    user_home_dir_path = Path('~').expanduser()
-    tessdata_dir = user_home_dir_path / '.local' / 'share' / 'tessdata' / 'best'
-    tessdata_dir_config = r'--tessdata-dir "%s"' % str(tessdata_dir)
-    environ['TESSDATA_PREFIX'] = str(tessdata_dir)
+    tessdata_path = Path(tessdata_dir).expanduser()
+    tessdata_dir_config = r'--tessdata-dir "%s"' % str(tessdata_path)
+    environ['TESSDATA_PREFIX'] = str(tessdata_path)
     data = image_to_data(image, lang="jpn", output_type=Output.DICT, config=tessdata_dir_config)
-    boxes = image_to_boxes(image, lang="jpn", output_type=Output.DICT, config=tessdata_dir_config)
+    # boxes = image_to_boxes(image, lang="jpn", output_type=Output.DICT, config=tessdata_dir_config)
     less_conf_data = [(i,data['text'][i]) for i,c in enumerate(data['conf']) if 0 < c < conf_min]
     lines = ocr.image_to_string(Image.fromarray(image), lang="jpn", builder=builders.LineBoxBuilder())
     return [t.content.replace(' ','') for t in (lines[from_:to_] if to_ is not None else lines[from_:])], less_conf_data if len(less_conf_data) > 0 else None, data if len(less_conf_data) > 0 else None
@@ -80,7 +82,7 @@ lines_to_dict = {
     ImageDictKey.other: None
 }
 for key, to_ in lines_to_dict.items():
-    lines, confs, data= get_lines((image_dict[key]), to_=to_) # Image.fromarray
+    lines, confs, data= ocr_lines((image_dict[key]), to_=to_) # Image.fromarray
     text = '\t'.join(lines)
     print(f"{key.name}: {text}")
     print(confs) if confs else None
