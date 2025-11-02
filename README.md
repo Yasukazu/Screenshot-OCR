@@ -117,11 +117,11 @@ H_PAD=20
 V_PAD=40
 ```
 
-  - `TESSDATA_PREFIX=/usr/share/tesseract-ocr/4.00/tessdata`
-  - `TESSDATA_DIR=/usr/share/tesseract-ocr/4.00/tessdata`
-  - `PYTHONPATH=/usr/local/lib/python3.8/dist-packages`
+  - `TESSDATA_PREFIX=~/.local/share/tessdata/best`
   - `LD_LIBRARY_PATH=/usr/local/lib:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/lib64:/lib:/usr/lib`
+
 0f. Install Misaki Font
+
 from cwd as screen root:
 ```
 wget https://littlelimit.net/arc/misaki/misaki_png_2021-05-05a.zip
