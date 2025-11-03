@@ -63,7 +63,7 @@ for r in range(6):
     ax[r].xaxis.tick_top()
 ax[0].imshow(image)
 image_dict = {}
-h_lines, filtered_image = app_func(image, binarize=False, cvt_color=cv2.COLOR_BGR2GRAY, image_dict=image_dict)
+h_lines, filtered_image = app_func(image, single=False, cvt_color=cv2.COLOR_BGR2GRAY, image_dict=image_dict, binarize=False)
 # mono_image = cv2.cvtColor(filtered_image, cv2.COLOR_BGR2GRAY)
 text_image = cv2.threshold(filtered_image, thresh=161, maxval=255, type=cv2.THRESH_BINARY)[1]
 negative_mono_image = cv2.bitwise_not(filtered_image)
@@ -101,12 +101,19 @@ lines_to_dict = {
     ImageDictKey.rest_hours: None,
     ImageDictKey.other: None
 }
-for key, to_ in lines_to_dict.items():
-    lines, confs, data= ocr_lines((image_dict[key]), to_=to_) # Image.fromarray
-    text = '\t'.join(lines)
-    print(f"{key.name}: {text}")
-    print(confs) if confs else None
-    print(data) if data else None
+from io import StringIO
+with StringIO() as f:
+    for key, to_ in lines_to_dict.items():
+        lines, confs, data= ocr_lines((image_dict[key]), to_=to_) # Image.fromarray
+        text = '\t'.join(lines)
+        print(f"{key.name}: {text}")
+        print(f"{key.name}: {text}\n", file=f)
+        print(confs, file=f) if confs else None
+        print(data, file=f) if data else None
+        f.write('\n')
+    f.seek(0)
+    conf_data = f.read()
+print(conf_data)
 r = np.array(negative_mono_image)[:, :].flatten()
 bins_range = range(0, 257, 8)
 xtics_range = range(0, 257, 32)

@@ -49,7 +49,7 @@ class ImageDictKey(Enum):
     salary = "salary"
     other = "other"
 
-def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_OTSU, thresh_value: float=150.0, binarize=True, cvt_color: int=cv2.COLOR_BGR2GRAY, image_dict: dict[ImageDictKey, np.ndarray] | None= None, pre_thresh_valule:float=235.0) -> tuple[float | Sequence[int], np.ndarray]:
+def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_OTSU, thresh_value: float=150.0, single:bool=False, cvt_color: int=cv2.COLOR_BGR2GRAY, image_dict: dict[ImageDictKey, np.ndarray] | None= None, pre_thresh_valule:float=235.0, binarize:bool=True) -> tuple[float | Sequence[int], np.ndarray]:
     org_image = image_fullpath = None
     match(given_image):
         case ndarray():
@@ -67,7 +67,11 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_OTSU, 
     if height <= 0 or width <= 0:
         raise ValueError("Error: Invalid image shape: %s" % org_image.shape)
     mono_image = cv2.cvtColor(org_image, cvt_color)
-    auto_thresh, pre_image = cv2.threshold(mono_image, thresh=pre_thresh_valule, maxval=255, type=cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    if binarize:
+        auto_thresh, pre_image = cv2.threshold(mono_image, thresh=0, maxval=255, type=cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    else:
+        auto_thresh = 0
+        pre_image = mono_image
     b_image = cv2.threshold(mono_image, thresh=pre_thresh_valule, maxval=255, type=cv2.THRESH_BINARY)[1] # binary, high contrast
     '''fig, ax = plt.subplots(1, 6)
     for r in range(6):
@@ -96,6 +100,7 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_OTSU, 
     # heading_ypos = last_ypos + 1
     b_image = b_image[last_ypos + 2:, :] # remove pre-heading area and its closing border
     image = pre_image[last_ypos + 2:, :] # remove pre-heading area and its closing border
+
     h_line_ypos_array = np.array(h_line_ypos_list[h_cur + 1:]) - (last_ypos + 1)
     last_ypos = h_line_ypos_array[0]
     ypos_list: list[int] =[last_ypos]
@@ -144,7 +149,10 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_OTSU, 
         b_image[ypos, :] = 255
     for ypos in ypos_list:
         b_image[ypos, :] = 255
-
+    # Mask the left-top circle as a white rectangle onto image
+    cv2.rectangle(image, (0, 0), (cut_x, cut_height), (255, 255, 255), -1)
+    if single:
+        return auto_thresh, image
     ## get area of hours_from / hours_to
     xpos = -1
     for xpos in reversed(range(width // 2)):
@@ -172,12 +180,8 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_OTSU, 
         image_dict[ImageDictKey.hours_to] = image[ypos_list[0]:ypos_list[1], xpos2:]
         image_dict[ImageDictKey.rest_hours] = image[ypos_list[1]:ypos_list[-1], :]
         image_dict[ImageDictKey.other] = image[ypos_list[-1]:, :]
-    # draw a white rectangle
-    cv2.rectangle(image, (0, 0), (cut_x, cut_height), (255, 255, 255), -1)
-    if not binarize:
-        return ypos_list, image
-    else:
-        return cv2.threshold(image, thresh=thresh_value, maxval=255, type=thresh_type) 
+
+    return ypos_list, image
 # Result
 '''102
 103
