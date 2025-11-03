@@ -49,7 +49,7 @@ class ImageDictKey(Enum):
     salary = "salary"
     other = "other"
 
-def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_OTSU, thresh_value: float=150.0, single:bool=False, cvt_color: int=cv2.COLOR_BGR2GRAY, image_dict: dict[ImageDictKey, np.ndarray] | None= None, pre_thresh_valule:float=235.0, binarize:bool=True) -> tuple[float | Sequence[int], np.ndarray]:
+def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_BINARY + cv2.THRESH_OTSU, thresh_value: float=150.0, single:bool=False, cvt_color: int=cv2.COLOR_BGR2GRAY, image_dict: dict[ImageDictKey, np.ndarray] | None= None, b_thresh_valule:float=235.0, binarize:bool=True) -> tuple[float | Sequence[int], np.ndarray]:
     org_image = image_fullpath = None
     match(given_image):
         case ndarray():
@@ -68,11 +68,11 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_OTSU, 
         raise ValueError("Error: Invalid image shape: %s" % org_image.shape)
     mono_image = cv2.cvtColor(org_image, cvt_color)
     if binarize:
-        auto_thresh, pre_image = cv2.threshold(mono_image, thresh=0, maxval=255, type=cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        auto_thresh, pre_image = cv2.threshold(mono_image, thresh=thresh_value, maxval=255, type=thresh_type)
     else:
         auto_thresh = 0
         pre_image = mono_image
-    b_image = cv2.threshold(mono_image, thresh=pre_thresh_valule, maxval=255, type=cv2.THRESH_BINARY)[1] # binary, high contrast
+    b_image = cv2.threshold(mono_image, thresh=b_thresh_valule, maxval=255, type=cv2.THRESH_BINARY)[1] # binary, high contrast
     '''fig, ax = plt.subplots(1, 6)
     for r in range(6):
         ax[r].invert_yaxis()
@@ -149,9 +149,9 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_OTSU, 
         b_image[ypos, :] = 255
     for ypos in ypos_list:
         b_image[ypos, :] = 255
-    # Mask the left-top circle as a white rectangle onto image
-    cv2.rectangle(image, (0, 0), (cut_x, cut_height), (255, 255, 255), -1)
     if single:
+        # Mask the left-top circle as a white rectangle onto image
+        cv2.rectangle(image, (0, 0), (cut_x, cut_height), (255, 255, 255), -1)
         return auto_thresh, image
     ## get area of hours_from / hours_to
     xpos = -1
