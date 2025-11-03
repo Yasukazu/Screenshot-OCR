@@ -144,6 +144,16 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_BINARY
     if x_cd == -1 or not blank_area_found:
         raise ValueError("No blank area found at the right side of the heading shape!")
     cut_x = x_cd + x
+    heading_area = h_image[:, cut_x + 1:]
+    ## find half-or-longer-width continuous line(black/0)
+    y = -1
+    for y in range(heading_area.shape[0]):
+        run_values, run_starts, run_lengths = find_runs(heading_area[y])
+        if len(run_values) == 3 and run_values[1] == 0 and run_lengths[1] >= heading_area.shape[1] // 2:
+            break
+    if y == -1:
+        raise ValueError("No half-or-longer-width continuous line(black/0) found in the heading area!")
+    heading_area = heading_area[ :y - 1, : ]
     ## erase unwanted h_lines
     for ypos in erase_ypos_list:
         b_image[ypos, :] = 255
@@ -152,6 +162,7 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_BINARY
     if single:
         # Mask the left-top circle as a white rectangle onto image
         cv2.rectangle(image, (0, 0), (cut_x, cut_height), (255, 255, 255), -1)
+        cv2.rectangle(image, (0, y - 1), (image.shape[1], image.shape[0]), (255, 255, 255), -1)
         return auto_thresh, image
     ## get area of hours_from / hours_to
     xpos = -1
@@ -174,7 +185,7 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_BINARY
         raise ValueError("No blank area found at the right side of the hours area center!")
     # add the heading area to the dict
     if image_dict is not None:
-        image_dict[ImageDictKey.heading] = h_image[:, cut_x + 1:]
+        image_dict[ImageDictKey.heading] = heading_area
         image_dict[ImageDictKey.hours] = image[ypos_list[0]:ypos_list[1], :]
         image_dict[ImageDictKey.hours_from] = image[ypos_list[0]:ypos_list[1], :xpos]
         image_dict[ImageDictKey.hours_to] = image[ypos_list[0]:ypos_list[1], xpos2:]
@@ -201,3 +212,32 @@ x,x_cd=(28,168)
 
 thresh_value=161
 '''
+
+def find_runs(x):
+    """Find runs of consecutive items in an array.
+    Return: run_values, run_starts, run_lengths"""
+
+    # ensure array
+    x = np.asanyarray(x)
+    if x.ndim != 1:
+        raise ValueError('only 1D array supported')
+    n = x.shape[0]
+
+    # handle empty array
+    if n == 0:
+        return np.array([]), np.array([]), np.array([])
+
+    else:
+        # find run starts
+        loc_run_start = np.empty(n, dtype=bool)
+        loc_run_start[0] = True
+        np.not_equal(x[:-1], x[1:], out=loc_run_start[1:])
+        run_starts = np.nonzero(loc_run_start)[0]
+
+        # find run values
+        run_values = x[loc_run_start]
+
+        # find run lengths
+        run_lengths = np.diff(np.append(run_starts, n))
+
+        return run_values, run_starts, run_lengths
