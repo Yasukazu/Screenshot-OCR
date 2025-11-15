@@ -245,18 +245,22 @@ def find_border(image: np.ndarray, border_color: BorderColor=BorderColor.BLACK, 
 		pass
 
 	edge_len = int(image.shape[1] * edge_ratio)
+	border_len = image.shape[1] - edge_len * 2
 	def get_border_color(y: int) -> BorderColor:
 		unique = np.unique(image[y, :edge_len]) # edge_len:-edge_len])
 		if unique.size not in (1, 3):
 			raise NotBorder()
 		color = unique[0] if unique.size == 1 else unique[1]
 		return BorderColor.BLACK if color == 0 else BorderColor.WHITE
-
+	from itertools import groupby
 	def get_border_or_bg(y: int) -> bool:# | None:
-		unique = np.unique(image[y, edge_len:-edge_len]) # edge_len:-edge_len])
-		if unique.size > 1:
-			raise NotBorder()
-		return True if unique[0] == border_color.value else False 
+		# u_grp = [border_color.value in list(g) 
+		for n, (k, g) in enumerate(groupby(image[y, :])):
+			if n > 3:
+				raise NotBorder()
+			if k == border_color.value and len(list(g)) >= border_len:
+				return True
+		return False
 	y = -1
 	border_found = False
 	for y in range(image.shape[0]):
