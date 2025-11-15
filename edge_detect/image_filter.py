@@ -80,38 +80,14 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_BINARY
 		pre_image = mono_image
 	b_image = cv2.threshold(mono_image, thresh=b_thresh_valule, maxval=255, type=cv2.THRESH_BINARY)[1] # binary, high contrast
 	## cut preceding bump area
-	bump_ypos, bump_ypos_len = find_border(b_image)
-	b_image_without_bump = b_image[bump_ypos + bump_ypos_len:, :]
-	SUBPLOT_SIZE = 2
-	fig, ax = plt.subplots(1, SUBPLOT_SIZE)
-	for r in range(SUBPLOT_SIZE):
-		ax[r].invert_yaxis()
-		ax[r].xaxis.tick_top()
-	ax[0].imshow(b_image)
-	ax[1].imshow(b_image_without_bump)
-	plt.show()
-	breakpoint()
-	## cut leading area: until the first horizontal line
-	# check b_image does not starts with black horizontal line
-	if b_image[0, :].all() == 0: # 0 is black
-		raise ValueError("Image starts with black horizontal line!")
-	h_line_ypos_list: list[int] = [ypos for ypos in range(height) if (b_image[ypos, :].all() == 0)]
-	if len(h_line_ypos_list) < 2:
-		raise ValueError("Not enough black horizontal line found!")
-	# cut heading area
-	last_ypos = h_line_ypos_list[0]
-	h_cur = -1
-	for h_cur, ypos in enumerate(h_line_ypos_list[1:]):
-		if ypos > last_ypos + 2:
-			break
-		else:
-			last_ypos = ypos
-	assert h_cur >= 0
-	# heading_ypos = last_ypos + 1
-	b_image = b_image[last_ypos + 2:, :] # remove pre-heading area and its closing border
-	image = pre_image[last_ypos + 2:, :] # remove pre-heading area and its closing border
+	try:
+		bump_ypos, bump_ypos_len = find_border(b_image)
+		b_image = b_image[bump_ypos + bump_ypos_len:, :] # remove pre-heading area and its closing border
+		image = pre_image[bump_ypos + bump_ypos_len:, :] # remove pre-heading area and its closing border
 
-	h_line_ypos_array = np.array(h_line_ypos_list[h_cur + 1:]) - (last_ypos + 1)
+	except NoBorderError:
+		raise ValueError("No bump border found!")
+	"""h_line_ypos_array = np.array(h_line_ypos_list[h_cur + 1:]) - (last_ypos + 1)
 	last_ypos = h_line_ypos_array[0]
 	ypos_list: list[int] =[last_ypos]
 	ypos = h_cur = -1
@@ -128,9 +104,12 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_BINARY
 	# mask image of a left-topcv2.threshold(image, thresh=thresh_value, maxval=255, type=thresh_type) circle as blank
 	## find the top block
 	cut_height = h_line_ypos_array[0] # h_cur + 1] - last_ypos
-	assert cut_height > 0
-
-	h_image = b_image[:cut_height - 1, :]
+	assert cut_height > 0 """
+	try:
+		head_border, head_border_len = find_border(b_image)
+	except NoBorderError:
+		raise ValueError("No heading border found!")
+	h_image = b_image[:head_border, :]
 	### scan left-top area for a (non-white) shape
 	x = -1
 	non_unique = False
@@ -171,7 +150,7 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_BINARY
 		b_image[ypos, :] = 255
 	if single:
 		# Mask the left-top circle as a white rectangle onto image
-		cv2.rectangle(image, (0, 0), (cut_x, cut_height), (255, 255, 255), -1)
+		cv2.rectangle(image, (0, 0), (cut_x, head_border), (255, 255, 255), -1)
 		cv2.rectangle(image, (0, y - 1), (image.shape[1], image.shape[0]), (255, 255, 255), -1)
 		return auto_thresh, image
 	## get area of hours_from / hours_to
@@ -210,7 +189,7 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_BINARY
 106
 107
 108
-109
+10[i for i for k, g in groupby()]9
 334
 335
 603
@@ -230,7 +209,7 @@ def find_runs(x):
 	# ensure array
 	x = np.asanyarray(x)
 	if x.ndim != 1:
-		raise ValueError('only 1D array supported')
+		raise ValueError('onl[i for i for k, g in groupby()]y 1D array supported')
 	n = x.shape[0]
 
 	# handle empty array
@@ -253,46 +232,59 @@ def find_runs(x):
 		return run_values, run_starts, run_lengths
 
 class BorderColor(Enum):
-	WHITE = 1
-	BLACK = -1
+	WHITE = 255
+	BLACK = 0
 	#@classmethod def reversed(cls, color: BorderColor): return cls.BLACK if color == cls.WHITE else cls.WHITE
 
-class NotBorderError(Exception):
+class NoBorderError(Exception):
 	pass
 
+def find_border(image: np.ndarray, border_color: BorderColor=BorderColor.BLACK, edge_ratio: float=0.10) -> tuple[int, int]:
 
-def find_border(image: np.ndarray, border_color: BorderColor=BorderColor.BLACK, edge_len: int =5) -> tuple[int, int]: # | None:
+	class NotBorder(Exception):
+		pass
+
+	edge_len = int(image.shape[1] * edge_ratio)
 	def get_border_color(y: int) -> BorderColor:
-		unique = np.unique(image[y, edge_len:-edge_len])
-		if unique.size != 1:
-			raise NotBorderError()
-		color = unique[0]
+		unique = np.unique(image[y, :edge_len]) # edge_len:-edge_len])
+		if unique.size not in (1, 3):
+			raise NotBorder()
+		color = unique[0] if unique.size == 1 else unique[1]
 		return BorderColor.BLACK if color == 0 else BorderColor.WHITE
+
+	def get_border_or_bg(y: int) -> bool:# | None:
+		unique = np.unique(image[y, edge_len:-edge_len]) # edge_len:-edge_len])
+		if unique.size > 1:
+			raise NotBorder()
+		return True if unique[0] == border_color.value else False 
 	y = -1
 	border_found = False
 	for y in range(image.shape[0]):
 		try:
-			color = get_border_color(y)
-		except NotBorderError:
+			is_border = get_border_or_bg(y)
+		except NotBorder:
 			continue
-		if color == border_color:
-			border_found = True
+		if is_border: #color == border_color:
+			border_found = is_border
 			break
 	if not border_found:
-		raise NotBorderError # return None
-	b_color_list: list[BorderColor] = [border_color]
+		raise NoBorderError()
 	if y == image.shape[0] - 1:
 		return y, 1
-	for dy in range(y, image.shape[0]):
+	b_list: list[bool] = [border_found]
+	# b_color_list: list[BorderColor] = [border_color]
+	for dy in range(y + 1, image.shape[0]):
 		try:
-			color = get_border_color(dy)
-			b_color_list.append(color)
-		except NotBorderError:
+			is_border = get_border_or_bg(dy)
+			b_list.append(is_border)
+		except NotBorder:
 			break
-	last_white = 0
+	
+	last_white = list(reversed(b_list)).index(border_found)
+	'''last_white = 0
 	for i in reversed(range(len(b_color_list))):
 		if b_color_list[i].value == -(border_color.value):
 			last_white += 1
 		else:
-			break
-	return y, len(b_color_list) - last_white
+			break'''
+	return y, len(b_list) - last_white
