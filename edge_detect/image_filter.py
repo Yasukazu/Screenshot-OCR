@@ -42,7 +42,7 @@ class ImageFilterResult:
 	thresh_value: float = 0.0
 
 class KeyUnit(Enum):
-	STR = 0
+	TEXT = 0
 	HOUR = 1
 	TIME = 2
 	MONEY = 3
@@ -51,15 +51,17 @@ class KeyUnit(Enum):
 class ImageFilterParam(Enum):
 	heading_left_pad = 1
 	heading_height = 2
+	shift_from = 3
+	shift_until = 4
 
 class ImageDictKey(Enum):
-	heading = (KeyUnit.STR, 1)#heading"
+	heading = (KeyUnit.TEXT, 1)#heading"
 	hours = (KeyUnit.HOUR, 1)#"hours"
 	rest_hours = (KeyUnit.HOUR, 2)#"rest_hours"
-	hour_from = (KeyUnit.TIME, 1)#"hours_from"
-	hour_to = (KeyUnit.TIME, 2)#"hours_to"
+	shift_start = (KeyUnit.TIME, 1)#"hours_from"
+	shift_end = (KeyUnit.TIME, 2)#"hours_to"
 	salary = (KeyUnit.MONEY, 1)#"salary"
-	other = (KeyUnit.STR, 2)#"other"
+	other = (KeyUnit.TEXT, 2)#"other"
 
 
 def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_BINARY + cv2.THRESH_OTSU, thresh_value: float=150.0, single:bool=False, cvt_color: int=cv2.COLOR_BGR2GRAY, image_dict: dict[ImageDictKey, np.ndarray] | None= None, image_filter_params: dict[ImageFilterParam, int] = {}, b_thresh_valule:float=235.0, binarize:bool=True) -> tuple[float | Sequence[int], np.ndarray]:
@@ -101,9 +103,17 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_BINARY
 		raise ValueError("No heading border found!")
 	pre_h_image = b_image[:head_border, :]
 	h_image = trim_heading(pre_h_image, image_filter_params)
-	fig, plots = plt.subplots(1, 2)
-	plots[0].imshow(pre_h_image)
-	plots[1].imshow(h_image)
+	cur_image = b_image[head_border + head_border_len + 1:, :]
+	try:
+		shift_border, shift_border_len = find_border(cur_image)
+	except NoBorderError:
+		raise ValueError("No shift border found!")
+	pre_s_image = cur_image[:shift_border, :]
+	shift_images = get_split_shifts(pre_s_image, image_filter_params)
+	fig, plots = plt.subplots(1, 3)
+	plots[0].imshow(cur_image)
+	plots[1].imshow(shift_images[0])
+	plots[2].imshow(shift_images[1])
 	plt.show()
 	breakpoint()
 	
@@ -154,7 +164,7 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_BINARY
 	xpos = -1
 	for xpos in reversed(range(width // 2)):
 		v_line = b_image[ypos_list[0]:ypos_list[1]-1, xpos]
-		if np.count_nonzero(v_line==0) == 0: #len(np.unique(v_line)) == 1 and bool((v_line == 255).all()):
+		if np.count_nonzero(v_lishift_start_widthne==0) == 0: #len(np.unique(v_line)) == 1 and bool((v_line == 255).all()):
 			break
 	if xpos == -1:
 		raise ValueError("No blank area found at the left side of the hours area center!")
@@ -173,8 +183,8 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_BINARY
 	if image_dict is not None:
 		image_dict[ImageDictKey.heading] = heading_area
 		image_dict[ImageDictKey.hours] = image[ypos_list[0]:ypos_list[1], :]
-		image_dict[ImageDictKey.hour_from] = image[ypos_list[0]:ypos_list[1], :xpos]
-		image_dict[ImageDictKey.hour_to] = image[ypos_list[0]:ypos_list[1], xpos2:]
+		image_dict[ImageDictKey.shift_start] = image[ypos_list[0]:ypos_list[1], :xpos]
+		image_dict[ImageDictKey.shift_end] = image[ypos_list[0]:ypos_list[1], xpos2:]
 		image_dict[ImageDictKey.rest_hours] = image[ypos_list[1]:ypos_list[-1], :]
 		image_dict[ImageDictKey.other] = image[ypos_list[-1]:, :]
 
@@ -338,23 +348,49 @@ def trim_heading(h_image: np.ndarray, params: dict[ImageFilterParam, int] ={}, m
 		if x < min_width:
 			raise ValueError("Not enough valid width(%d) for the heading!" % x)
 		left_pad = params[ImageFilterParam.heading_left_pad] = x
-	h_image = h_image[:, left_pad:]
+	# h_image = h_image[:, left_pad:]
 	try:
 		heading_height = params[ImageFilterParam.heading_height]
 	except KeyError:
 		## skip bottom white padding
 		dy = -1
 		for dy in reversed(range(height)):
-			if np.any(h_image[dy, :] != 255):
+			if np.any(h_image[dy, left_pad:] != 255):
 				break
 		assert dy >= 0
 		## skip bottom shape
 		y = -1
 		for y in range(dy, 0, -1):
-			if np.all(h_image[y, :] == 255):
+			if np.all(h_image[y, left_pad:] == 255):
 				break
 		if y < min_height:
 			raise ValueError("Not enough valid height(%d) for the heading!" % y)
-		heading_height = y + 1
+		heading_height = y # + 1
 		params[ImageFilterParam.heading_height] = heading_height
-	return h_image[:heading_height, :]
+	return h_image[:heading_height, left_pad:]
+
+def get_split_shifts(image: np.ndarray, params: dict[ImageFilterParam, int] ={}, set_params=True) -> tuple[np.ndarray,np.ndarray]:
+	'''h_image: binarized i.e. 0 or 255
+	background is 255
+	'''
+	center = image.shape[1] // 2
+	try:
+		shift_start_width = params[ImageFilterParam.shift_from]
+	except KeyError:
+		for x in range(center - 1, 0, -1):
+			v_line = image[:, x]
+			if np.all(v_line == 255):
+				break
+	shift_start_width = x # + 1
+	try:
+		shift_end_width = params[ImageFilterParam.shift_until]
+	except KeyError:
+		for x in range(center + 1, image.shape[1]):
+			v_line = image[:, x]
+			if np.all(v_line == 255):
+				break
+	shift_end_width = x # + 1
+	if set_params:
+		params[ImageFilterParam.shift_from] = shift_start_width
+		params[ImageFilterParam.shift_until] = shift_end_width
+	return image[:, :shift_start_width], image[:, shift_end_width:]
