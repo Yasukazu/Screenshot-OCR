@@ -11,6 +11,7 @@ from enum import Enum
 import sys
 
 import matplotlib.pyplot as plt
+# from pyocr.pyocr import exc
 
 cwd = Path(__file__).resolve().parent
 sys.path.append(str(cwd.parent))
@@ -46,6 +47,11 @@ class KeyUnit(Enum):
 	TIME = 2
 	MONEY = 3
 
+
+class ImageFilterParam(Enum):
+	heading_left_pad = 1
+	heading_height = 2
+
 class ImageDictKey(Enum):
 	heading = (KeyUnit.STR, 1)#heading"
 	hours = (KeyUnit.HOUR, 1)#"hours"
@@ -55,7 +61,8 @@ class ImageDictKey(Enum):
 	salary = (KeyUnit.MONEY, 1)#"salary"
 	other = (KeyUnit.STR, 2)#"other"
 
-def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_BINARY + cv2.THRESH_OTSU, thresh_value: float=150.0, single:bool=False, cvt_color: int=cv2.COLOR_BGR2GRAY, image_dict: dict[ImageDictKey, np.ndarray] | None= None, b_thresh_valule:float=235.0, binarize:bool=True) -> tuple[float | Sequence[int], np.ndarray]:
+
+def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_BINARY + cv2.THRESH_OTSU, thresh_value: float=150.0, single:bool=False, cvt_color: int=cv2.COLOR_BGR2GRAY, image_dict: dict[ImageDictKey, np.ndarray] | None= None, image_filter_params: dict[ImageFilterParam, int] = {}, b_thresh_valule:float=235.0, binarize:bool=True) -> tuple[float | Sequence[int], np.ndarray]:
 	org_image = image_fullpath = None
 	match(given_image):
 		case ndarray():
@@ -87,29 +94,19 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_BINARY
 
 	except NoBorderError:
 		raise ValueError("No bump border found!")
-	"""h_line_ypos_array = np.array(h_line_ypos_list[h_cur + 1:]) - (last_ypos + 1)
-	last_ypos = h_line_ypos_array[0]
-	ypos_list: list[int] =[last_ypos]
-	ypos = h_cur = -1
-	erase_ypos_list = []
-	for h_cur, ypos in enumerate(h_line_ypos_array[1:]):
-		if ypos > ypos_list[-1] + 1:
-			ypos_list.append(ypos)
-		else:
-			last_ypos = ypos
-			erase_ypos_list.append(ypos)
-	if len(ypos_list) == 1: # h_cur < 0 or ypos < 0:
-		raise ValueError("Failed to find the next ypos!")
 
-	# mask image of a left-topcv2.threshold(image, thresh=thresh_value, maxval=255, type=thresh_type) circle as blank
-	## find the top block
-	cut_height = h_line_ypos_array[0] # h_cur + 1] - last_ypos
-	assert cut_height > 0 """
 	try:
 		head_border, head_border_len = find_border(b_image)
 	except NoBorderError:
 		raise ValueError("No heading border found!")
-	h_image = b_image[:head_border, :]
+	pre_h_image = b_image[:head_border, :]
+	h_image = trim_heading(pre_h_image, image_filter_params)
+	fig, plots = plt.subplots(1, 2)
+	plots[0].imshow(pre_h_image)
+	plots[1].imshow(h_image)
+	plt.show()
+	breakpoint()
+	
 	### scan left-top area for a (non-white) shape
 	x = -1
 	non_unique = False
@@ -225,6 +222,21 @@ def find_runs(x):
 
 		# find run values
 		run_values = x[loc_run_start]
+	if left_pad is not None and heading_height is not None:
+		return h_image[:heading_height, left_pad:]
+	## skip bottom white padding
+	dy = -1
+	for dy in reversed(range(height)):
+		if np.any(h_image[dy, :] != 255):
+			break
+	assert dy >= 0
+	## skip bottom shape
+	y = -1
+	for y in range(height - dy, 0, -1):
+		if np.all(h_image[y, :] == 255):
+			break
+	if y < min_height:
+		raise ValueError("Not enough valid height(%d) for the heading!" % y)
 
 		# find run lengths
 		run_lengths = np.diff(np.append(run_starts, n))
@@ -292,3 +304,57 @@ def find_border(image: np.ndarray, border_color: BorderColor=BorderColor.BLACK, 
 		else:
 			break'''
 	return y, len(b_list) - last_white
+
+
+def trim_heading(h_image: np.ndarray, params: dict[ImageFilterParam, int] ={}, min_width: int = 8, min_height: int = 8) -> np.ndarray:
+	'''h_image: binarized i.e. 0 or 255
+	background is 255
+	'''
+	# if not np.any(h_image[:, -1] == 0) or not np.any(h_image[:, 0] == 0):
+	left_pad = params.get(ImageFilterParam.heading_left_pad, None)
+	heading_height = params.get(ImageFilterParam.heading_height, None)
+	if left_pad is not None and heading_height is not None:
+		return h_image[:heading_height, left_pad:]
+	height, width = h_image.shape[:2]
+	if width == 0 or height == 0:
+		raise ValueError("h_image width or height is 0!")
+	try:
+		left_pad = params[ImageFilterParam.heading_left_pad]
+	except KeyError:
+		#1 skip left white padding
+		px = -1
+		for px in range(width):
+			v_line = h_image[:, px]
+			if np.any(v_line == 0):
+				break
+		if px == width:
+			raise ValueError("Not enough valid width(%d) for the heading!" % width)
+		#2 pass the shape 
+		x = -1
+		for x in range(px + 1, width):
+			v_line = h_image[:, x]
+			if np.all(v_line == 255):
+				break
+		if x < min_width:
+			raise ValueError("Not enough valid width(%d) for the heading!" % x)
+		left_pad = params[ImageFilterParam.heading_left_pad] = x
+	h_image = h_image[:, left_pad:]
+	try:
+		heading_height = params[ImageFilterParam.heading_height]
+	except KeyError:
+		## skip bottom white padding
+		dy = -1
+		for dy in reversed(range(height)):
+			if np.any(h_image[dy, :] != 255):
+				break
+		assert dy >= 0
+		## skip bottom shape
+		y = -1
+		for y in range(dy, 0, -1):
+			if np.all(h_image[y, :] == 255):
+				break
+		if y < min_height:
+			raise ValueError("Not enough valid height(%d) for the heading!" % y)
+		heading_height = y + 1
+		params[ImageFilterParam.heading_height] = heading_height
+	return h_image[:heading_height, :]
