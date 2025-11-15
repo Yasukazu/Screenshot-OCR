@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from enum import Enum
 import sys
 
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 cwd = Path(__file__).resolve().parent
 sys.path.append(str(cwd.parent))
@@ -71,7 +71,7 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_BINARY
 	# assert isinstance(image, np.ndarray) #MatLike)
 	height, width = org_image.shape[:2]
 	if height <= 0 or width <= 0:
-		raise ValueError("Error: Invalid image shape: %s" % org_image.shape)
+		raise ValueError("Error: 0 height or width image shape: %s" % org_image.shape[:2])
 	mono_image = cv2.cvtColor(org_image, cvt_color)
 	if binarize:
 		auto_thresh, pre_image = cv2.threshold(mono_image, thresh=thresh_value, maxval=255, type=thresh_type)
@@ -79,31 +79,25 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_BINARY
 		auto_thresh = 0
 		pre_image = mono_image
 	b_image = cv2.threshold(mono_image, thresh=b_thresh_valule, maxval=255, type=cv2.THRESH_BINARY)[1] # binary, high contrast
-	'''fig, ax = plt.subplots(1, 6)
-	for r in range(6):
+	## cut preceding bump area
+	bump_ypos, bump_ypos_len = find_border(b_image)
+	b_image_without_bump = b_image[bump_ypos + bump_ypos_len:, :]
+	SUBPLOT_SIZE = 2
+	fig, ax = plt.subplots(1, SUBPLOT_SIZE)
+	for r in range(SUBPLOT_SIZE):
 		ax[r].invert_yaxis()
 		ax[r].xaxis.tick_top()
-	ax[0].imshow(org_image)
-	ax[1].imshow(mono_image)
-	ax[2].imshow(pre_image)
-	ax[3].imshow(b_image)'''
+	ax[0].imshow(b_image)
+	ax[1].imshow(b_image_without_bump)
+	plt.show()
+	breakpoint()
 	## cut leading area: until the first horizontal line
-	assert height > 0	
-	for ypos in range(height):
-		h_line = b_image[ypos, :]
-		if (h_line == 0).all():
-			break
-	if ypos == height:
-		raise ValueError("No horizontal line found!")
-	b_image = b_image[ypos:, :]
-	height -= ypos
-	h_line_ypos_list: list[int] = []
-	for ypos in range(height):
-		h_line = b_image[ypos, :]
-		if (h_line == 0).all(): # len(np.unique(h_line)) == 1 and bool((h_line < 255).any()):
-			h_line_ypos_list.append(ypos)
+	# check b_image does not starts with black horizontal line
+	if b_image[0, :].all() == 0: # 0 is black
+		raise ValueError("Image starts with black horizontal line!")
+	h_line_ypos_list: list[int] = [ypos for ypos in range(height) if (b_image[ypos, :].all() == 0)]
 	if len(h_line_ypos_list) < 2:
-		raise ValueError("Not enough heading line found!")
+		raise ValueError("Not enough black horizontal line found!")
 	# cut heading area
 	last_ypos = h_line_ypos_list[0]
 	h_cur = -1
@@ -257,3 +251,48 @@ def find_runs(x):
 		run_lengths = np.diff(np.append(run_starts, n))
 
 		return run_values, run_starts, run_lengths
+
+class BorderColor(Enum):
+	WHITE = 1
+	BLACK = -1
+	#@classmethod def reversed(cls, color: BorderColor): return cls.BLACK if color == cls.WHITE else cls.WHITE
+
+class NotBorderError(Exception):
+	pass
+
+
+def find_border(image: np.ndarray, border_color: BorderColor=BorderColor.BLACK, edge_len: int =5) -> tuple[int, int]: # | None:
+	def get_border_color(y: int) -> BorderColor:
+		unique = np.unique(image[y, edge_len:-edge_len])
+		if unique.size != 1:
+			raise NotBorderError()
+		color = unique[0]
+		return BorderColor.BLACK if color == 0 else BorderColor.WHITE
+	y = -1
+	border_found = False
+	for y in range(image.shape[0]):
+		try:
+			color = get_border_color(y)
+		except NotBorderError:
+			continue
+		if color == border_color:
+			border_found = True
+			break
+	if not border_found:
+		raise NotBorderError # return None
+	b_color_list: list[BorderColor] = [border_color]
+	if y == image.shape[0] - 1:
+		return y, 1
+	for dy in range(y, image.shape[0]):
+		try:
+			color = get_border_color(dy)
+			b_color_list.append(color)
+		except NotBorderError:
+			break
+	last_white = 0
+	for i in reversed(range(len(b_color_list))):
+		if b_color_list[i].value == -(border_color.value):
+			last_white += 1
+		else:
+			break
+	return y, len(b_color_list) - last_white
