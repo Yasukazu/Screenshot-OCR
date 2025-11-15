@@ -49,17 +49,22 @@ class KeyUnit(Enum):
 
 
 class ImageFilterParam(Enum):
-	heading_left_pad = 1
-	heading_height = 2
-	shift_from = 3
-	shift_until = 4
+	heading_height = 1.1
+	heading_left_pad = 1.2
+	shift_ypos = 2.0
+	shift_height = 2.1
+	shift_from_width = 2.2
+	shift_until_xpos = 2.3
+	rest_hour_ypos = 3.0
+	rest_hour_height = 3.1
+	other_ypos = 4.0
 
 class ImageDictKey(Enum):
 	heading = (KeyUnit.TEXT, 1)#heading"
 	hours = (KeyUnit.HOUR, 1)#"hours"
 	rest_hours = (KeyUnit.HOUR, 2)#"rest_hours"
-	shift_start = (KeyUnit.TIME, 1)#"hours_from"
-	shift_end = (KeyUnit.TIME, 2)#"hours_to"
+	shift_from = (KeyUnit.TIME, 1)#"hours_from"
+	shift_until = (KeyUnit.TIME, 2)#"hours_to"
 	salary = (KeyUnit.MONEY, 1)#"salary"
 	other = (KeyUnit.TEXT, 2)#"other"
 
@@ -110,10 +115,20 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_BINARY
 		raise ValueError("No shift border found!")
 	pre_s_image = cur_image[:shift_border, :]
 	shift_images = get_split_shifts(pre_s_image, image_filter_params)
-	fig, plots = plt.subplots(1, 3)
+	cur_image = cur_image[shift_border + shift_border_len + 1:, :]
+	try:
+		hours_border, hours_border_len = find_border(cur_image)
+	except NoBorderError:
+		raise ValueError("No hours border found!")
+	hours_image = cur_image[:hours_border, :]
+	other_image = cur_image[hours_border + hours_border_len + 1:, :]
+
+	fig, plots = plt.subplots(1, 5)
 	plots[0].imshow(cur_image)
 	plots[1].imshow(shift_images[0])
 	plots[2].imshow(shift_images[1])
+	plots[3].imshow(hours_image)
+	plots[4].imshow(other_image)
 	plt.show()
 	breakpoint()
 	
@@ -183,8 +198,8 @@ def taimee(given_image: ndarray | Path | str, thresh_type: int=cv2.THRESH_BINARY
 	if image_dict is not None:
 		image_dict[ImageDictKey.heading] = heading_area
 		image_dict[ImageDictKey.hours] = image[ypos_list[0]:ypos_list[1], :]
-		image_dict[ImageDictKey.shift_start] = image[ypos_list[0]:ypos_list[1], :xpos]
-		image_dict[ImageDictKey.shift_end] = image[ypos_list[0]:ypos_list[1], xpos2:]
+		image_dict[ImageDictKey.shift_from] = image[ypos_list[0]:ypos_list[1], :xpos]
+		image_dict[ImageDictKey.shift_until] = image[ypos_list[0]:ypos_list[1], xpos2:]
 		image_dict[ImageDictKey.rest_hours] = image[ypos_list[1]:ypos_list[-1], :]
 		image_dict[ImageDictKey.other] = image[ypos_list[-1]:, :]
 
@@ -375,7 +390,7 @@ def get_split_shifts(image: np.ndarray, params: dict[ImageFilterParam, int] ={},
 	'''
 	center = image.shape[1] // 2
 	try:
-		shift_start_width = params[ImageFilterParam.shift_from]
+		shift_start_width = params[ImageFilterParam.shift_from_width]
 	except KeyError:
 		for x in range(center - 1, 0, -1):
 			v_line = image[:, x]
@@ -383,7 +398,7 @@ def get_split_shifts(image: np.ndarray, params: dict[ImageFilterParam, int] ={},
 				break
 	shift_start_width = x # + 1
 	try:
-		shift_end_width = params[ImageFilterParam.shift_until]
+		shift_end_width = params[ImageFilterParam.shift_until_xpos]
 	except KeyError:
 		for x in range(center + 1, image.shape[1]):
 			v_line = image[:, x]
@@ -391,6 +406,6 @@ def get_split_shifts(image: np.ndarray, params: dict[ImageFilterParam, int] ={},
 				break
 	shift_end_width = x # + 1
 	if set_params:
-		params[ImageFilterParam.shift_from] = shift_start_width
-		params[ImageFilterParam.shift_until] = shift_end_width
+		params[ImageFilterParam.shift_from_width] = shift_start_width
+		params[ImageFilterParam.shift_until_xpos] = shift_end_width
 	return image[:, :shift_start_width], image[:, shift_end_width:]

@@ -87,8 +87,8 @@ ax[0].imshow(bin_image)
 # border_image = cv2.bitwise_and(text_border_image, text_image)
 
 ax[1].imshow(image_dict[ImageDictKey.heading])
-ax[2].imshow(image_dict[ImageDictKey.hour_from])
-ax[3].imshow(image_dict[ImageDictKey.hour_to])
+ax[2].imshow(image_dict[ImageDictKey.shift_from])
+ax[3].imshow(image_dict[ImageDictKey.shift_until])
 ax[4].imshow(image_dict[ImageDictKey.rest_hours])
 ax[5].imshow(image_dict[ImageDictKey.other])
 heading_image = Image.fromarray(image_dict[ImageDictKey.heading])
@@ -112,8 +112,8 @@ def ocr_lines(image: np.ndarray, from_: int = 0, to_: int | None = None, conf_mi
     return [t.content.replace(' ','') for t in (lines[from_:to_] if to_ is not None else lines[from_:])], less_conf_data if len(less_conf_data) > 0 else None, data if len(less_conf_data) > 0 else None
 lines_to_dict = {
     ImageDictKey.heading: -1,
-    ImageDictKey.hour_from: None,
-    ImageDictKey.hour_to: None,
+    ImageDictKey.shift_from: None,
+    ImageDictKey.shift_until: None,
     ImageDictKey.rest_hours: None,
     ImageDictKey.other: None
 }
