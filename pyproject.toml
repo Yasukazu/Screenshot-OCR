@@ -7,6 +7,7 @@ requires-python = ">=3.11"
 readme = "README.md"
 dependencies = [
     "console-menu>=0.8.0",
+    "fancy-dataclass>=0.10.1",
     "flask>=3.1.2",
     "img2pdf>=0.5.1,<0.6.0",
     "logbook>=1.8.2",
@@ -21,6 +22,8 @@ dependencies = [
     "pytesseract>=0.3.13",
     "python-dotenv>=1.1.0",
     "returns>=0.23.0",
+    "tomli-w>=1.2.0",
+    "tomlkit>=0.13.3",
 ]
 
 [dependency-groups]

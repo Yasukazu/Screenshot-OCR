@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 from numpy import ndarray
 from pathlib import Path
-from typing import Sequence
+from typing import Sequence, NamedTuple
 from dataclasses import dataclass
 from enum import Enum
 import sys
@@ -53,6 +53,28 @@ class KeyUnit(Enum):
 	TIME = 2
 	MONEY = 3
 
+from fancy_dataclass import TOMLDataclass
+
+class HeadingArea(NamedTuple):
+	height: int
+	left: int
+
+class ShiftSplit(NamedTuple):
+	left_width: int # start-from time
+	right_xpos: int # end-by time
+	
+
+@dataclass
+class ImageFilterAreas(TOMLDataclass):
+	'''tuple's first element is ypos (downward offset from heading top) and second element is height
+	'''
+	heading: tuple[int, HeadingArea] # midashi
+	shift: tuple[int, int, ShiftSplit] # syuugyou jikan
+	break_time: tuple[int, int] # kyuukei jikan
+	paystub: tuple[int] # meisai
+	salary: tuple[int] # kyuuyo
+
+
 
 class ImageFilterParam(Enum):
 	ypos = 0.1
@@ -71,8 +93,8 @@ class ImageFilterParam(Enum):
 	break_time = 3
 	break_time_ypos = 3.1
 	break_time_height = 3.2
-	payslip = 4
-	payslip_ypos = 4.1
+	paystub = 4
+	paystub_ypos = 4.1
 	salary = 5
 	salary_ypos = 5.1
 
@@ -145,7 +167,8 @@ def taimee(
 	except NoBorderError:
 		raise ValueError("No heading border found!")
 	pre_h_image = b_image[:head_border, :]
-	h_image = trim_heading(pre_h_image, image_filter_params)
+	heading_area: HeadingArea = trim_heading(pre_h_image, image_filter_params, return_as_cuts=True)
+	h_image = pre_h_image[:heading_area.height, heading_area.left:]
 	cur_image = b_image[head_border + head_border_len + 1 :, :]
 	try:
 		shift_border, shift_border_len = find_border(cur_image)
@@ -332,7 +355,6 @@ def find_runs(x):
 class BorderColor(Enum):
 	WHITE = 255
 	BLACK = 0
-	# @classmethod def reversed(cls, color: BorderColor): return cls.BLACK if color == cls.WHITE else cls.WHITE
 
 
 class NoBorderError(Exception):
@@ -344,6 +366,8 @@ def find_border(
 	border_color: BorderColor = BorderColor.BLACK,
 	edge_ratio: float = 0.10,
 ) -> tuple[int, int]:
+	"""Find border of the image.
+	Return: border_ypos, border_len"""
 	class NotBorder(Exception):
 		pass
 
@@ -406,9 +430,11 @@ def trim_heading(
 	params: dict[ImageFilterParam, int] = {},
 	min_width: int = 8,
 	min_height: int = 8,
-) -> np.ndarray:
+	return_as_cuts: bool = False,
+) -> np.ndarray | HeadingArea:
 	"""h_image: binarized i.e. 0 or 255
 	background is 255
+	Return: trimmed heading or list of trimmed headings(return_as_cuts=True) as HeadingCuts(bottom_cut_height, left_cut_width)
 	"""
 	# if not np.any(h_image[:, -1] == 0) or not np.any(h_image[:, 0] == 0):
 	left_pad = params.get(ImageFilterParam.heading_left_pad, None)
@@ -457,33 +483,45 @@ def trim_heading(
 			raise ValueError("Not enough valid height(%d) for the heading!" % y)
 		heading_height = y  # + 1
 		params[ImageFilterParam.heading_height] = heading_height
-	return h_image[:heading_height, left_pad:]
+	return HeadingArea(heading_height, left_pad) if return_as_cuts else h_image[:heading_height, left_pad:]
 
 
 def get_split_shifts(
-	image: np.ndarray, params: dict[ImageFilterParam, int] = {}, set_params=True
-) -> tuple[np.ndarray, np.ndarray]:
-	"""h_image: binarized i.e. 0 or 255
-	background is 255
+	image: np.ndarray, params: dict[ImageFilterParam, int] = {}, set_params=True, 
+return_as_cuts: bool = False, center_rate = 0.5
+) -> tuple[np.ndarray, np.ndarray] | ShiftSplit:
+	"""Split image into left and right;black-filled shape's x position is center_rate;
+	Args: h_image: binarized i.e. 0 or 255
+	background is 255(white);
+	Return: tuple[left_width, right_start_xpos] if return_as_cuts else tuple[left_image, right_image]
 	"""
-	center = image.shape[1] // 2
+	if not(0 < center_rate < 1):
+		raise ValueError("center_rate must be between 0 and 1!")
+	width = image.shape[1]
+	center = int(width * center_rate)
+	x = -1
 	try:
-		shift_start_width = params[ImageFilterParam.shift_from_width]
+		x = params[ImageFilterParam.shift_from_width]
 	except KeyError:
 		for x in range(center - 1, 0, -1):
 			v_line = image[:, x]
 			if np.all(v_line == 255):
 				break
+	if x < 0:
+		raise ValueError("Not enough valid width(%d) for the shift!" % x)
 	shift_start_width = x  # + 1
+	x = -1
 	try:
-		shift_end_width = params[ImageFilterParam.shift_until_xpos]
+		x = params[ImageFilterParam.shift_until_xpos]
 	except KeyError:
 		for x in range(center + 1, image.shape[1]):
 			v_line = image[:, x]
 			if np.all(v_line == 255):
 				break
+	if x < 0:
+		raise ValueError("Not enough valid width(%d) for the shift!" % x)
 	shift_end_width = x  # + 1
 	if set_params:
 		params[ImageFilterParam.shift_from_width] = shift_start_width
 		params[ImageFilterParam.shift_until_xpos] = shift_end_width
-	return image[:, :shift_start_width], image[:, shift_end_width:]
+	return ShiftSplit(shift_start_width, shift_end_width) if return_as_cuts else (image[:, :shift_start_width], image[:, shift_end_width:])
