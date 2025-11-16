@@ -393,9 +393,9 @@ def find_border(
 	from itertools import groupby
 
 	def get_border_or_bg(y: int) -> bool:  # | None:
-		# u_grp = [border_color.value in list(g)
+		# Returns True if border is found, False if background is found, raises NotBorder if not found
 		for n, (k, g) in enumerate(groupby(image[y, :])):
-			if n > 3:
+			if n >= 3:
 				raise NotBorder()
 			if k == border_color.value and len(list(g)) >= border_len:
 				return True
