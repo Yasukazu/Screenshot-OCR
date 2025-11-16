@@ -53,26 +53,35 @@ class KeyUnit(Enum):
 	TIME = 2
 	MONEY = 3
 
-from fancy_dataclass import TOMLDataclass
+
+#@dataclass
+class ImageFilterItemArea(NamedTuple):
+	ypos: int
+	height: int
 
 class HeadingArea(NamedTuple):
+	ypos: int
 	height: int
-	left: int
+	xpos: int
 
 class ShiftSplit(NamedTuple):
+	ypos: int
+	height: int
 	left_width: int # start-from time
-	right_xpos: int # end-by time
+	right_pos: int # end-by time
 	
 
+from fancy_dataclass import TOMLDataclass
+
 @dataclass
-class ImageFilterAreas(TOMLDataclass):
+class ImageFilterAreas(ImageFilterItemArea, TOMLDataclass):
 	'''tuple's first element is ypos (downward offset from heading top) and second element is height
 	'''
-	heading: tuple[int, HeadingArea] # midashi
-	shift: tuple[int, int, ShiftSplit] # syuugyou jikan
-	break_time: tuple[int, int] # kyuukei jikan
-	paystub: tuple[int] # meisai
-	salary: tuple[int] # kyuuyo
+	heading: HeadingArea # midashi
+	shift: ShiftSplit # syuugyou jikan
+	break_time: ImageFilterItemArea # kyuukei jikan
+	paystub: ImageFilterItemArea # meisai
+	salary: ImageFilterItemArea # kyuuyo
 
 
 
@@ -168,7 +177,7 @@ def taimee(
 		raise ValueError("No heading border found!")
 	pre_h_image = b_image[:head_border, :]
 	heading_area: HeadingArea = trim_heading(pre_h_image, image_filter_params, return_as_cuts=True)
-	h_image = pre_h_image[:heading_area.height, heading_area.left:]
+	h_image = pre_h_image[:heading_area.height, heading_area.xpos:]
 	cur_image = b_image[head_border + head_border_len + 1 :, :]
 	try:
 		shift_border, shift_border_len = find_border(cur_image)
@@ -470,7 +479,7 @@ def trim_heading(
 	except KeyError:
 		## skip bottom white padding
 		dy = -1
-		for dy in reversed(range(height)):
+		for dy ishift_end_widthn reversed(range(height)):
 			if np.any(h_image[dy, left_pad:] != 255):
 				break
 		assert dy >= 0
@@ -483,7 +492,7 @@ def trim_heading(
 			raise ValueError("Not enough valid height(%d) for the heading!" % y)
 		heading_height = y  # + 1
 		params[ImageFilterParam.heading_height] = heading_height
-	return HeadingArea(heading_height, left_pad) if return_as_cuts else h_image[:heading_height, left_pad:]
+	return HeadingArea(ypos=0, height=heading_height, xpos=left_pad) if return_as_cuts else h_image[:heading_height, left_pad:]
 
 
 def get_split_shifts(
@@ -509,7 +518,7 @@ return_as_cuts: bool = False, center_rate = 0.5
 				break
 	if x < 0:
 		raise ValueError("Not enough valid width(%d) for the shift!" % x)
-	shift_start_width = x  # + 1
+	left_area_width = x  # + 1
 	x = -1
 	try:
 		x = params[ImageFilterParam.shift_until_xpos]
@@ -520,8 +529,8 @@ return_as_cuts: bool = False, center_rate = 0.5
 				break
 	if x < 0:
 		raise ValueError("Not enough valid width(%d) for the shift!" % x)
-	shift_end_width = x  # + 1
+	right_area_xpos = x  # + 1
 	if set_params:
-		params[ImageFilterParam.shift_from_width] = shift_start_width
-		params[ImageFilterParam.shift_until_xpos] = shift_end_width
-	return ShiftSplit(shift_start_width, shift_end_width) if return_as_cuts else (image[:, :shift_start_width], image[:, shift_end_width:])
+		params[ImageFilterParam.shift_from_width] = left_area_width
+		params[ImageFilterParam.shift_until_xpos] = right_area_xpos
+	return ShiftSplit(ypos=0, height=image.shape[0], left_width=left_area_width, right_pos=right_area_xpos) if return_as_cuts else (image[:, :left_area_width], image[:, right_area_xpos:])
