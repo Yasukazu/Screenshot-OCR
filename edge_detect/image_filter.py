@@ -54,27 +54,48 @@ class KeyUnit(Enum):
 	MONEY = 3
 
 
-#@dataclass
-class ImageFilterItemArea(NamedTuple):
-	ypos: int
-	height: int
+@dataclass
+class ImageFilterItemArea:#(NamedTuple):
+	ypos: int = 0
+	height: int = -1
+	xpos: int = 0
+	width: int = -1
 
-class HeadingArea(NamedTuple):
-	ypos: int
+	def as_slice_param(self) -> tuple[int, int, int, int]:
+		return self.ypos, (self.ypos + self.height) if self.height > 0 else -1, self.xpos, self.xpos + self.width if self.width > 0 else -1
+	def crop_image(self, image: np.ndarray) -> np.ndarray:
+		param = self.as_slice_param()
+		return image[param[0]:param[1], param[2]:param[3]]
+
+# from typing import override
+
+@dataclass
+class HeadingArea(ImageFilterItemArea):#(NamedTuple):
+	pass
+	'''ypos: int
 	height: int
 	xpos: int
+	def as_slice_param(self) -> tuple[int, int, int, int]:
+		return self.ypos, self.ypos + self.height, self.xpos, -1
+	def crop_image(self, image: np.ndarray) -> np.ndarray:
+		return image[self.ypos : self.ypos + self.height, self.xpos : -1]'''
 
-class ShiftSplit(NamedTuple):
-	ypos: int
-	height: int
-	left_width: int # start-from time
-	right_pos: int # end-by time
+@dataclass
+class ShiftSplit(ImageFilterItemArea):#(NamedTuple):
+	'''ypos: int
+	height: int'''
+	@property
+	def left_width(self)-> int: # start-from time
+		return self.xpos
+	@property
+	def right_pos(self)-> int: # end-by time
+		return self.width
 	
 
 from fancy_dataclass import TOMLDataclass
 
 @dataclass
-class ImageFilterAreas(ImageFilterItemArea, TOMLDataclass):
+class ImageFilterAreas(TOMLDataclass):
 	'''tuple's first element is ypos (downward offset from heading top) and second element is height
 	'''
 	heading: HeadingArea # midashi
@@ -128,6 +149,7 @@ def taimee(
 	image_filter_params: dict[ImageFilterParam, int] = {},
 	b_thresh_valule: float = 235.0,
 	binarize: bool = True,
+	image_filter_areas: ImageFilterAreas | None = None,
 ) -> tuple[float | Sequence[int], np.ndarray]:
 	org_image = image_fullpath = None
 	match given_image:
@@ -167,7 +189,6 @@ def taimee(
 		image = pre_image[
 			bump_ypos + bump_ypos_len :, :
 		]  # remove pre-heading area and its closing border
-
 	except NoBorderError:
 		raise ValueError("No bump border found!")
 	image_filter_params[ImageFilterParam.heading_ypos] = bump_ypos
@@ -176,8 +197,9 @@ def taimee(
 	except NoBorderError:
 		raise ValueError("No heading border found!")
 	pre_h_image = b_image[:head_border, :]
-	heading_area: HeadingArea = trim_heading(pre_h_image, image_filter_params, return_as_cuts=True)
+	heading_area: HeadingArea = trim_heading(pre_h_image, image_filter_params)#, return_as_cuts=True)
 	h_image = pre_h_image[:heading_area.height, heading_area.xpos:]
+	h_image2 = heading_area.crop_image(pre_h_image)
 	cur_image = b_image[head_border + head_border_len + 1 :, :]
 	try:
 		shift_border, shift_border_len = find_border(cur_image)
@@ -193,7 +215,6 @@ def taimee(
 	image_filter_params[ImageFilterParam.break_time_ypos] = breaktime_border
 	hours_image = cur_image[:breaktime_border, :]
 	other_image = cur_image[breaktime_border + breaktime_border_len + 1 :, :]
-
 	fig, plots = plt.subplots(1, 5)
 	plots[0].imshow(cur_image)
 	plots[1].imshow(shift_images[0])
@@ -202,7 +223,6 @@ def taimee(
 	plots[4].imshow(other_image)
 	plt.show()
 	breakpoint()
-
 	### scan left-top area for a (non-white) shape
 	x = -1
 	non_unique = False
@@ -291,7 +311,6 @@ def taimee(
 		]
 		image_dict[ImageDictKey.rest_hours] = image[ypos_list[1] : ypos_list[-1], :]
 		image_dict[ImageDictKey.payslip] = image[ypos_list[-1] :, :]
-
 	return ypos_list, image
 
 
@@ -439,8 +458,8 @@ def trim_heading(
 	params: dict[ImageFilterParam, int] = {},
 	min_width: int = 8,
 	min_height: int = 8,
-	return_as_cuts: bool = False,
-) -> np.ndarray | HeadingArea:
+	# return_as_cuts: bool = False,
+) -> HeadingArea:
 	"""h_image: binarized i.e. 0 or 255
 	background is 255
 	Return: trimmed heading or list of trimmed headings(return_as_cuts=True) as HeadingCuts(bottom_cut_height, left_cut_width)
@@ -479,7 +498,7 @@ def trim_heading(
 	except KeyError:
 		## skip bottom white padding
 		dy = -1
-		for dy ishift_end_widthn reversed(range(height)):
+		for dy in reversed(range(height)):
 			if np.any(h_image[dy, left_pad:] != 255):
 				break
 		assert dy >= 0
@@ -492,7 +511,7 @@ def trim_heading(
 			raise ValueError("Not enough valid height(%d) for the heading!" % y)
 		heading_height = y  # + 1
 		params[ImageFilterParam.heading_height] = heading_height
-	return HeadingArea(ypos=0, height=heading_height, xpos=left_pad) if return_as_cuts else h_image[:heading_height, left_pad:]
+	return HeadingArea(ypos=0, height=heading_height, xpos=left_pad) # if return_as_cuts else h_image[:heading_height, left_pad:]
 
 
 def get_split_shifts(
