@@ -84,7 +84,8 @@ class HeadingArea(ImageFilterItemArea):#(NamedTuple):
 from io import IOBase
 @dataclass
 class ShiftSplit(ImageFilterItemArea):#(NamedTuple):
-	'''ypos: int
+	'''This area only has left_width and right_pos
+	ypos: int
 	height: int'''
 
 	def to_toml(self, fp: IOBase, **kwargs):
