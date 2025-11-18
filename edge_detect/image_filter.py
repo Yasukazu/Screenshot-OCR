@@ -53,9 +53,11 @@ class KeyUnit(Enum):
 	TIME = 2
 	MONEY = 3
 
+from fancy_dataclass import TOMLDataclass
+
 
 @dataclass
-class ImageFilterItemArea:#(NamedTuple):
+class ImageFilterItemArea(TOMLDataclass):#(NamedTuple):
 	ypos: int = 0
 	height: int = -1
 	xpos: int = 0
@@ -79,11 +81,17 @@ class HeadingArea(ImageFilterItemArea):#(NamedTuple):
 		return self.ypos, self.ypos + self.height, self.xpos, -1
 	def crop_image(self, image: np.ndarray) -> np.ndarray:
 		return image[self.ypos : self.ypos + self.height, self.xpos : -1]'''
-
+from io import IOBase
 @dataclass
 class ShiftSplit(ImageFilterItemArea):#(NamedTuple):
 	'''ypos: int
 	height: int'''
+
+	def to_toml(self, fp: IOBase, **kwargs):
+		fp.write("ypos = %d\n" % self.ypos)
+		fp.write("height = %d\n" % self.height)
+		fp.write("left_width = %d\n" % self.xpos)
+		fp.write("right_pos = %d\n" % self.width)
 	@property
 	def left_width(self)-> int: # start-from time
 		return self.xpos
@@ -92,16 +100,26 @@ class ShiftSplit(ImageFilterItemArea):#(NamedTuple):
 		return self.width
 	
 
-from fancy_dataclass import TOMLDataclass
-
 @dataclass
-class ImageFilterAreas(TOMLDataclass):
+class ImageFilterAreas:
 	'''tuple's first element is ypos (downward offset from heading top) and second element is height
 	'''
+	def to_toml(self, fp: IOBase, **kwargs):
+		fp.write("[HeadingArea]\n")
+		self.heading.to_toml(fp, **kwargs)
+		fp.write("[ShiftSplit]\n")
+		self.shift.to_toml(fp, **kwargs)
+		fp.write("[BreakTime]\n")
+		self.break_time.to_toml(fp, **kwargs)
+		fp.write("[Payslip]\n")
+		self.payslip.to_toml(fp, **kwargs)
+		fp.write("[Salary]\n")
+		self.salary.to_toml(fp, **kwargs)
+
 	heading: HeadingArea # midashi
 	shift: ShiftSplit # syuugyou jikan
 	break_time: ImageFilterItemArea # kyuukei jikan
-	paystub: ImageFilterItemArea # meisai
+	payslip: ImageFilterItemArea # meisai
 	salary: ImageFilterItemArea # kyuuyo
 
 
