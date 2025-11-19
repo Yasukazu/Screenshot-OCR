@@ -110,8 +110,9 @@ class HeadingArea(ImageFilterItemArea):
 @dataclass
 class ShiftArea(ImageFilterItemArea):
 	'''Needs to initialize using named parameters::
-	left_width: as xpos
-	right_pos: as width
+	start_width: as xpos
+	end_xpos: as width
+	while start_xpos is 0 and end_width is -1
 	'''
 
 	def to_toml(self, fp: IOBase, **kwargs):
@@ -159,9 +160,14 @@ class ImageFilterAreas:
 		if not kwargs['name']:
 			raise ValueError("requires 'name' key's value in kwargs")
 		fp.write(f"[{self.__class__.__name__}.{kwargs['name']}]\n")
+		try:
+			as_dict = kwargs['as_dict']
+		except KeyError:
+			as_dict = False
 		for key, area in self.__dict__.items():
 			if isclass(area): # area.to_toml(fp)
-				fp.write(f"{key} = {str(list(area.param))}\n")
+				fp.write(f"{key} = ")
+				fp.write(f"{area.as_dict()}\n") if as_dict else fp.write(f"{list(area.param)}\n")
 
 
 	heading: HeadingArea # midashi
