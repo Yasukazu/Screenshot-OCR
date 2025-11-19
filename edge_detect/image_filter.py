@@ -74,13 +74,12 @@ type Int4 = tuple[int, int, int, int]
 
 @dataclass
 class ImageFilterItemArea(TOMLDataclass):
-	'''param: ItemAreaParam
 	ypos: int = 0
 	height: int = -1
 	xpos: int = 0
-	width: int = -1'''
+	width: int = -1
 
-	param: ItemAreaParam # NamedTuple:read only
+	# param: ItemAreaParam # NamedTuple:read only
 
 	def __post_init__(self):
 		if self.ypos < 0 or self.xpos < 0:
@@ -89,23 +88,12 @@ class ImageFilterItemArea(TOMLDataclass):
 			raise InvalidValueError("height and width must be larger than 0 except -1")
 
 	@property
-	def ypos(self)-> int:
-		return self.param.ypos
+	def param(self)-> Int4:
+		return (self.ypos, self.height, self.xpos, self.width)
 
-	@property
-	def height(self)-> int:
-		return self.param.height
-
-	@property
-	def xpos(self)-> int:
-		return self.param.xpos
-
-	@property
-	def width(self)-> int:
-		return self.param.width
 
 	def as_slice_param(self) -> Sequence[Int4]:
-		return ((self.param.ypos, (self.param.ypos + self.param.height) if self.param.height > 0 else -1, self.param.xpos, (self.param.xpos + self.param.width) if self.param.width > 0 else -1),)
+		return ((self.ypos, (self.ypos + self.height) if self.height > 0 else -1, self.xpos, (self.xpos + self.width) if self.width > 0 else -1),)
 
 	def crop_image(self, image: np.ndarray) -> Iterator[np.ndarray]:
 		for param in self.as_slice_param():
@@ -120,7 +108,7 @@ class HeadingArea(ImageFilterItemArea):
 
 
 @dataclass
-class ShiftSplit(ImageFilterItemArea):
+class ShiftArea(ImageFilterItemArea):
 	'''Needs to initialize using named parameters::
 	left_width: as xpos
 	right_pos: as width
@@ -129,33 +117,33 @@ class ShiftSplit(ImageFilterItemArea):
 	def to_toml(self, fp: IOBase, **kwargs):
 		fp.write(f"{self.__class__.__name__} = {str(list(self.param))}\n")
 	@property
-	def left_width(self)-> int: # start-from time
+	def start_width(self)-> int: # start-from time
 		return self.xpos
 
 	@property
-	def right_pos(self)-> int: # end-by time
+	def end_xpos(self)-> int: # end-by time
 		return self.width
 
 
 	@override
 	def as_slice_param(self) -> Sequence[Int4]:
-		return (self.param.ypos, (self.param.ypos + self.param.height) if self.param.height > 0 else -1, 0, self.param.xpos), (self.param.ypos, (self.param.ypos + self.param.height) if self.param.height > 0 else -1, self.param.width, -1)
+		return (self.ypos, (self.ypos + self.height) if self.height > 0 else -1, 0, self.xpos), (self.ypos, (self.ypos + self.height) if self.height > 0 else -1, self.width, -1)
 
 	def crop_image(self, image: np.ndarray) -> Iterator[np.ndarray]:
 		for param in self.as_slice_param():
 			yield image[param[0]:param[1], param[2]:param[3]]
 
 @dataclass
-class BreakTime(ImageFilterItemArea):
+class BreaktimeArea(ImageFilterItemArea):
 	def to_toml(self, fp: IOBase, **kwargs):
 		fp.write(f"{self.__class__.__name__} = {str(list(self.param))}\n")
 
 @dataclass
-class PaySlip(ImageFilterItemArea):
+class PaylipArea(ImageFilterItemArea):
 	def to_toml(self, fp: IOBase, **kwargs):
 		fp.write(f"{self.__class__.__name__} = {str(list(self.param))}\n")
 @dataclass
-class Salary(ImageFilterItemArea):
+class SalaryArea(ImageFilterItemArea):
 	def to_toml(self, fp: IOBase, **kwargs):
 		fp.write(f"{self.__class__.__name__} = {str(list(self.param))}\n")
 
@@ -168,6 +156,8 @@ class ImageFilterAreas:
 		'''requires "name" key in kwargs'''
 		if 'name' not in kwargs:
 			raise ValueError("requires 'name' key in kwargs")
+		if not kwargs['name']:
+			raise ValueError("requires 'name' key's value in kwargs")
 		fp.write(f"[{self.__class__.__name__}.{kwargs['name']}]\n")
 		for key, area in self.__dict__.items():
 			if isclass(area): # area.to_toml(fp)
@@ -175,10 +165,10 @@ class ImageFilterAreas:
 
 
 	heading: HeadingArea # midashi
-	shift: ShiftSplit # syuugyou jikan
-	break_time: ImageFilterItemArea # kyuukei jikan
-	payslip: ImageFilterItemArea # meisai
-	salary: ImageFilterItemArea # kyuuyo
+	shift: ShiftArea # syuugyou jikan
+	break_time: BreaktimeArea # kyuukei jikan
+	payslip: PaylipArea # meisai
+	salary: SalaryArea # kyuuyo
 
 
 
@@ -591,7 +581,7 @@ def trim_heading(
 def get_split_shifts(
 	image: np.ndarray, params: dict[ImageFilterParam, int] = {}, set_params=True, 
 return_as_cuts: bool = False, center_rate = 0.5
-) -> tuple[np.ndarray, np.ndarray] | ShiftSplit:
+) -> tuple[np.ndarray, np.ndarray] | ShiftArea:
 	"""Split image into left and right;black-filled shape's x position is center_rate;
 	Args: h_image: binarized i.e. 0 or 255
 	background is 255(white);
@@ -626,4 +616,4 @@ return_as_cuts: bool = False, center_rate = 0.5
 	if set_params:
 		params[ImageFilterParam.shift_from_width] = left_area_width
 		params[ImageFilterParam.shift_until_xpos] = right_area_xpos
-	return ShiftSplit(ypos=0, height=image.shape[0], left_width=left_area_width, right_pos=right_area_xpos) if return_as_cuts else (image[:, :left_area_width], image[:, right_area_xpos:])
+	return ShiftArea(ypos=0, height=image.shape[0], start_width=left_area_width, end_xpos=right_area_xpos) if return_as_cuts else (image[:, :left_area_width], image[:, right_area_xpos:])
