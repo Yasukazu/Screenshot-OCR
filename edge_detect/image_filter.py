@@ -1,3 +1,5 @@
+from io import IOBase
+
 from cv2 import UMat
 import cv2
 
@@ -6,13 +8,14 @@ import cv2
 import numpy as np
 from numpy import ndarray
 from pathlib import Path
-from typing import Sequence, NamedTuple
+from typing import Iterator, Sequence, NamedTuple, override, Sequence
 from dataclasses import dataclass
 from enum import Enum
 import sys
-
 import matplotlib.pyplot as plt
-# from pyocr.pyocr import exc
+from inspect import isclass
+from itertools import groupby
+from fancy_dataclass import TOMLDataclass
 
 cwd = Path(__file__).resolve().parent
 sys.path.append(str(cwd.parent))
@@ -53,69 +56,123 @@ class KeyUnit(Enum):
 	TIME = 2
 	MONEY = 3
 
-from fancy_dataclass import TOMLDataclass
 
 
-@dataclass
-class ImageFilterItemArea(TOMLDataclass):#(NamedTuple):
+class InvalidValueError(ValueError):
+	"""Raised when a value is invalid."""
+	pass
+
+class ItemAreaParam(NamedTuple):
 	ypos: int = 0
 	height: int = -1
 	xpos: int = 0
 	width: int = -1
 
-	def as_slice_param(self) -> tuple[int, int, int, int]:
-		return self.ypos, (self.ypos + self.height) if self.height > 0 else -1, self.xpos, self.xpos + self.width if self.width > 0 else -1
-	def crop_image(self, image: np.ndarray) -> np.ndarray:
-		param = self.as_slice_param()
-		return image[param[0]:param[1], param[2]:param[3]]
-
-# from typing import override
+# from Python 3.12
+type Int4 = tuple[int, int, int, int]
+# type ItemAreaParamType = Int4 | Sequence[Int4]
 
 @dataclass
-class HeadingArea(ImageFilterItemArea):#(NamedTuple):
-	pass
-	'''ypos: int
-	height: int
-	xpos: int
-	def as_slice_param(self) -> tuple[int, int, int, int]:
-		return self.ypos, self.ypos + self.height, self.xpos, -1
-	def crop_image(self, image: np.ndarray) -> np.ndarray:
-		return image[self.ypos : self.ypos + self.height, self.xpos : -1]'''
-from io import IOBase
+class ImageFilterItemArea(TOMLDataclass):
+	'''param: ItemAreaParam
+	ypos: int = 0
+	height: int = -1
+	xpos: int = 0
+	width: int = -1'''
+
+	param: ItemAreaParam # NamedTuple:read only
+
+	def __post_init__(self):
+		if self.ypos < 0 or self.xpos < 0:
+			raise InvalidValueError("ypos and xpos must be positive")
+		if (self.height < -1 or self.height == 0) or (self.width < -1 or self.width == 0):
+			raise InvalidValueError("height and width must be larger than 0 except -1")
+
+	@property
+	def ypos(self)-> int:
+		return self.param.ypos
+
+	@property
+	def height(self)-> int:
+		return self.param.height
+
+	@property
+	def xpos(self)-> int:
+		return self.param.xpos
+
+	@property
+	def width(self)-> int:
+		return self.param.width
+
+	def as_slice_param(self) -> Sequence[Int4]:
+		return ((self.param.ypos, (self.param.ypos + self.param.height) if self.param.height > 0 else -1, self.param.xpos, (self.param.xpos + self.param.width) if self.param.width > 0 else -1),)
+
+	def crop_image(self, image: np.ndarray) -> Iterator[np.ndarray]:
+		for param in self.as_slice_param():
+			yield image[param[0]:param[1], param[2]:param[3]]
+
+
 @dataclass
-class ShiftSplit(ImageFilterItemArea):#(NamedTuple):
-	'''This area only has left_width and right_pos
-	ypos: int
-	height: int'''
+class HeadingArea(ImageFilterItemArea):
+	'''Necessary named parameters: ypos, height, xpos '''
+	def to_toml(self, fp: IOBase, **kwargs):
+		fp.write(f"{self.__class__.__name__} = {str(list(self.param))}\n")
+
+
+@dataclass
+class ShiftSplit(ImageFilterItemArea):
+	'''Needs to initialize using named parameters::
+	left_width: as xpos
+	right_pos: as width
+	'''
 
 	def to_toml(self, fp: IOBase, **kwargs):
-		fp.write("ypos = %d\n" % self.ypos)
-		fp.write("height = %d\n" % self.height)
-		fp.write("left_width = %d\n" % self.xpos)
-		fp.write("right_pos = %d\n" % self.width)
+		fp.write(f"{self.__class__.__name__} = {str(list(self.param))}\n")
 	@property
 	def left_width(self)-> int: # start-from time
 		return self.xpos
+
 	@property
 	def right_pos(self)-> int: # end-by time
 		return self.width
-	
+
+
+	@override
+	def as_slice_param(self) -> Sequence[Int4]:
+		return (self.param.ypos, (self.param.ypos + self.param.height) if self.param.height > 0 else -1, 0, self.param.xpos), (self.param.ypos, (self.param.ypos + self.param.height) if self.param.height > 0 else -1, self.param.width, -1)
+
+	def crop_image(self, image: np.ndarray) -> Iterator[np.ndarray]:
+		for param in self.as_slice_param():
+			yield image[param[0]:param[1], param[2]:param[3]]
+
+@dataclass
+class BreakTime(ImageFilterItemArea):
+	def to_toml(self, fp: IOBase, **kwargs):
+		fp.write(f"{self.__class__.__name__} = {str(list(self.param))}\n")
+
+@dataclass
+class PaySlip(ImageFilterItemArea):
+	def to_toml(self, fp: IOBase, **kwargs):
+		fp.write(f"{self.__class__.__name__} = {str(list(self.param))}\n")
+@dataclass
+class Salary(ImageFilterItemArea):
+	def to_toml(self, fp: IOBase, **kwargs):
+		fp.write(f"{self.__class__.__name__} = {str(list(self.param))}\n")
+
 
 @dataclass
 class ImageFilterAreas:
 	'''tuple's first element is ypos (downward offset from heading top) and second element is height
 	'''
 	def to_toml(self, fp: IOBase, **kwargs):
-		fp.write("[HeadingArea]\n")
-		self.heading.to_toml(fp, **kwargs)
-		fp.write("[ShiftSplit]\n")
-		self.shift.to_toml(fp, **kwargs)
-		fp.write("[BreakTime]\n")
-		self.break_time.to_toml(fp, **kwargs)
-		fp.write("[Payslip]\n")
-		self.payslip.to_toml(fp, **kwargs)
-		fp.write("[Salary]\n")
-		self.salary.to_toml(fp, **kwargs)
+		'''requires "name" key in kwargs'''
+		if 'name' not in kwargs:
+			raise ValueError("requires 'name' key in kwargs")
+		fp.write(f"[{self.__class__.__name__}.{kwargs['name']}]\n")
+		for key, area in self.__dict__.items():
+			if isclass(area): # area.to_toml(fp)
+				fp.write(f"{key} = {str(list(area.param))}\n")
+
 
 	heading: HeadingArea # midashi
 	shift: ShiftSplit # syuugyou jikan
@@ -428,16 +485,14 @@ def find_border(
 		color = unique[0] if unique.size == 1 else unique[1]
 		return BorderColor.BLACK if color == 0 else BorderColor.WHITE
 
-	from itertools import groupby
-
 	def get_border_or_bg(y: int) -> bool:  # | None:
-		# Returns True if border is found, False if background is found, raises NotBorder if not found
-		for n, (k, g) in enumerate(groupby(image[y, :])):
-			if n >= 3:
-				raise NotBorder()
-			if k == border_color.value and len(list(g)) >= border_len:
-				return True
-		return False
+			# Returns True if border is found, False if background is found, raises NotBorder if not found
+			for n, (k, g) in enumerate(groupby(image[y, :])):
+				if n >= 3:
+					raise NotBorder()
+				if k == border_color.value and len(list(g)) >= border_len:
+					return True
+			return False
 
 	y = -1
 	border_found = False
