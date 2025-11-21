@@ -51,12 +51,22 @@ class ImageFilterResult:
 
 
 class KeyUnit(Enum):
+	PIXEL = -1
 	TEXT = 0
 	HOUR = 1
 	TIME = 2
 	MONEY = 3
 
 
+class ImageAreaKey(Enum):
+	leading = (KeyUnit.PIXEL, 1)
+	heading = (KeyUnit.TEXT, 1)  # heading"
+	work_time = (KeyUnit.HOUR, 1)  # "hours"
+	break_time = (KeyUnit.HOUR, 2)  # "rest_hours"
+	shift_start = (KeyUnit.TIME, 1)  # "hours_from"
+	shift_end = (KeyUnit.TIME, 2)  # "hours_to"
+	salary = (KeyUnit.MONEY, 1)  # "salary"
+	payslip = (KeyUnit.TEXT, 2)  # "other"
 
 class InvalidValueError(ValueError):
 	"""Raised when a value is invalid."""
@@ -101,6 +111,10 @@ class ImageFilterItemArea(TOMLDataclass):
 
 
 @dataclass
+class LeadingArea(ImageFilterItemArea):
+	pass
+
+@dataclass
 class HeadingArea(ImageFilterItemArea):
 	'''Necessary named parameters: ypos, height, xpos '''
 	def to_toml(self, fp: IOBase, **kwargs):
@@ -124,11 +138,13 @@ class ShiftArea(ImageFilterItemArea):
 	@property
 	def end_xpos(self)-> int: # end-by time
 		return self.width
+@dataclass
+class ShiftStartArea(ImageFilterItemArea):
+	pass
 
-
-	@override
-	def as_slice_param(self) -> Sequence[Int4]:
-		return (self.ypos, (self.ypos + self.height) if self.height > 0 else -1, 0, self.xpos), (self.ypos, (self.ypos + self.height) if self.height > 0 else -1, self.width, -1)
+@dataclass
+class ShiftEndArea(ImageFilterItemArea):
+	pass
 
 	def crop_image(self, image: np.ndarray) -> Iterator[np.ndarray]:
 		for param in self.as_slice_param():
@@ -140,7 +156,7 @@ class BreaktimeArea(ImageFilterItemArea):
 		fp.write(f"{self.__class__.__name__} = {str(list(self.param))}\n")
 
 @dataclass
-class PaylipArea(ImageFilterItemArea):
+class PayslipArea(ImageFilterItemArea):
 	def to_toml(self, fp: IOBase, **kwargs):
 		fp.write(f"{self.__class__.__name__} = {str(list(self.param))}\n")
 @dataclass
@@ -169,12 +185,23 @@ class ImageFilterAreas:
 				fp.write(f"{key} = ")
 				fp.write(f"{area.as_dict()}\n") if as_dict else fp.write(f"{list(area.param)}\n")
 
+	area_key_list = [ImageAreaKey.leading, ImageAreaKey.heading, ImageAreaKey.shift_start, ImageAreaKey.shift_end, ImageAreaKey.break_time, ImageAreaKey.payslip, ImageAreaKey.salary]
 
+	areas = {
+		ImageAreaKey.leading: LeadingArea,
+		ImageAreaKey.heading: HeadingArea,
+		ImageAreaKey.shift_start: ShiftStartArea,
+		ImageAreaKey.shift_end: ShiftEndArea,
+		ImageAreaKey.break_time: BreaktimeArea,
+		ImageAreaKey.payslip: PayslipArea,
+		ImageAreaKey.salary: SalaryArea,
+	}
 	heading: HeadingArea # midashi
 	shift: ShiftArea # syuugyou jikan
 	break_time: BreaktimeArea # kyuukei jikan
-	payslip: PaylipArea # meisai
+	payslip: PayslipArea # meisai
 	salary: SalaryArea # kyuuyo
+	y_offset: int = 0
 
 
 
@@ -201,14 +228,6 @@ class ImageFilterParam(Enum):
 	salary_ypos = 5.1
 
 
-class ImageDictKey(Enum):
-	heading = (KeyUnit.TEXT, 1)  # heading"
-	hours = (KeyUnit.HOUR, 1)  # "hours"
-	rest_hours = (KeyUnit.HOUR, 2)  # "rest_hours"
-	shift_from = (KeyUnit.TIME, 1)  # "hours_from"
-	shift_until = (KeyUnit.TIME, 2)  # "hours_to"
-	salary = (KeyUnit.MONEY, 1)  # "salary"
-	payslip = (KeyUnit.TEXT, 2)  # "other"
 
 
 def taimee(
@@ -217,7 +236,7 @@ def taimee(
 	thresh_value: float = 150.0,
 	single: bool = False,
 	cvt_color: int = cv2.COLOR_BGR2GRAY,
-	image_dict: dict[ImageDictKey, np.ndarray] | None = None,
+	image_dict: dict[ImageAreaKey, np.ndarray] | None = None,
 	image_filter_params: dict[ImageFilterParam, int] = {},
 	b_thresh_valule: float = 235.0,
 	binarize: bool = True,
@@ -375,14 +394,14 @@ def taimee(
 		)
 	# add the heading area to the dict
 	if image_dict is not None:
-		image_dict[ImageDictKey.heading] = heading_area
-		image_dict[ImageDictKey.hours] = image[ypos_list[0] : ypos_list[1], :]
-		image_dict[ImageDictKey.shift_from] = image[ypos_list[0] : ypos_list[1], :xpos]
-		image_dict[ImageDictKey.shift_until] = image[
+		image_dict[ImageAreaKey.heading] = heading_area
+		image_dict[ImageAreaKey.work_time] = image[ypos_list[0] : ypos_list[1], :]
+		image_dict[ImageAreaKey.shift_start] = image[ypos_list[0] : ypos_list[1], :xpos]
+		image_dict[ImageAreaKey.shift_end] = image[
 			ypos_list[0] : ypos_list[1], xpos2:
 		]
-		image_dict[ImageDictKey.rest_hours] = image[ypos_list[1] : ypos_list[-1], :]
-		image_dict[ImageDictKey.payslip] = image[ypos_list[-1] :, :]
+		image_dict[ImageAreaKey.break_time] = image[ypos_list[1] : ypos_list[-1], :]
+		image_dict[ImageAreaKey.payslip] = image[ypos_list[-1] :, :]
 	return ypos_list, image
 
 
