@@ -1,4 +1,4 @@
 [image-path]
-dir = "DATA"
+dir = "~/github/screen/DATA/2025/10"
 [image-path.taimee]
-filename = 'taimee-test.png'
+filename = '*_jp.co.taimee.png'

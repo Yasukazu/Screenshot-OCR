@@ -90,7 +90,7 @@ ax[1].imshow(image_dict[ImageDictKey.heading])
 ax[2].imshow(image_dict[ImageDictKey.shift_from])
 ax[3].imshow(image_dict[ImageDictKey.shift_until])
 ax[4].imshow(image_dict[ImageDictKey.rest_hours])
-ax[5].imshow(image_dict[ImageDictKey.other])
+ax[5].imshow(image_dict[ImageDictKey.payslip])
 heading_image = Image.fromarray(image_dict[ImageDictKey.heading])
 #from tempfile import TemporaryDirectory
 from os import environ
@@ -115,7 +115,7 @@ lines_to_dict = {
     ImageDictKey.shift_from: None,
     ImageDictKey.shift_until: None,
     ImageDictKey.rest_hours: None,
-    ImageDictKey.other: None
+    ImageDictKey.payslip: None
 }
 with StringIO() as f:
     for key, to_ in lines_to_dict.items():
