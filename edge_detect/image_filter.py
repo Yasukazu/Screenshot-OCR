@@ -229,6 +229,20 @@ class ImageFilterParam(Enum):
 
 
 
+class NonNeabyElems:
+	def __init__(self,
+		thresh: int = 10,
+		elems: list[int] = []
+	):
+		self.thresh = thresh
+		self.elems = elems
+
+	def add(self, i: int):
+		if len(self.elems) == 0:
+			self.elems.append(i)
+		else:
+			if i - self.elems[-1] > self.thresh:
+				self.elems.append(i)
 
 def taimee(
 	given_image: ndarray | Path | str,
@@ -271,6 +285,9 @@ def taimee(
 	b_image = cv2.threshold(
 		mono_image, thresh=b_thresh_valule, maxval=255, type=cv2.THRESH_BINARY
 	)[1]  # binary, high contrast
+	non_neaby_elems = NonNeabyElems()
+	for y in find_horizontal_lines(b_image):
+		non_neaby_elems.add(y)
 	## cut preceding bump area
 	try:
 		bump_ypos, bump_ypos_len = find_border(b_image)
@@ -661,16 +678,6 @@ def merge_nearby_elems(elems: Sequence[int], thresh=9) -> Iterator[int]:
 	if sent:
 		yield elem0
 
-@dataclass
-class NeabyElems:
-	thresh: int = 10
-	elems: list[int] = []
-	def add(self, i: int):
-		if len(self.elems) == 0:
-			self.elems.append(i)
-		else:
-			if i - self.elems[-1] > self.thresh:
-				self.elems.append(i)
 
 		
 

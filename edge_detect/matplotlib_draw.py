@@ -64,9 +64,10 @@ except tomllib.TOMLDecodeError as err:
 image = cv2.imread(str(image_fullpath)) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
 if image is None:
     raise ValueError("Error: Could not load image: %s" % image_fullpath)
-from image_filter import ImageDictKey
+from image_filter import ImageDictKey, taimee
 import image_filter
-app_func = getattr(image_filter, APP_STR)
+image_filter_apps = {'taimee': taimee}
+app_func = image_filter_apps[APP_STR]
 if not app_func:
     raise ValueError(f"Error: Failed to load `app_func` : '{APP_STR}' in 'image_filter'")
 SUBPLOT_SIZE = 6
@@ -87,11 +88,11 @@ ax[0].imshow(bin_image)
 # border_image = cv2.bitwise_and(text_border_image, text_image)
 
 ax[1].imshow(image_dict[ImageDictKey.heading])
-ax[2].imshow(image_dict[ImageDictKey.shift_from])
-ax[3].imshow(image_dict[ImageDictKey.shift_until])
-ax[4].imshow(image_dict[ImageDictKey.rest_hours])
+ax[2].imshow(image_dict[ImageDictKey.shift_start])
+ax[3].imshow(image_dict[ImageDictKey.shift_end])
+ax[4].imshow(image_dict[ImageDictKey.break_time])
 ax[5].imshow(image_dict[ImageDictKey.payslip])
-heading_image = Image.fromarray(image_dict[ImageDictKey.heading])
+heading_image = Image.fromarray(image_dict[ImageAreaKey.heading])
 #from tempfile import TemporaryDirectory
 from os import environ
 from pytesseract import pytesseract, image_to_data, image_to_boxes, Output
@@ -111,11 +112,11 @@ def ocr_lines(image: np.ndarray, from_: int = 0, to_: int | None = None, conf_mi
     lines = ocr.image_to_string(Image.fromarray(image), lang="jpn", builder=builders.LineBoxBuilder(tesseract_layout=psm_value))
     return [t.content.replace(' ','') for t in (lines[from_:to_] if to_ is not None else lines[from_:])], less_conf_data if len(less_conf_data) > 0 else None, data if len(less_conf_data) > 0 else None
 lines_to_dict = {
-    ImageDictKey.heading: -1,
-    ImageDictKey.shift_from: None,
-    ImageDictKey.shift_until: None,
-    ImageDictKey.rest_hours: None,
-    ImageDictKey.payslip: None
+    ImageAreaKey.heading: -1,
+    ImageAreaKey.shift_start: None,
+    ImageAreaKey.shift_end: None,
+    ImageAreaKey.break_time: None,
+    ImageAreaKey.payslip: None
 }
 with StringIO() as f:
     for key, to_ in lines_to_dict.items():
