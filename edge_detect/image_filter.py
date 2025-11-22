@@ -267,12 +267,25 @@ def find_horizontal_borders(
 
 	def get_border_or_bg(y: int) -> bool | None:
 		# Returns True if border is found, False if background is found, else returns None
-		for n, (k, g) in enumerate(groupby(image[y, :])):
+		arr = image[y, edge_len:-edge_len]
+		if np.all(arr == border_color.value):
+			return True
+		elif np.all(arr == 255):
+			return False
+		return None
+		'''changes = arr[1:] != arr[:-1]
+		change_indices = np.where(changes)[0] + 1
+		if not(change_indices.size):
+			return None
+		all_indices = np.concatenate(([0], change_indices, [len(arr)]))
+		run_lengths = np.diff(all_indices)
+		run_values = arr[all_indices[:-1]]
+		for n, (k, g) in enumerate(groupby(arr.tolist())):
 			if n >= 3:
 				return None # raise NotBorder()
 			if k == border_color.value and len(list(g)) >= border_len:
 				return True
-		return False
+		return False'''
 
 	y = -1
 	# border_lines = []
@@ -282,6 +295,17 @@ def find_horizontal_borders(
 			yield n
 			# border_lines.append(n)
 	# return border_lines
+class ImageAreaName(NamedTuple):
+	ypos: int = 0
+	height: int = -1
+	xpos: int = 0
+	width: int = -1
+class SplitImageAreaName(NamedTuple):
+	'''dual column layout'''
+	ypos: int = 0
+	height: int = -1
+	start_xpos: int = 0
+	end_xpos: int = -1
 
 class TaimeeFilter:
 	THRESHOLD = 237
@@ -289,8 +313,9 @@ class TaimeeFilter:
 		self.image = given_image if isinstance(given_image, np.ndarray) else cv2.imread(str(given_image))
 		self.params = params
 		self.borders = []
-		self.non_nearby_borders = NonNearbyElems(thresh=self.image.shape[0] // 20)
-		for border in find_horizontal_borders(self.image, border_color=BorderColor.BLACK):
+		self.bin_image = cv2.threshold(self.image, self.THRESHOLD, 255, cv2.THRESH_BINARY)[1]
+		self.non_nearby_borders = NonNearbyElems(thresh=self.bin_image.shape[0] // 20)
+		for border in find_horizontal_borders(self.bin_image, border_color=BorderColor.BLACK):
 			self.non_nearby_borders.add(border)
 			self.borders.append(border)
 		self.non_nearby_array = np.array(self.non_nearby_borders.elems)
@@ -300,14 +325,14 @@ class TaimeeFilter:
 		self.non_nearby_array = self.non_nearby_array[1:] - self.leading_y
 
 		
-	def extract_heading(self, params: dict[ImageFilterParam, tuple[int, int]] | None = None) -> tuple[int, int, int]:
+	def extract_heading(self, params: dict[ImageFilterParam, tuple[int, int]] | None = None) -> ImageAreaName:# tuple[int, int, int]:
 		'''Return: (ypos, height, x_start)
 		Use with self.leading_y like image[self.leading_y: self.leading_y + height, x_start:]'''
 		if len(self.non_nearby_array) == 0:
 			raise ValueError("No nearby borders found")
 		if self.leading_y >= self.non_nearby_array[0]:
 			raise ValueError("Leading y is not less than non-nearby array first element")
-		heading_area = self.image[self.leading_y:self.non_nearby_array[0] + self.leading_y, :].copy()
+		heading_area = self.bin_image[self.leading_y:self.non_nearby_array[0] + self.leading_y, :].copy()
 		for y in self.border_array:
 			if y >= heading_area.shape[0]:
 				break
@@ -324,7 +349,7 @@ class TaimeeFilter:
 			if np.all(heading_area[y2, xpos:] == 255):
 				break
 		assert y2 > 0, "No valid row found (2)"
-		new_params = (self.leading_y, y2, xpos)
+		new_params = ImageAreaName(self.leading_y, y2, xpos)#, -1)
 		if params is not None:
 			params[ImageFilterParam.heading] = new_params
 		return new_params

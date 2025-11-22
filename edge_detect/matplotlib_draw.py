@@ -64,10 +64,10 @@ except tomllib.TOMLDecodeError as err:
 image = cv2.imread(str(image_fullpath)) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
 if image is None:
 	raise ValueError("Error: Could not load image: %s" % image_fullpath)
-from image_filter import ImageDictKey, taimee, BinaryImage, TaimeeFilter, ImageFilterParam
+from image_filter import ImageDictKey, taimee, BinaryImage, TaimeeFilter, ImageFilterParam, ImageAreaName
 from typing import Any
 # import image_filter
-title_window = 'Binary Iimage'
+'''title_window = 'Binary Iimage'
 cv2.namedWindow(title_window)
 binary_image = BinaryImage(image, binarize=True)
 g_threshold = 237
@@ -86,12 +86,18 @@ for r in range(SUBPLOT_SIZE):
 	ax[r].invert_yaxis()
 	ax[r].xaxis.tick_top()
 	ax[r].set_title(f"Row {r+1}")
-ax[0].imshow(b_image, cmap='gray')
-filter_params: dict[ImageFilterParam, Any] = {}
-taimee_filter = TaimeeFilter(given_image=b_image, params=filter_params)
+ax[0].imshow(b_image, cmap='gray')'''
+filter_param_dict: dict[ImageFilterParam, Any] = {}
+taimee_filter = TaimeeFilter(given_image=image, params=filter_param_dict)
 heading_param_dict = {}
-heading_ypos, heading_height, heading_xpos = taimee_filter.extract_heading(heading_param_dict)
-ax[1].imshow(b_image[heading_ypos:heading_ypos+heading_height, heading_xpos:], cmap='gray')
+#heading_ypos, heading_height, heading_xpos, heading_width 
+heading_param = taimee_filter.extract_heading(heading_param_dict)
+filter_param_dict |= heading_param_dict
+with open('taimee_filter.cfg', 'w') as wf:
+	wf.write("taimee={")
+	wf.write(','.join([f"'{k.name}':{list(v)}" for k, v in filter_param_dict.items()]) + '}\n')
+
+ax[1].imshow(b_image[heading_param.ypos:heading_param.ypos+heading_param.height, heading_param.xpos:], cmap='gray')
 plt.show()
 image_filter_apps = {'taimee': taimee}
 app_func = image_filter_apps[APP_STR]
