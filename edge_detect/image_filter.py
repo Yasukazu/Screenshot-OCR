@@ -287,9 +287,11 @@ def taimee(
 		mono_image, thresh=b_thresh_valule, maxval=255, type=cv2.THRESH_BINARY
 	)[1]  # binary, high contrast
 	non_nearby_elems = NonNearbyElems(thresh=height // 20)
+	horizontal_borders = []
 	try:
 		for y in find_horizontal_borders(b_image):
 			non_nearby_elems.add(y)
+			horizontal_borders.append(y)
 	except NoBorderError:
 		raise ValueError("No horizontal borders found!")
 	non_nearby_elems_array = np.array(non_nearby_elems.elems)
@@ -297,11 +299,15 @@ def taimee(
 	non_nearby_elems_array[:] -= leading_height
 	non_nearby_elems = non_nearby_elems_array[1:].tolist()
 	heading_elem = non_nearby_elems[0]
+	from image_filter import TaimeeFilter
+	taimee_filter = TaimeeFilter(b_image, horizontal_borders)
+	leading, heading_ypos, heading_xpos = taimee_filter.strip_heading()
+	# heading_area_xpos = TaimeeFilter.get_heading_avatar_end_xpos(b_image[leading_height:heading_elem+leading_height, :], borders=horizontal_borders)
 	ocr = TesseractOCR()
 	from pandas import DataFrame
 	from pytesseract import Output as TesseractOutput
-	ocr_dataframe = ocr.exec_ocr(mono_image[leading_height:heading_elem+leading_height, :], output_type=TesseractOutput.DATAFRAME)
-	
+	ocr_dataframe = ocr.exec_ocr(mono_image[leading:leading+heading_ypos, heading_xpos:], output_type=TesseractOutput.DATAFRAME)
+	print(ocr_dataframe[ocr_dataframe['conf'] > 0]['text']	
 	## cut preceding bump area
 	try:
 		bump_ypos, bump_ypos_len = find_border(b_image)
@@ -676,7 +682,73 @@ return_as_cuts: bool = False, center_rate = 0.5
 
 class TaimeeFilter:
 	def __init__(self, image: np.ndarray, params: dict[ImageFilterParam, int] = {}):
-		pass
+		self.image = image
+		self.borders = []
+		self.non_nearby_borders = NonNearbyElems(thresh=image.shape[0] // 20)
+		for border in find_horizontal_borders(image):
+			self.non_nearby_borders.add(border)
+			self.borders.append(border)
+		self.non_nearby_array = np.array(self.non_nearby_borders.elems)
+		self.leading = self.borders[0]
+		self.border_array = np.array(self.borders)
+		self.border_array = self.border_array - self.leading
+		self.non_nearby_array = self.non_nearby_array[1:] - self.leading
+
+		
+	def strip_heading(self) -> tuple[int, int, int]:
+		'''Return: (y_leading, y_position, x_position) '''
+		heading_area = self.image[self.leading:self.non_nearby_array[0] + self.leading, :].copy()
+		for y in self.border_array:
+			if y >= heading_area.shape[0]:
+				break
+			heading_area[y, :] = 255
+		xpos = self.get_heading_avatar_end_xpos(heading_area, remove_borders=False)
+		# scan from bottom
+		# assert heading_area[-1, xpos:].all() == 255
+		for y in range(heading_area.shape[0] - 1, 0, -1):
+			if np.any(heading_area[y, xpos:] == 0):
+				break
+			# Found a row with at least one non-white pixel
+		assert y > 0, "No valid row found"
+		for y2 in range(y, 0, -1):
+			if np.all(heading_area[y2, xpos:] == 255):
+				break
+		assert y2 > 0, "No valid row found (2)"
+		return self.leading, y2, xpos
+
+		
+
+		
+	@classmethod
+	def get_heading_avatar_end_xpos(cls, image: np.ndarray, min_width: int = 8, 		borders: list[int] | None =None, remove_borders: bool = False)->int:
+		height, width = image.shape[:2]
+
+		# Remove horizontal borders from the image to simplify processing
+		if remove_borders:
+			image = image.copy()
+			if borders is None:
+				for y in (find_horizontal_borders(image)):
+					image[y, :] = 255
+			else:
+				for y in borders:
+					image[y, :] = 255
+
+		px = -1
+		for px in range(width):
+			v_line = image[:, px]
+			if np.any(v_line == 0):
+				break
+		if px == width:
+			raise ValueError("Not enough valid width(%d) for the heading!" % width)
+		# 2 pass the shape
+		x = -1
+		for x in range(px + 1, width):
+			v_line = image[:, x]
+			if np.all(v_line == 255):
+				break
+		if x < min_width:
+			raise ValueError("Not enough valid width(%d) for the heading!" % x)
+		return x
 
 def merge_nearby_elems(elems: Sequence[int], thresh=9) -> Iterator[int]:
 	if len(elems) < 2:
