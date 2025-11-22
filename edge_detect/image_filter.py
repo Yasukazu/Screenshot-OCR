@@ -291,15 +291,16 @@ class TaimeeFilter:
 			self.non_nearby_borders.add(border)
 			self.borders.append(border)
 		self.non_nearby_array = np.array(self.non_nearby_borders.elems)
-		self.leading = self.borders[0]
+		self.leading_y = self.borders[0]
 		self.border_array = np.array(self.borders)
-		self.border_array = self.border_array - self.leading
-		self.non_nearby_array = self.non_nearby_array[1:] - self.leading
+		self.border_array = self.border_array - self.leading_y
+		self.non_nearby_array = self.non_nearby_array[1:] - self.leading_y
 
 		
-	def strip_heading(self) -> tuple[int, int, int]:
-		'''Return: (y_leading, y_position, x_position) '''
-		heading_area = self.image[self.leading:self.non_nearby_array[0] + self.leading, :].copy()
+	def strip_heading(self) -> tuple[int, int]:
+		'''Return: (height, x_start)
+		Use with self.leading_y like image[self.leading_y: self.leading_y + height, x_start:]'''
+		heading_area = self.image[self.leading_y:self.non_nearby_array[0] + self.leading_y, :].copy()
 		for y in self.border_array:
 			if y >= heading_area.shape[0]:
 				break
@@ -316,7 +317,7 @@ class TaimeeFilter:
 			if np.all(heading_area[y2, xpos:] == 255):
 				break
 		assert y2 > 0, "No valid row found (2)"
-		return self.leading, y2, xpos
+		return y2, xpos
 
 		
 
@@ -408,12 +409,12 @@ def taimee(
 	heading_elem = non_nearby_elems[0]
 	# from image_filter import TaimeeFilter
 	taimee_filter = TaimeeFilter(b_image, horizontal_borders)
-	leading, heading_ypos, heading_xpos = taimee_filter.strip_heading()
+	heading_y_height, heading_x_start = taimee_filter.strip_heading()
 	# heading_area_xpos = TaimeeFilter.get_heading_avatar_end_xpos(b_image[leading_height:heading_elem+leading_height, :], borders=horizontal_borders)
 	ocr = TesseractOCR()
 	# from pandas import DataFrame
 	from pytesseract import Output as TesseractOutput
-	ocr_dataframe = ocr.exec_ocr(mono_image[leading:leading+heading_ypos, heading_xpos:], output_type=TesseractOutput.DATAFRAME)
+	ocr_dataframe = ocr.exec_ocr(mono_image[taimee_filter.leading_y: taimee_filter.leading_y+heading_y_height, heading_x_start:], output_type=TesseractOutput.DATAFRAME)
 	print(ocr_dataframe[ocr_dataframe['conf'] > 0]['text']	
 	## cut preceding bump area
 	try:
