@@ -207,26 +207,27 @@ class ImageFilterAreas:
 
 
 class ImageFilterParam(Enum):
-	ypos = 0.1
-	height = 0.2
-	left = 0.3
-	right = 0.4
-	heading = 1
-	heading_ypos = 1.1
-	heading_height = 1.2
-	heading_left_pad = 1.3
-	shift = 2
-	shift_ypos = 2.1
-	shift_height = 2.2
-	shift_from_width = 2.3
-	shift_until_xpos = 2.4
-	break_time = 3
-	break_time_ypos = 3.1
-	break_time_height = 3.2
-	paystub = 4
-	paystub_ypos = 4.1
-	salary = 5
-	salary_ypos = 5.1
+	leading = 0, 0
+	ypos = 0,1
+	height = 0,2
+	xpos = 0,3
+	width = 0,4
+	heading = 1, 0
+	heading_ypos = 1,1
+	heading_height = 1,2
+	heading_xpos = 1,3
+	shift = 2, 0
+	shift_ypos = 2,1
+	shift_height = 2,2
+	shift_start_width = 2,3
+	shift_end_xpos = 2,4
+	breaktime = 3, 0
+	breaktime_ypos = 3,1
+	breaktime_height = 3,2
+	paystub = 4, 0
+	paystub_ypos = 4,1
+	salary = 5, 0
+	salary_ypos = 5,1
 
 
 class NonNearbyElems:
@@ -283,11 +284,13 @@ def find_horizontal_borders(
 	# return border_lines
 
 class TaimeeFilter:
-	def __init__(self, image: np.ndarray, params: dict[ImageFilterParam, int] = {}):
-		self.image = image
+	THRESHOLD = 237
+	def __init__(self, given_image: np.ndarray | Path | str, params: dict[ImageFilterParam, int] = {}):
+		self.image = given_image if isinstance(given_image, np.ndarray) else cv2.imread(str(given_image))
+		self.params = params
 		self.borders = []
-		self.non_nearby_borders = NonNearbyElems(thresh=image.shape[0] // 20)
-		for border in find_horizontal_borders(image, border_color=BorderColor.BLACK):
+		self.non_nearby_borders = NonNearbyElems(thresh=self.image.shape[0] // 20)
+		for border in find_horizontal_borders(self.image, border_color=BorderColor.BLACK):
 			self.non_nearby_borders.add(border)
 			self.borders.append(border)
 		self.non_nearby_array = np.array(self.non_nearby_borders.elems)
@@ -297,9 +300,13 @@ class TaimeeFilter:
 		self.non_nearby_array = self.non_nearby_array[1:] - self.leading_y
 
 		
-	def strip_heading(self) -> tuple[int, int]:
-		'''Return: (height, x_start)
+	def extract_heading(self, params: dict[ImageFilterParam, tuple[int, int]] | None = None) -> tuple[int, int, int]:
+		'''Return: (ypos, height, x_start)
 		Use with self.leading_y like image[self.leading_y: self.leading_y + height, x_start:]'''
+		if len(self.non_nearby_array) == 0:
+			raise ValueError("No nearby borders found")
+		if self.leading_y >= self.non_nearby_array[0]:
+			raise ValueError("Leading y is not less than non-nearby array first element")
 		heading_area = self.image[self.leading_y:self.non_nearby_array[0] + self.leading_y, :].copy()
 		for y in self.border_array:
 			if y >= heading_area.shape[0]:
@@ -317,7 +324,10 @@ class TaimeeFilter:
 			if np.all(heading_area[y2, xpos:] == 255):
 				break
 		assert y2 > 0, "No valid row found (2)"
-		return y2, xpos
+		new_params = (self.leading_y, y2, xpos)
+		if params is not None:
+			params[ImageFilterParam.heading] = new_params
+		return new_params
 
 		
 
@@ -352,6 +362,50 @@ class TaimeeFilter:
 		if x < min_width:
 			raise ValueError("Not enough valid width(%d) for the heading!" % x)
 		return x
+from dataclasses import field
+@dataclass
+class BinaryImage:
+	given_image: ndarray | Path | str
+	thresh_type: int = cv2.THRESH_BINARY # cv2.THRESH_OTSU
+	thresh_value: float = 150.0
+	single: bool = False
+	cvt_color: int = cv2.COLOR_BGR2GRAY
+	image_dict: dict[ImageDictKey, np.ndarray] | None = field(default_factory=dict)
+	image_filter_params: dict[ImageFilterParam, int] = field(default_factory=dict)
+	b_thresh_val: float = 235.0
+	binarize: bool = True
+	image_filter_areas: ImageFilterAreas | None = None
+
+	def __post_init__(self):
+		org_image = image_fullpath = None
+		match self.given_image:
+			case ndarray():
+				org_image = self.given_image
+			case Path():
+				image_fullpath = str(self.given_image.resolve())
+			case str():
+				image_fullpath = str(Path(self.given_image).resolve())
+		if image_fullpath is not None:
+			org_image = cv2.imread(image_fullpath)
+			if org_image is None:
+				raise ValueError("Error: Could not load image: %s" % image_fullpath)
+		# assert isinstance(imagrecess_border_lene, np.ndarray) #MatLike)
+		height, width = org_image.shape[:2]
+		if height <= 0 or width <= 0:
+			raise ValueError(
+				"Error: 0 height or width image shape: %s" % org_image.shape[:2]
+			)
+		self.mono_image = cv2.cvtColor(org_image, self.cvt_color)
+
+	def bin_image(self, thresh_val: float | None = None):
+			return cv2.threshold(
+				self.mono_image, thresh=thresh_val if thresh_val is not None else self.b_thresh_val, maxval=255, type=self.thresh_type
+			)[1]
+	'''
+		else:
+			self.auto_thresh_val = 0
+			self.bin_image = self.mono_image'''
+
 
 def taimee(
 	given_image: ndarray | Path | str,
@@ -409,13 +463,13 @@ def taimee(
 	heading_elem = non_nearby_elems[0]
 	# from image_filter import TaimeeFilter
 	taimee_filter = TaimeeFilter(b_image, horizontal_borders)
-	heading_y_height, heading_x_start = taimee_filter.strip_heading()
+	heading_ypos, heading_height, heading_xpos = taimee_filter.extract_heading()
 	# heading_area_xpos = TaimeeFilter.get_heading_avatar_end_xpos(b_image[leading_height:heading_elem+leading_height, :], borders=horizontal_borders)
 	ocr = TesseractOCR()
 	# from pandas import DataFrame
 	from pytesseract import Output as TesseractOutput
-	ocr_dataframe = ocr.exec_ocr(mono_image[taimee_filter.leading_y: taimee_filter.leading_y+heading_y_height, heading_x_start:], output_type=TesseractOutput.DATAFRAME)
-	print(ocr_dataframe[ocr_dataframe['conf'] > 0]['text']	
+	ocr_dataframe = ocr.exec_ocr(mono_image[taimee_filter.leading_y: taimee_filter.leading_y+heading_height, heading_xpos:], output_type=TesseractOutput.DATAFRAME)
+	heading_text = ocr_dataframe[ocr_dataframe['conf'] > 0]['text']	
 	## cut preceding bump area
 	try:
 		bump_ypos, bump_ypos_len = find_border(b_image)

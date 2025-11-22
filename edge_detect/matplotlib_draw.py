@@ -64,8 +64,35 @@ except tomllib.TOMLDecodeError as err:
 image = cv2.imread(str(image_fullpath)) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
 if image is None:
 	raise ValueError("Error: Could not load image: %s" % image_fullpath)
-from image_filter import ImageDictKey, taimee
-import image_filter
+from image_filter import ImageDictKey, taimee, BinaryImage, TaimeeFilter, ImageFilterParam
+from typing import Any
+# import image_filter
+title_window = 'Binary Iimage'
+cv2.namedWindow(title_window)
+binary_image = BinaryImage(image, binarize=True)
+g_threshold = 237
+def on_trackbar(val):
+	global g_threshold
+	g_threshold = val
+	b_image = binary_image.bin_image(thresh_val=g_threshold)
+	cv2.imshow('Binary Image', b_image)
+cv2.createTrackbar('Threshold', title_window, g_threshold, 255, on_trackbar)
+on_trackbar(g_threshold)
+cv2.waitKey(0)
+b_image = binary_image.bin_image(thresh_val=g_threshold)
+SUBPLOT_SIZE = 2
+fig, ax = plt.subplots(SUBPLOT_SIZE, 1)#, figsize=(10, 4*SUBPLOT_SIZE))
+for r in range(SUBPLOT_SIZE):
+	ax[r].invert_yaxis()
+	ax[r].xaxis.tick_top()
+	ax[r].set_title(f"Row {r+1}")
+ax[0].imshow(b_image, cmap='gray')
+filter_params: dict[ImageFilterParam, Any] = {}
+taimee_filter = TaimeeFilter(given_image=b_image, params=filter_params)
+heading_param_dict = {}
+heading_ypos, heading_height, heading_xpos = taimee_filter.extract_heading(heading_param_dict)
+ax[1].imshow(b_image[heading_ypos:heading_ypos+heading_height, heading_xpos:], cmap='gray')
+plt.show()
 image_filter_apps = {'taimee': taimee}
 app_func = image_filter_apps[APP_STR]
 if not app_func:
@@ -75,12 +102,13 @@ fig, ax = plt.subplots(SUBPLOT_SIZE, 1)
 for r in range(SUBPLOT_SIZE):
 	ax[r].invert_yaxis()
 	ax[r].xaxis.tick_top()
+	ax[r].set_title(f"Row {r}")
 image_dict = {}
 h_lines, filtered_image = app_func(image, single=False, cvt_color=cv2.COLOR_BGR2GRAY, image_dict=image_dict, binarize=True)
 # mono_image = cv2.cvtColor(filtered_image, cv2.COLOR_BGR2GRAY)
-bin_image = cv2.threshold(filtered_image, thresh=150, maxval=255, type=cv2.THRESH_BINARY)[1]
+binary_image = cv2.threshold(filtered_image, thresh=150, maxval=255, type=cv2.THRESH_BINARY)[1]
 # ax[0].imshow(image)
-ax[0].imshow(bin_image)
+ax[0].imshow(binary_image)
 # negative_mono_image = cv2.bitwise_not(filtered_image)
 # text_border_image = cv2.threshold(negative_mono_image, thresh=16, maxval=255, type=cv2.THRESH_BINARY)[1]
 # negative_text_image = cv2.bitwise_not(text_image)
