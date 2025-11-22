@@ -58,7 +58,7 @@ class KeyUnit(Enum):
 	MONEY = 3
 
 
-class ImageAreaKey(Enum):
+class ImageDictKey(Enum):
 	leading = (KeyUnit.PIXEL, 1)
 	heading = (KeyUnit.TEXT, 1)  # heading"
 	work_time = (KeyUnit.HOUR, 1)  # "hours"
@@ -111,8 +111,8 @@ class ImageFilterItemArea(TOMLDataclass):
 
 
 @dataclass
-class LeadingArea(ImageFilterItemArea):
-	pass
+class LeadingArea:
+	height: int
 
 @dataclass
 class HeadingArea(ImageFilterItemArea):
@@ -185,16 +185,16 @@ class ImageFilterAreas:
 				fp.write(f"{key} = ")
 				fp.write(f"{area.as_dict()}\n") if as_dict else fp.write(f"{list(area.param)}\n")
 
-	area_key_list = [ImageAreaKey.leading, ImageAreaKey.heading, ImageAreaKey.shift_start, ImageAreaKey.shift_end, ImageAreaKey.break_time, ImageAreaKey.payslip, ImageAreaKey.salary]
+	area_key_list = [ImageDictKey.leading, ImageDictKey.heading, ImageDictKey.shift_start, ImageDictKey.shift_end, ImageDictKey.break_time, ImageDictKey.payslip, ImageDictKey.salary]
 
 	areas = {
-		ImageAreaKey.leading: LeadingArea,
-		ImageAreaKey.heading: HeadingArea,
-		ImageAreaKey.shift_start: ShiftStartArea,
-		ImageAreaKey.shift_end: ShiftEndArea,
-		ImageAreaKey.break_time: BreaktimeArea,
-		ImageAreaKey.payslip: PayslipArea,
-		ImageAreaKey.salary: SalaryArea,
+		ImageDictKey.leading: LeadingArea,
+		ImageDictKey.heading: HeadingArea,
+		ImageDictKey.shift_start: ShiftStartArea,
+		ImageDictKey.shift_end: ShiftEndArea,
+		ImageDictKey.break_time: BreaktimeArea,
+		ImageDictKey.payslip: PayslipArea,
+		ImageDictKey.salary: SalaryArea,
 	}
 	heading: HeadingArea # midashi
 	shift: ShiftArea # syuugyou jikan
@@ -236,7 +236,7 @@ def taimee(
 	thresh_value: float = 150.0,
 	single: bool = False,
 	cvt_color: int = cv2.COLOR_BGR2GRAY,
-	image_dict: dict[ImageAreaKey, np.ndarray] | None = None,
+	image_dict: dict[ImageDictKey, np.ndarray] | None = None,
 	image_filter_params: dict[ImageFilterParam, int] = {},
 	b_thresh_valule: float = 235.0,
 	binarize: bool = True,
@@ -394,14 +394,14 @@ def taimee(
 		)
 	# add the heading area to the dict
 	if image_dict is not None:
-		image_dict[ImageAreaKey.heading] = heading_area
-		image_dict[ImageAreaKey.work_time] = image[ypos_list[0] : ypos_list[1], :]
-		image_dict[ImageAreaKey.shift_start] = image[ypos_list[0] : ypos_list[1], :xpos]
-		image_dict[ImageAreaKey.shift_end] = image[
+		image_dict[ImageDictKey.heading] = heading_area
+		image_dict[ImageDictKey.work_time] = image[ypos_list[0] : ypos_list[1], :]
+		image_dict[ImageDictKey.shift_start] = image[ypos_list[0] : ypos_list[1], :xpos]
+		image_dict[ImageDictKey.shift_end] = image[
 			ypos_list[0] : ypos_list[1], xpos2:
 		]
-		image_dict[ImageAreaKey.break_time] = image[ypos_list[1] : ypos_list[-1], :]
-		image_dict[ImageAreaKey.payslip] = image[ypos_list[-1] :, :]
+		image_dict[ImageDictKey.break_time] = image[ypos_list[1] : ypos_list[-1], :]
+		image_dict[ImageDictKey.payslip] = image[ypos_list[-1] :, :]
 	return ypos_list, image
 
 
@@ -642,3 +642,65 @@ return_as_cuts: bool = False, center_rate = 0.5
 		params[ImageFilterParam.shift_from_width] = left_area_width
 		params[ImageFilterParam.shift_until_xpos] = right_area_xpos
 	return ShiftArea(ypos=0, height=image.shape[0], start_width=left_area_width, end_xpos=right_area_xpos) if return_as_cuts else (image[:, :left_area_width], image[:, right_area_xpos:])
+
+class TaimeeFilter:
+	def __init__(self, image: np.ndarray, params: dict[ImageFilterParam, int] = {}):
+		pass
+
+def merge_nearby_elems(elems: Sequence[int], thresh=9) -> Iterator[int]:
+	if len(elems) < 2:
+		raise ValueError("elems must be 2 or more!")
+	elem0 = elems[0]
+	elem = sent = None
+	for elem in elems[1:]:
+		sent = False
+		if elem - elem0 > thresh:
+			yield elem0
+			sent = True
+			elem0 = elem
+	if sent:
+		yield elem0
+
+@dataclass
+class NeabyElems:
+	thresh: int = 10
+	elems: list[int] = []
+	def add(self, i: int):
+		if len(self.elems) == 0:
+			self.elems.append(i)
+		else:
+			if i - self.elems[-1] > self.thresh:
+				self.elems.append(i)
+
+		
+
+def find_horizontal_lines(
+	image: np.ndarray,
+	border_color: BorderColor = BorderColor.BLACK,
+	edge_ratio: float = 0.10,
+) -> Iterator[int]:
+	"""Find border lines in the image.
+	Return: list of border ypos"""
+
+
+	edge_len = int(image.shape[1] * edge_ratio)
+	border_len = image.shape[1] - edge_len * 2
+
+
+	def get_border_or_bg(y: int) -> bool | None:
+		# Returns True if border is found, False if background is found, else returns None
+		for n, (k, g) in enumerate(groupby(image[y, :])):
+			if n >= 3:
+				return None # raise NotBorder()
+			if k == border_color.value and len(list(g)) >= border_len:
+				return True
+		return False
+
+	y = -1
+	# border_lines = []
+	for n, y in enumerate(range(image.shape[0])):
+		is_border = get_border_or_bg(y)
+		if is_border:  # color == border_color:
+			yield n
+			# border_lines.append(n)
+	# return border_lines
