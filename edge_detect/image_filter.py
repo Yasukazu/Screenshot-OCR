@@ -229,7 +229,6 @@ class ImageFilterParam(Enum):
 	salary_ypos = 5.1
 
 
-
 class NonNearbyElems:
 	def __init__(self,
 		thresh: int = 10,
@@ -244,6 +243,114 @@ class NonNearbyElems:
 		else:
 			if i - self.elems[-1] > self.thresh:
 				self.elems.append(i)
+
+class BorderColor(Enum):
+	WHITE = 255
+	BLACK = 0
+
+
+class NoBorderError(Exception):
+	pass
+def find_horizontal_borders(
+	image: np.ndarray,
+	border_color: BorderColor = BorderColor.BLACK,
+	edge_ratio: float = 0.10,
+) -> Iterator[int]:
+	"""Find border lines in the image.
+	Return: list of border ypos"""
+
+
+	edge_len = int(image.shape[1] * edge_ratio)
+	border_len = image.shape[1] - edge_len * 2
+
+
+	def get_border_or_bg(y: int) -> bool | None:
+		# Returns True if border is found, False if background is found, else returns None
+		for n, (k, g) in enumerate(groupby(image[y, :])):
+			if n >= 3:
+				return None # raise NotBorder()
+			if k == border_color.value and len(list(g)) >= border_len:
+				return True
+		return False
+
+	y = -1
+	# border_lines = []
+	for n, y in enumerate(range(image.shape[0])):
+		is_border = get_border_or_bg(y)
+		if is_border:  # color == border_color:
+			yield n
+			# border_lines.append(n)
+	# return border_lines
+
+class TaimeeFilter:
+	def __init__(self, image: np.ndarray, params: dict[ImageFilterParam, int] = {}):
+		self.image = image
+		self.borders = []
+		self.non_nearby_borders = NonNearbyElems(thresh=image.shape[0] // 20)
+		for border in find_horizontal_borders(image, border_color=BorderColor.BLACK):
+			self.non_nearby_borders.add(border)
+			self.borders.append(border)
+		self.non_nearby_array = np.array(self.non_nearby_borders.elems)
+		self.leading = self.borders[0]
+		self.border_array = np.array(self.borders)
+		self.border_array = self.border_array - self.leading
+		self.non_nearby_array = self.non_nearby_array[1:] - self.leading
+
+		
+	def strip_heading(self) -> tuple[int, int, int]:
+		'''Return: (y_leading, y_position, x_position) '''
+		heading_area = self.image[self.leading:self.non_nearby_array[0] + self.leading, :].copy()
+		for y in self.border_array:
+			if y >= heading_area.shape[0]:
+				break
+			heading_area[y, :] = 255
+		xpos = self.get_heading_avatar_end_xpos(heading_area, remove_borders=False)
+		# scan from bottom
+		# assert heading_area[-1, xpos:].all() == 255
+		for y in range(heading_area.shape[0] - 1, 0, -1):
+			if np.any(heading_area[y, xpos:] == 0):
+				break
+			# Found a row with at least one non-white pixel
+		assert y > 0, "No valid row found"
+		for y2 in range(y, 0, -1):
+			if np.all(heading_area[y2, xpos:] == 255):
+				break
+		assert y2 > 0, "No valid row found (2)"
+		return self.leading, y2, xpos
+
+		
+
+		
+	@classmethod
+	def get_heading_avatar_end_xpos(cls, image: np.ndarray, min_width: int = 8, 		borders: list[int] | None =None, remove_borders: bool = False)->int:
+		height, width = image.shape[:2]
+
+		# Remove horizontal borders from the image to simplify processing
+		if remove_borders:
+			image = image.copy()
+			if borders is None:
+				for y in (find_horizontal_borders(image)):
+					image[y, :] = 255
+			else:
+				for y in borders:
+					image[y, :] = 255
+
+		px = -1
+		for px in range(width):
+			v_line = image[:, px]
+			if np.any(v_line == 0):
+				break
+		if px == width:
+			raise ValueError("Not enough valid width(%d) for the heading!" % width)
+		# 2 pass the shape
+		x = -1
+		for x in range(px + 1, width):
+			v_line = image[:, x]
+			if np.all(v_line == 255):
+				break
+		if x < min_width:
+			raise ValueError("Not enough valid width(%d) for the heading!" % x)
+		return x
 
 def taimee(
 	given_image: ndarray | Path | str,
@@ -299,12 +406,12 @@ def taimee(
 	non_nearby_elems_array[:] -= leading_height
 	non_nearby_elems = non_nearby_elems_array[1:].tolist()
 	heading_elem = non_nearby_elems[0]
-	from image_filter import TaimeeFilter
+	# from image_filter import TaimeeFilter
 	taimee_filter = TaimeeFilter(b_image, horizontal_borders)
 	leading, heading_ypos, heading_xpos = taimee_filter.strip_heading()
 	# heading_area_xpos = TaimeeFilter.get_heading_avatar_end_xpos(b_image[leading_height:heading_elem+leading_height, :], borders=horizontal_borders)
 	ocr = TesseractOCR()
-	from pandas import DataFrame
+	# from pandas import DataFrame
 	from pytesseract import Output as TesseractOutput
 	ocr_dataframe = ocr.exec_ocr(mono_image[leading:leading+heading_ypos, heading_xpos:], output_type=TesseractOutput.DATAFRAME)
 	print(ocr_dataframe[ocr_dataframe['conf'] > 0]['text']	
@@ -508,13 +615,6 @@ def find_runs(x):
 		return run_values, run_starts, run_lengths
 
 
-class BorderColor(Enum):
-	WHITE = 255
-	BLACK = 0
-
-
-class NoBorderError(Exception):
-	pass
 
 
 def find_border(
@@ -680,75 +780,7 @@ return_as_cuts: bool = False, center_rate = 0.5
 		params[ImageFilterParam.shift_until_xpos] = right_area_xpos
 	return ShiftArea(ypos=0, height=image.shape[0], start_width=left_area_width, end_xpos=right_area_xpos) if return_as_cuts else (image[:, :left_area_width], image[:, right_area_xpos:])
 
-class TaimeeFilter:
-	def __init__(self, image: np.ndarray, params: dict[ImageFilterParam, int] = {}):
-		self.image = image
-		self.borders = []
-		self.non_nearby_borders = NonNearbyElems(thresh=image.shape[0] // 20)
-		for border in find_horizontal_borders(image):
-			self.non_nearby_borders.add(border)
-			self.borders.append(border)
-		self.non_nearby_array = np.array(self.non_nearby_borders.elems)
-		self.leading = self.borders[0]
-		self.border_array = np.array(self.borders)
-		self.border_array = self.border_array - self.leading
-		self.non_nearby_array = self.non_nearby_array[1:] - self.leading
 
-		
-	def strip_heading(self) -> tuple[int, int, int]:
-		'''Return: (y_leading, y_position, x_position) '''
-		heading_area = self.image[self.leading:self.non_nearby_array[0] + self.leading, :].copy()
-		for y in self.border_array:
-			if y >= heading_area.shape[0]:
-				break
-			heading_area[y, :] = 255
-		xpos = self.get_heading_avatar_end_xpos(heading_area, remove_borders=False)
-		# scan from bottom
-		# assert heading_area[-1, xpos:].all() == 255
-		for y in range(heading_area.shape[0] - 1, 0, -1):
-			if np.any(heading_area[y, xpos:] == 0):
-				break
-			# Found a row with at least one non-white pixel
-		assert y > 0, "No valid row found"
-		for y2 in range(y, 0, -1):
-			if np.all(heading_area[y2, xpos:] == 255):
-				break
-		assert y2 > 0, "No valid row found (2)"
-		return self.leading, y2, xpos
-
-		
-
-		
-	@classmethod
-	def get_heading_avatar_end_xpos(cls, image: np.ndarray, min_width: int = 8, 		borders: list[int] | None =None, remove_borders: bool = False)->int:
-		height, width = image.shape[:2]
-
-		# Remove horizontal borders from the image to simplify processing
-		if remove_borders:
-			image = image.copy()
-			if borders is None:
-				for y in (find_horizontal_borders(image)):
-					image[y, :] = 255
-			else:
-				for y in borders:
-					image[y, :] = 255
-
-		px = -1
-		for px in range(width):
-			v_line = image[:, px]
-			if np.any(v_line == 0):
-				break
-		if px == width:
-			raise ValueError("Not enough valid width(%d) for the heading!" % width)
-		# 2 pass the shape
-		x = -1
-		for x in range(px + 1, width):
-			v_line = image[:, x]
-			if np.all(v_line == 255):
-				break
-		if x < min_width:
-			raise ValueError("Not enough valid width(%d) for the heading!" % x)
-		return x
 
 def merge_nearby_elems(elems: Sequence[int], thresh=9) -> Iterator[int]:
 	if len(elems) < 2:
@@ -765,35 +797,3 @@ def merge_nearby_elems(elems: Sequence[int], thresh=9) -> Iterator[int]:
 		yield elem0
 
 
-		
-
-def find_horizontal_borders(
-	image: np.ndarray,
-	border_color: BorderColor = BorderColor.BLACK,
-	edge_ratio: float = 0.10,
-) -> Iterator[int]:
-	"""Find border lines in the image.
-	Return: list of border ypos"""
-
-
-	edge_len = int(image.shape[1] * edge_ratio)
-	border_len = image.shape[1] - edge_len * 2
-
-
-	def get_border_or_bg(y: int) -> bool | None:
-		# Returns True if border is found, False if background is found, else returns None
-		for n, (k, g) in enumerate(groupby(image[y, :])):
-			if n >= 3:
-				return None # raise NotBorder()
-			if k == border_color.value and len(list(g)) >= border_len:
-				return True
-		return False
-
-	y = -1
-	# border_lines = []
-	for n, y in enumerate(range(image.shape[0])):
-		is_border = get_border_or_bg(y)
-		if is_border:  # color == border_color:
-			yield n
-			# border_lines.append(n)
-	# return border_lines
