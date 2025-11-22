@@ -2,6 +2,7 @@ from io import IOBase
 
 from cv2 import UMat
 import cv2
+from tesseract_ocr import TesseractOCR
 
 # from cvc2.typing import MatLike
 # import matplotlib.pyplot as plt
@@ -229,7 +230,7 @@ class ImageFilterParam(Enum):
 
 
 
-class NonNeabyElems:
+class NonNearbyElems:
 	def __init__(self,
 		thresh: int = 10,
 		elems: list[int] = []
@@ -285,9 +286,22 @@ def taimee(
 	b_image = cv2.threshold(
 		mono_image, thresh=b_thresh_valule, maxval=255, type=cv2.THRESH_BINARY
 	)[1]  # binary, high contrast
-	non_neaby_elems = NonNeabyElems()
-	for y in find_horizontal_lines(b_image):
-		non_neaby_elems.add(y)
+	non_nearby_elems = NonNearbyElems(thresh=height // 20)
+	try:
+		for y in find_horizontal_borders(b_image):
+			non_nearby_elems.add(y)
+	except NoBorderError:
+		raise ValueError("No horizontal borders found!")
+	non_nearby_elems_array = np.array(non_nearby_elems.elems)
+	leading_height = non_nearby_elems_array[0]
+	non_nearby_elems_array[:] -= leading_height
+	non_nearby_elems = non_nearby_elems_array[1:].tolist()
+	heading_elem = non_nearby_elems[0]
+	ocr = TesseractOCR()
+	from pandas import DataFrame
+	from pytesseract import Output as TesseractOutput
+	ocr_dataframe = ocr.exec_ocr(mono_image[leading_height:heading_elem+leading_height, :], output_type=TesseractOutput.DATAFRAME)
+	
 	## cut preceding bump area
 	try:
 		bump_ypos, bump_ypos_len = find_border(b_image)
@@ -681,7 +695,7 @@ def merge_nearby_elems(elems: Sequence[int], thresh=9) -> Iterator[int]:
 
 		
 
-def find_horizontal_lines(
+def find_horizontal_borders(
 	image: np.ndarray,
 	border_color: BorderColor = BorderColor.BLACK,
 	edge_ratio: float = 0.10,
