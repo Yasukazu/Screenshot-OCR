@@ -346,13 +346,7 @@ class TaimeeFilter:
 			heading_area[y, :] = 255
 		xpos = self.get_heading_avatar_end_xpos(heading_area, remove_borders=False)
 		# scan from bottom
-		# assert heading_area[-1, xpos:].all() == 255
-		found_black = False
-		class HeightWidth(NamedTuple):
-			height: int
-			width: int
 		heading_h, heading_w = heading_area.shape[:2]
-
 		shape_hlen = heading_w // 3
 		def get_shape_hline(y: int):
 			for n, (k, g) in enumerate(groupby(heading_area[y, :].tolist())):
@@ -365,12 +359,14 @@ class TaimeeFilter:
 				break
 		if not shape_found:
 			raise ValueError("No shape found in heading bottom area!")
-		# Found a row with at least one non-white pixel
 		heading_area[0, :] = 255
+		y2 = -1
+		bg_found = False
 		for y2 in range(y, 0, -1):
 			if np.all(heading_area[y2, xpos:] == 255):
+				bg_found = True
 				break
-		if y2 == 0:
+		if not bg_found:
 			raise ValueError("No valid shape found (2)")
 		'''cv2.imshow("Heading area bottom shape", heading_area[y2+1:y+1, xpos:])	
 		cv2.waitKey(0)'''
