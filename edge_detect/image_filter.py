@@ -387,8 +387,17 @@ class TaimeeFilter:
 					break
 			if not bg_found:
 				raise ValueError("No valid shape found (4)")
-			print(f"Shape's rectangle size is:: height: {y - y2}, width: {x2 - x} ")
+			print(f"Bottom Shape's rectangle size is:: height: {y - y2}, width: {x2 - x} ")
 			print(f"and it's position is:: from heading area top: {y2}, from left: {xpos + x}")
+			assert (y + 2 ) > (y2 - 1)
+			assert (x2 + 1) > (x - 1)
+			shape_area_image = shape_area[y2-1:y + 2, x - 1:x2 + 1]
+			cv2.imshow("Heading area bottom shape only", shape_area_image)	
+			cv2.waitKey(0)
+			contours, _ = cv2.findContours(shape_area_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+			contour = contours[0]
+			x, y, w, h = cv2.boundingRect(contour)
+			print(f"Bottom Shape's bounding rectangle size is:: height: {h}, width: {w} ")
 			h_area_copy = heading_area.copy()
 			cv2.rectangle(h_area_copy, (xpos + x, y2), (xpos + x2, y), (0, 0, 0), 2)
 			cv2.imshow("Heading area bottom shape", h_area_copy)	
