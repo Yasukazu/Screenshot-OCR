@@ -93,9 +93,10 @@ heading_param_dict = {}
 #heading_ypos, heading_height, heading_xpos, heading_width 
 heading_param = taimee_filter.extract_heading(heading_param_dict)
 filter_param_dict |= heading_param_dict
-with open('taimee_filter.cfg', 'w') as wf:
-	wf.write("taimee={")
-	wf.write(','.join([f"'{k.name}':{list(v)}" for k, v in filter_param_dict.items()]) + '}\n')
+with open('taimee_filter.toml', 'w') as wf:
+	wf.write("[taimee]")#={")
+	heading_param.to_toml(wf)
+	# wf.write(','.join([f"'{k.name}':{list(v)}" for k, v in filter_param_dict.items()]) + '}\n')
 
 ax[1].imshow(b_image[heading_param.ypos:heading_param.ypos+heading_param.height, heading_param.xpos:], cmap='gray')
 plt.show()

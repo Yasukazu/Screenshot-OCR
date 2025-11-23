@@ -1,4 +1,5 @@
 from io import IOBase
+from dataclasses import field
 
 from cv2 import UMat
 import cv2
@@ -295,7 +296,9 @@ def find_horizontal_borders(
 			yield n
 			# border_lines.append(n)
 	# return border_lines
-class ImageAreaName(NamedTuple):
+
+@dataclass
+class ImageAreaName(TOMLDataclass):
 	ypos: int = 0
 	height: int = -1
 	xpos: int = 0
