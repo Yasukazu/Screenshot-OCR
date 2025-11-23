@@ -91,15 +91,29 @@ filter_param_dict: dict[ImageFilterParam, Any] = {}
 taimee_filter = TaimeeFilter(given_image=image, params=filter_param_dict)
 heading_param_dict = {}
 #heading_ypos, heading_height, heading_xpos, heading_width 
+t_leading_y = taimee_filter.leading_y
 heading_param = taimee_filter.extract_heading(heading_param_dict)
 filter_param_dict |= heading_param_dict
-with open('taimee_filter.toml', 'w') as wf:
-	wf.write("[taimee]")#={")
-	heading_param.to_toml(wf)
-	# wf.write(','.join([f"'{k.name}':{list(v)}" for k, v in filter_param_dict.items()]) + '}\n')
 
-ax[1].imshow(b_image[heading_param.ypos:heading_param.ypos+heading_param.height, heading_param.xpos:], cmap='gray')
+	# wf.write(','.join([f"'{k.name}':{list(v)}" for k, v in filter_param_dict.items()]) + '}\n')
+fig, ax = plt.subplots(1, 2)
+ax[1].imshow(taimee_filter.bin_image[t_leading_y:t_leading_y+heading_param.height, heading_param.xpos:], cmap='gray')
 plt.show()
+from io import StringIO
+wf = StringIO()
+# wf.write("[taimee]\n")
+wf.write("[heading-param.taimee]\n")
+heading_param.to_toml(wf)
+toml_str = wf.getvalue()
+wf.close()
+toml_filename = 'taimee-filter.toml'
+with open(toml_filename, 'w') as wf:
+	wf.write(toml_str)
+from tomllib import load
+with open(toml_filename, 'rb') as rf:
+	toml_dict = load(rf)
+heading_image_area = ImageAreaName(**toml_dict['heading-param']['taimee'])
+print(toml_dict)
 image_filter_apps = {'taimee': taimee}
 app_func = image_filter_apps[APP_STR]
 if not app_func:

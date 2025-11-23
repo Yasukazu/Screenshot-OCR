@@ -352,7 +352,7 @@ class TaimeeFilter:
 			if np.all(heading_area[y2, xpos:] == 255):
 				break
 		assert y2 > 0, "No valid row found (2)"
-		new_params = ImageAreaName(self.leading_y, y2, xpos)#, -1)
+		new_params = ImageAreaName(0, y2, xpos)#, -1)
 		if params is not None:
 			params[ImageFilterParam.heading] = new_params
 		return new_params
