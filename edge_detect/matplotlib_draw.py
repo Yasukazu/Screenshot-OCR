@@ -61,10 +61,10 @@ except FileNotFoundError as err:
 	raise ValueError("Error: file not found!\n%s" % err)
 except tomllib.TOMLDecodeError as err:
 	raise ValueError("Error: failed to TOML decode!\n%s" % err)
-image = cv2.imread(str(image_fullpath)) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
+image = cv2.imread(str(image_fullpath), cv2.IMREAD_GRAYSCALE) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
 if image is None:
 	raise ValueError("Error: Could not load image: %s" % image_fullpath)
-from image_filter import ImageDictKey, taimee, BinaryImage, TaimeeFilter, ImageFilterParam, ImageAreaName
+from image_filter import ImageDictKey, taimee, BinaryImage, TaimeeFilter, ImageFilterParam, ImageAreaParam
 from typing import Any
 # import image_filter
 '''title_window = 'Binary Iimage'
@@ -79,7 +79,8 @@ def on_trackbar(val):
 cv2.createTrackbar('Threshold', title_window, g_threshold, 255, on_trackbar)
 on_trackbar(g_threshold)
 cv2.waitKey(0)
-b_image = binary_image.bin_image(thresh_val=g_threshold)
+breakpoint()'''
+'''b_image = binary_image.bin_image(thresh_val=g_threshold)
 SUBPLOT_SIZE = 2
 fig, ax = plt.subplots(SUBPLOT_SIZE, 1)#, figsize=(10, 4*SUBPLOT_SIZE))
 for r in range(SUBPLOT_SIZE):
@@ -112,7 +113,7 @@ with open(toml_filename, 'w') as wf:
 from tomllib import load
 with open(toml_filename, 'rb') as rf:
 	toml_dict = load(rf)
-heading_image_area = ImageAreaName(**toml_dict['heading-param']['taimee'])
+heading_image_area = ImageAreaParam(**toml_dict['heading-param']['taimee'])
 print(toml_dict)
 image_filter_apps = {'taimee': taimee}
 app_func = image_filter_apps[APP_STR]
