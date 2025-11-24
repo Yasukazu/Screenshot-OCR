@@ -332,7 +332,7 @@ class TaimeeFilter:
 			self.non_nearby_array = self.non_nearby_array[1:] - self.leading_y
 
 		
-	def extract_heading(self, params: dict[ImageFilterParam, tuple[int, int]] | None = None, seek_bottom_shape: bool = False) -> ImageAreaParam:# tuple[int, int, int]:
+	def extract_heading(self, params: dict[ImageFilterParam, tuple[int, int]] | None = None, seek_button_shape: bool = False) -> ImageAreaParam:# tuple[int, int, int]:
 		'''Return: (ypos, height, x_start)
 		Use with self.leading_y like image[self.leading_y: self.leading_y + height, x_start:]'''
 		if len(self.non_nearby_array) == 0:
@@ -345,20 +345,21 @@ class TaimeeFilter:
 				break
 			heading_area[y, :] = 255
 		xpos = self.get_heading_avatar_end_xpos(heading_area, remove_borders=False)
-		# scan from bottom
-		if seek_bottom_shape:
+		# scan button like shape from bottom
+		if seek_button_shape:
 			heading_h, heading_w = heading_area.shape[:2]
-			shape_hlen = heading_w // 3
-			def get_shape_hline(y: int):
+			button_w_goal = heading_w // 3
+			def get_hline(y: int):
 				for n, (k, g) in enumerate(groupby(heading_area[y, :].tolist())):
-					if n == 3 and k == 0 and len(list(g)) >= shape_hlen:
-						return True
-			shape_found = False
+					if n == 3 and k == 0 and (w:=len(list(g))) >= button_w_goal:
+						return w
+				return 0
+			button_edge_w = 0
 			for y in range(heading_h - 1, 0, -1):
-				if get_shape_hline(y):
-					shape_found = True
+				if (w:=get_hline(y)):
+					button_edge_w = w
 					break
-			if not shape_found:
+			if not button_edge_w:
 				raise ValueError("No shape found in heading bottom area!")
 			heading_area[0, :] = 255
 			y2 = -1
@@ -368,33 +369,35 @@ class TaimeeFilter:
 					bg_found = True
 					break
 			if not bg_found:
-				raise ValueError("No valid shape found (2)")
+				raise ValueError("No button shape found (2)")
 			'''cv2.imshow("Heading area bottom shape", heading_area[y2+1:y+1, xpos:])	
 			cv2.waitKey(0)'''
-			shape_area = heading_area[y2+1:y+1, xpos:]
-			shape_w = shape_area.shape[1]
+			# try to find button width
+			button_band = heading_area[y2+1:y+1, xpos:]
+			shape_w = button_band.shape[1]
 			black_found = False
 			for x in range(shape_w):
-				if np.any(shape_area[:, x] != 255):
+				if np.any(button_band[:, x] != 255):
 					black_found = True
 					break
 			if not black_found:
 				raise ValueError("No valid shape found (3)")
 			bg_found = False
 			for x2 in range(x, shape_w):
-				if np.all(shape_area[:, x2] == 255):
+				if np.all(button_band[:, x2] == 255):
 					bg_found = True
 					break
 			if not bg_found:
 				raise ValueError("No valid shape found (4)")
-			print(f"Bottom Shape's rectangle size is:: height: {y - y2}, width: {x2 - x} ")
+			print(f"Button Shape's rectangle size is:: height: {y - y2}, width: {x2 - x} ")
 			print(f"and it's position is:: from heading area top: {y2}, from left: {xpos + x}")
 			assert (y + 2 ) > (y2 - 1)
 			assert (x2 + 1) > (x - 1)
-			shape_area_image = shape_area[y2-1:y + 2, x - 1:x2 + 1]
-			cv2.imshow("Heading area bottom shape only", shape_area_image)	
+			button_rect = button_band[:, x:x2]
+			# cv2.imshow("Heading shape area ", shape_band)	
+			cv2.imshow("Heading area bottom shape rect", button_rect)	
 			cv2.waitKey(0)
-			contours, _ = cv2.findContours(shape_area_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+			contours, _ = cv2.findContours(button_rect, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 			contour = contours[0]
 			x, y, w, h = cv2.boundingRect(contour)
 			print(f"Bottom Shape's bounding rectangle size is:: height: {h}, width: {w} ")

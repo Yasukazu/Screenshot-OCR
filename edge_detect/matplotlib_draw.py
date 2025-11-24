@@ -93,7 +93,7 @@ taimee_filter = TaimeeFilter(given_image=image, params=filter_param_dict)
 heading_param_dict = {}
 #heading_ypos, heading_height, heading_xpos, heading_width 
 t_leading_y = taimee_filter.leading_y
-heading_param = taimee_filter.extract_heading(heading_param_dict)
+heading_param = taimee_filter.extract_heading(heading_param_dict, seek_button_shape=True)
 filter_param_dict |= heading_param_dict
 
 	# wf.write(','.join([f"'{k.name}':{list(v)}" for k, v in filter_param_dict.items()]) + '}\n')
