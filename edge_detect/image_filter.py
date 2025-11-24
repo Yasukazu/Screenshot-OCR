@@ -348,19 +348,22 @@ class TaimeeFilter:
 		# scan button like shape from bottom
 		if seek_button_shape:
 			heading_h, heading_w = heading_area.shape[:2]
-			button_w_goal = heading_w // 3
+			button_w_min = heading_w // 3
+			def get_line(line: Sequence[int]):
+				for (k, g) in groupby(line):
+					if k == 0 and (w:=len(list(g))) >= button_w_min:
+						return w
 			def get_hline(y: int):
 				for n, (k, g) in enumerate(groupby(heading_area[y, :].tolist())):
-					if n == 3 and k == 0 and (w:=len(list(g))) >= button_w_goal:
+					if n == 3 and k == 0 and (w:=len(list(g))) >= button_w_min:
 						return w
-				return 0
-			button_edge_w = 0
+			button_bottom_line = None
 			for y in range(heading_h - 1, 0, -1):
-				if (w:=get_hline(y)):
-					button_edge_w = w
+				if (w:=get_line(heading_area[y, :].tolist())):
+					button_bottom_line = w
 					break
-			if not button_edge_w:
-				raise ValueError("No shape found in heading bottom area!")
+			if not button_bottom_line:
+				raise ValueError("No button found in heading bottom area!")
 			heading_area[0, :] = 255
 			y2 = -1
 			bg_found = False
@@ -369,7 +372,10 @@ class TaimeeFilter:
 					bg_found = True
 					break
 			if not bg_found:
-				raise ValueError("No button shape found (2)")
+				raise ValueError("No bg above button shape!")
+			button_top_line = get_line(heading_area[y2+1,:].tolist())
+			if abs(button_top_line - button_bottom_line) > 10:
+				raise ValueError("Button shape is not top-bottom symmetrical!")	
 			'''cv2.imshow("Heading area bottom shape", heading_area[y2+1:y+1, xpos:])	
 			cv2.waitKey(0)'''
 			# try to find button width
