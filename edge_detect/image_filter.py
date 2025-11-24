@@ -62,6 +62,7 @@ class KeyUnit(Enum):
 
 class ImageDictKey(Enum):
 	leading = (KeyUnit.PIXEL, 1)
+	heading_button = (KeyUnit.TEXT, 0)  # heading"
 	heading = (KeyUnit.TEXT, 1)  # heading"
 	work_time = (KeyUnit.HOUR, 1)  # "hours"
 	break_time = (KeyUnit.HOUR, 2)  # "rest_hours"
@@ -332,7 +333,7 @@ class TaimeeFilter:
 			self.non_nearby_array = self.non_nearby_array[1:] - self.leading_y
 
 		
-	def extract_heading(self, params: dict[ImageFilterParam, tuple[int, int]] | None = None, seek_button_shape: bool = False) -> ImageAreaParam:# tuple[int, int, int]:
+	def extract_heading(self, params: dict[ImageDictKey, tuple[int, int]] | None = None, seek_button_shape: bool = False, get_button_text: bool = False) -> ImageAreaParam|tuple[ImageAreaParam, str]:
 		'''Return: (ypos, height, x_start)
 		Use with self.leading_y like image[self.leading_y: self.leading_y + height, x_start:]'''
 		if len(self.non_nearby_array) == 0:
@@ -346,7 +347,7 @@ class TaimeeFilter:
 			heading_area[y, :] = 255
 		xpos = self.get_heading_avatar_end_xpos(heading_area, remove_borders=False)
 		# scan button like shape from bottom
-		if seek_button_shape:
+		if seek_button_shape or get_button_text:
 			heading_h, heading_w = heading_area.shape[:2]
 			button_w_min = heading_w // 3
 			def get_line(line: Sequence[int]):
@@ -373,6 +374,13 @@ class TaimeeFilter:
 					break
 			if not bg_found:
 				raise ValueError("No bg above button shape!")
+			button_text: str | None = None
+			if get_button_text:
+				from tesseract_ocr import TesseractOCR, Output
+				ocr = TesseractOCR()
+				ocr_result = ocr.exec(heading_area[y2:y, xpos:], output_type=Output.DATAFRAME, psm=7)
+				button_text = ''.join(list(ocr_result[ocr_result['conf']>0]['text']))
+				# print(f"OCR Result text: {ocr_text}")
 			button_top_line = get_line(heading_area[y2+1,:].tolist())
 			if abs(button_top_line - button_bottom_line) > 10:
 				raise ValueError("Button shape is not top-bottom symmetrical!")	
@@ -414,8 +422,8 @@ class TaimeeFilter:
 
 		new_params = ImageAreaParam(0, y2, xpos)#, -1)
 		if params is not None:
-			params[ImageFilterParam.heading] = new_params
-		return new_params
+			params[ImageDictKey.heading] = new_params
+		return (new_params, button_text) if button_text else new_params
 
 		
 
@@ -556,7 +564,7 @@ def taimee(
 	ocr = TesseractOCR()
 	# from pandas import DataFrame
 	from pytesseract import Output as TesseractOutput
-	ocr_dataframe = ocr.exec_ocr(mono_image[taimee_filter.leading_y: taimee_filter.leading_y+heading_height, heading_xpos:], output_type=TesseractOutput.DATAFRAME)
+	ocr_dataframe = ocr.exec(mono_image[taimee_filter.leading_y: taimee_filter.leading_y+heading_height, heading_xpos:], output_type=TesseractOutput.DATAFRAME)
 	heading_text = ocr_dataframe[ocr_dataframe['conf'] > 0]['text']	
 	## cut preceding bump area
 	try:

@@ -90,10 +90,11 @@ for r in range(SUBPLOT_SIZE):
 ax[0].imshow(b_image, cmap='gray')'''
 filter_param_dict: dict[ImageFilterParam, Any] = {}
 taimee_filter = TaimeeFilter(given_image=image, params=filter_param_dict)
-heading_param_dict = {}
+heading_param_dict: dict[ImageDictKey, ImageAreaParam|str] = {}
 #heading_ypos, heading_height, heading_xpos, heading_width 
 t_leading_y = taimee_filter.leading_y
-heading_param = taimee_filter.extract_heading(heading_param_dict, seek_button_shape=True)
+heading_param, button_text = taimee_filter.extract_heading(heading_param_dict, seek_button_shape=True, get_button_text=True)
+heading_param_dict[ImageDictKey.heading_button] = button_text
 filter_param_dict |= heading_param_dict
 
 	# wf.write(','.join([f"'{k.name}':{list(v)}" for k, v in filter_param_dict.items()]) + '}\n')
