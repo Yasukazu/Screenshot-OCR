@@ -10,7 +10,7 @@ from tesseract_ocr import TesseractOCR
 import numpy as np
 from numpy import ndarray
 from pathlib import Path
-from typing import Iterator, Sequence, NamedTuple, override, Sequence
+from typing import Iterator, Sequence, NamedTuple, Optional, Sequence
 from dataclasses import dataclass
 from enum import Enum
 import sys
@@ -333,7 +333,7 @@ class TaimeeFilter:
 			self.non_nearby_array = self.non_nearby_array[1:] - self.leading_y
 
 		
-	def extract_heading(self, params: dict[ImageDictKey, tuple[int, int]] | None = None, seek_button_shape: bool = False, get_button_text: bool = False) -> ImageAreaParam|tuple[ImageAreaParam, str]:
+	def extract_heading(self, params: dict[ImageDictKey, tuple[int, int]] | None = None, seek_button_shape: bool = False, button_text: Optional[list[str]] = None) -> ImageAreaParam|tuple[ImageAreaParam, str]:
 		'''Return: (ypos, height, x_start)
 		Use with self.leading_y like image[self.leading_y: self.leading_y + height, x_start:]'''
 		if len(self.non_nearby_array) == 0:
@@ -347,7 +347,7 @@ class TaimeeFilter:
 			heading_area[y, :] = 255
 		xpos = self.get_heading_avatar_end_xpos(heading_area, remove_borders=False)
 		# scan button like shape from bottom
-		if seek_button_shape or get_button_text:
+		if seek_button_shape or (button_text is not None):
 			heading_h, heading_w = heading_area.shape[:2]
 			button_w_min = heading_w // 3
 			def get_line(line: Sequence[int]):
@@ -374,16 +374,34 @@ class TaimeeFilter:
 					break
 			if not bg_found:
 				raise ValueError("No bg above button shape!")
-			button_text: str | None = None
-			if get_button_text:
+			button_area = heading_area[y2:y, xpos:]
+			cv2.imshow("Button area", button_area)
+			cv2.waitKey(0)
+			# find contours of the button
+			contours, _ = cv2.findContours(button_area, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+			contour = contours[0]
+			x, y, w, h = cv2.boundingRect(contour)
+			button_area_copy = button_area.copy()
+			cv2.rectangle(button_area_copy, (x, y), (x + w, y + h), 0, 2)
+			cv2.imshow("Button area and its bounding rect", button_area_copy)
+			cv2.waitKey(0)
+			print(f"Bottom Shape's bounding rectangle size is:: height: {h}, width: {w} ")
+			h_area_copy = heading_area.copy()
+			cv2.rectangle(h_area_copy, (xpos + x, y2), (xpos + x2, y), (0, 0, 0), 2)
+			cv2.imshow("Heading area bottom shape", h_area_copy)	
+			cv2.waitKey(0)
+			# button_text: str | None = None
+			if button_text is not None:
 				from tesseract_ocr import TesseractOCR, Output
 				ocr = TesseractOCR()
 				ocr_result = ocr.exec(heading_area[y2:y, xpos:], output_type=Output.DATAFRAME, psm=7)
-				button_text = ''.join(list(ocr_result[ocr_result['conf']>0]['text']))
+				button_text += list(ocr_result[ocr_result['conf'] > 50]['text'])
 				# print(f"OCR Result text: {ocr_text}")
-			button_top_line = get_line(heading_area[y2+1,:].tolist())
+
+			assert np.any(heading_area[y2 + 1, :] != 255)
+			button_top_line = get_line(heading_area[y2 + 1,:].tolist()) # length
 			if abs(button_top_line - button_bottom_line) > 10:
-				raise ValueError("Button shape is not top-bottom symmetrical!")	
+				raise ValueError(f"Button shape is not top-bottom symmetrical! top: {button_top_line}, bottom: {button_bottom_line}")	
 			'''cv2.imshow("Heading area bottom shape", heading_area[y2+1:y+1, xpos:])	
 			cv2.waitKey(0)'''
 			# try to find button width
@@ -411,19 +429,12 @@ class TaimeeFilter:
 			# cv2.imshow("Heading shape area ", shape_band)	
 			cv2.imshow("Heading area bottom shape rect", button_rect)	
 			cv2.waitKey(0)
-			contours, _ = cv2.findContours(button_rect, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-			contour = contours[0]
-			x, y, w, h = cv2.boundingRect(contour)
-			print(f"Bottom Shape's bounding rectangle size is:: height: {h}, width: {w} ")
-			h_area_copy = heading_area.copy()
-			cv2.rectangle(h_area_copy, (xpos + x, y2), (xpos + x2, y), (0, 0, 0), 2)
-			cv2.imshow("Heading area bottom shape", h_area_copy)	
-			cv2.waitKey(0)
+
 
 		new_params = ImageAreaParam(0, y2, xpos)#, -1)
 		if params is not None:
 			params[ImageDictKey.heading] = new_params
-		return (new_params, button_text) if button_text else new_params
+		return new_params
 
 		
 
