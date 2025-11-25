@@ -61,7 +61,7 @@ class KeyUnit(Enum):
 
 
 class ImageDictKey(Enum):
-	leading = (KeyUnit.PIXEL, 1)
+	y_offset = (KeyUnit.PIXEL, 1)
 	heading_button = (KeyUnit.TEXT, 0)  # heading"
 	heading = (KeyUnit.TEXT, 1)  # heading"
 	work_time = (KeyUnit.HOUR, 1)  # "hours"
@@ -114,7 +114,7 @@ class ImageFilterItemArea(TOMLDataclass):
 
 
 @dataclass
-class LeadingArea:
+class OffsetArea:
 	height: int
 
 @dataclass
@@ -188,10 +188,10 @@ class ImageFilterAreas:
 				fp.write(f"{key} = ")
 				fp.write(f"{area.as_dict()}\n") if as_dict else fp.write(f"{list(area.param)}\n")
 
-	area_key_list = [ImageDictKey.leading, ImageDictKey.heading, ImageDictKey.shift_start, ImageDictKey.shift_end, ImageDictKey.break_time, ImageDictKey.payslip, ImageDictKey.salary]
+	area_key_list = [ImageDictKey.y_offset, ImageDictKey.heading, ImageDictKey.shift_start, ImageDictKey.shift_end, ImageDictKey.break_time, ImageDictKey.payslip, ImageDictKey.salary]
 
 	areas = {
-		ImageDictKey.leading: LeadingArea,
+		ImageDictKey.y_offset: OffsetArea,
 		ImageDictKey.heading: HeadingArea,
 		ImageDictKey.shift_start: ShiftStartArea,
 		ImageDictKey.shift_end: ShiftEndArea,
@@ -209,7 +209,7 @@ class ImageFilterAreas:
 
 
 class ImageFilterParam(Enum):
-	leading = 0, 0
+	y_offset = 0, 0
 	ypos = 0,1
 	height = 0,2
 	xpos = 0,3
@@ -232,20 +232,28 @@ class ImageFilterParam(Enum):
 	salary_ypos = 5,1
 
 
-class NonNearbyElems:
+class DistantElems:
 	def __init__(self,
-		thresh: int = 10,
-		elems: list[int] = []
+		distance: int = 10,
+		elems: list[int] = [],
+		excluded: list[int] = [],
 	):
-		self.thresh = thresh
+		self.thresh = distance
 		self.elems = elems
+		self.excluded = excluded
 
-	def add(self, i: int):
+	def add(self, i: int) -> int:
+		'''returns 1 if added'''
 		if len(self.elems) == 0:
 			self.elems.append(i)
+			return 1
 		else:
 			if i - self.elems[-1] > self.thresh:
 				self.elems.append(i)
+				return 1
+			else:
+				self.excluded.append(i)
+				return 0
 
 class BorderColor(Enum):
 	WHITE = 255
@@ -315,33 +323,41 @@ class SplitImageAreaParam(TOMLDataclass):
 
 class TaimeeFilter:
 	THRESHOLD = 237
+	BORDERS_MIN = 3
+	BORDERS_MAX = 4
 	def __init__(self, given_image: np.ndarray | Path | str, params: dict[ImageFilterParam, int] = {}):
 		self.org_image = given_image if isinstance(given_image, np.ndarray) else cv2.imread(str(given_image))
 		self.params = params
-		self.borders = []
+		h_lines = []
 		self.bin_image = cv2.threshold(self.org_image, self.THRESHOLD, 255, cv2.THRESH_BINARY)[1]
-		self.non_nearby_borders = NonNearbyElems(thresh=self.bin_image.shape[0] // 20)
-		for border in find_horizontal_borders(self.bin_image, border_color=BorderColor.BLACK):
-			self.non_nearby_borders.add(border)
-			self.borders.append(border)
-		self.non_nearby_array = np.array(self.non_nearby_borders.elems)
-		self.leading_y = self.borders[0] if len(self.non_nearby_borders.elems) == 4 else -1
-		self.border_array = np.array(self.borders)
-		if self.leading_y > 0:
-			self.border_array = self.border_array - self.leading_y
-		if len(self.non_nearby_borders.elems) == 4:
-			self.non_nearby_array = self.non_nearby_array[1:] - self.leading_y
+		distant_h_lines = DistantElems(distance=self.bin_image.shape[0] // 20)
+		n = -1
+		added_distant_borders = 0
+		for n, border in enumerate(find_horizontal_borders(self.bin_image, border_color=BorderColor.BLACK)):
+			added_distant_borders += distant_h_lines.add(border)
+			h_lines.append(border)
+			if added_distant_borders >= self.BORDERS_MAX:
+				break
+		if added_distant_borders < self.BORDERS_MIN:
+			raise ValueError("Not enough borders found")
+		self.distant_array = np.array(distant_h_lines.elems)
+		self.y_offset = h_lines[0] if len(distant_h_lines.elems) == 4 else 0
+		self.horizontal_lines = np.array(h_lines)
+		if self.y_offset > 0:
+			self.horizontal_lines = self.horizontal_lines - self.y_offset
+		if len(distant_h_lines.elems) == 4:
+			self.distant_array = self.distant_array[1:] - self.y_offset
 
 		
 	def extract_heading(self, params: dict[ImageDictKey, tuple[int, int]] | None = None, seek_button_shape: bool = False, button_text: Optional[list[str]] = None) -> ImageAreaParam|tuple[ImageAreaParam, str]:
 		'''Return: (ypos, height, x_start)
-		Use with self.leading_y like image[self.leading_y: self.leading_y + height, x_start:]'''
-		if len(self.non_nearby_array) == 0:
+		Use with self.y_offset like image[self.y_offset: self.y_offset + height, x_start:]'''
+		if len(self.distant_array) == 0:
 			raise ValueError("No nearby borders found")
-		if self.leading_y >= self.non_nearby_array[0]:
-			raise ValueError("Leading y is not less than non-nearby array first element")
-		heading_area = self.bin_image[self.leading_y:self.non_nearby_array[0] + self.leading_y, :].copy()
-		for y in self.border_array:
+		if self.y_offset >= self.distant_array[0]:
+			raise ValueError("Y offset is not less than non-nearby array first element")
+		heading_area = self.bin_image[self.y_offset:self.distant_array[0] + self.y_offset, :].copy()
+		for y in self.horizontal_lines:
 			if y >= heading_area.shape[0]:
 				break
 			heading_area[y, :] = 255
@@ -555,7 +571,7 @@ def taimee(
 	b_image = cv2.threshold(
 		mono_image, thresh=b_thresh_valule, maxval=255, type=cv2.THRESH_BINARY
 	)[1]  # binary, high contrast
-	non_nearby_elems = NonNearbyElems(thresh=height // 20)
+	non_nearby_elems = DistantElems(distance=height // 20)
 	horizontal_borders = []
 	try:
 		for y in find_horizontal_borders(b_image):
@@ -575,7 +591,7 @@ def taimee(
 	ocr = TesseractOCR()
 	# from pandas import DataFrame
 	from pytesseract import Output as TesseractOutput
-	ocr_dataframe = ocr.exec(mono_image[taimee_filter.leading_y: taimee_filter.leading_y+heading_height, heading_xpos:], output_type=TesseractOutput.DATAFRAME)
+	ocr_dataframe = ocr.exec(mono_image[taimee_filter.y_offset: taimee_filter.y_offset+heading_height, heading_xpos:], output_type=TesseractOutput.DATAFRAME)
 	heading_text = ocr_dataframe[ocr_dataframe['conf'] > 0]['text']	
 	## cut preceding bump area
 	try:
