@@ -238,7 +238,7 @@ class DistantElems:
 		elems: list[int] = [],
 		excluded: list[int] = [],
 	):
-		self.thresh = distance
+		self.distance = distance
 		self.elems = elems
 		self.excluded = excluded
 
@@ -248,12 +248,53 @@ class DistantElems:
 			self.elems.append(i)
 			return 1
 		else:
-			if i - self.elems[-1] > self.thresh:
+			if i - self.elems[-1] > self.distance:
 				self.elems.append(i)
 				return 1
 			else:
 				self.excluded.append(i)
 				return 0
+
+class DistanceError(ValueError):
+	pass
+
+class DistantBunch:
+	def __init__(self, distance: int = 5):
+		self.distance = distance
+		self.elems: list[int] = []
+
+	def add(self, i: int):# -> int:
+		'''returns 1 if added'''
+		if i < 0:
+			raise ValueError("i must be non-negative") 
+		if len(self.elems) == 0:
+			self.elems.append(i)
+		else:
+			last_elem = self.elems[-1]
+			if i == last_elem:
+				return
+			if i - last_elem <= self.distance:
+				self.elems.append(i)
+			else:
+				raise DistanceError("DistantBunch over distance")
+class BunchOverFlow(ValueError):
+	pass
+class BunchLines:
+	def __init__(self, iter: Iterator[int], distance: int = 5, max_bunch: int = 4):
+		self.bunch_list: list[DistantBunch] = [DistantBunch(distance)]
+		self.distance = distance
+		self.max_bunch = max_bunch
+		bunch = self.bunch_list[-1]
+		for y in iter:
+			try:
+				bunch.add(y)
+			except DistanceError:
+				if len(self.bunch_list) >= self.max_bunch:
+					return # raise BunchOverFlow("Maximum number of bunches exceeded")
+				bunch = DistantBunch(self.distance)
+				bunch.add(y)
+				self.bunch_list.append(bunch)
+
 
 class BorderColor(Enum):
 	WHITE = 255
@@ -277,12 +318,11 @@ def find_horizontal_borders(
 
 	def get_border_or_bg(y: int) -> bool | None:
 		# Returns True if border is found, False if background is found, else returns None
+		if np.all(image[y, :] == 255):
+			return False
 		arr = image[y, edge_len:-edge_len]
 		if np.all(arr == border_color.value):
 			return True
-		elif np.all(arr == 255):
-			return False
-		return None
 		'''changes = arr[1:] != arr[:-1]
 		change_indices = np.where(changes)[0] + 1
 		if not(change_indices.size):
@@ -330,6 +370,7 @@ class TaimeeFilter:
 		self.params = params
 		h_lines = []
 		self.bin_image = cv2.threshold(self.org_image, self.THRESHOLD, 255, cv2.THRESH_BINARY)[1]
+		self.bunch_lines = BunchLines(find_horizontal_borders(self.bin_image, border_color=BorderColor.BLACK), max_bunch=self.BORDERS_MAX)
 		distant_h_lines = DistantElems(distance=self.bin_image.shape[0] // 20)
 		n = -1
 		added_distant_borders = 0
