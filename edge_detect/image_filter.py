@@ -255,45 +255,62 @@ class DistantElems:
 				self.excluded.append(i)
 				return 0
 
-class DistanceError(ValueError):
+class NearBunchError(ValueError):
 	pass
 
-class DistantBunch:
-	def __init__(self, distance: int = 5):
+class NearBunch:
+	def __init__(self, distance: int = 10):
 		self.distance = distance
 		self.elems: list[int] = []
 
-	def add(self, i: int):# -> int:
+	@property
+	def bunch_count(self):
+		return len(self.elems)
+
+	def add(self, i: int) -> int:
 		'''returns 1 if added'''
 		if i < 0:
 			raise ValueError("i must be non-negative") 
 		if len(self.elems) == 0:
 			self.elems.append(i)
+			return 1
 		else:
 			last_elem = self.elems[-1]
 			if i == last_elem:
-				return
+				return 0
 			if i - last_elem <= self.distance:
 				self.elems.append(i)
+				return 1
 			else:
-				raise DistanceError("DistantBunch over distance")
-class BunchOverFlow(ValueError):
+				raise NearBunchError("NearBunch over distance")
+
+class NotEnoughBunch(ValueError):
 	pass
-class BunchLines:
+
+class BunchList:
 	def __init__(self, iter: Iterator[int], distance: int = 5, max_bunch: int = 4):
-		self.bunch_list: list[DistantBunch] = [DistantBunch(distance)]
+		self.bunch_list: list[NearBunch] = [NearBunch(distance)]
 		self.distance = distance
 		self.max_bunch = max_bunch
 		bunch = self.bunch_list[-1]
 		for y in iter:
 			try:
 				bunch.add(y)
-			except DistanceError:
+			except NearBunchError:
 				if len(self.bunch_list) >= self.max_bunch:
 					return # raise BunchOverFlow("Maximum number of bunches exceeded")
-				bunch = DistantBunch(self.distance)
+				bunch = NearBunch(self.distance)
 				bunch.add(y)
 				self.bunch_list.append(bunch)
+
+	
+	@property
+	def main_bunch(self):
+		return self.bunch_list[0]
+	
+	@property
+	def trailing_bunches(self):
+		return self.bunch_list[1:]
 
 
 class BorderColor(Enum):
@@ -303,13 +320,17 @@ class BorderColor(Enum):
 
 class NoBorderError(Exception):
 	pass
+
 def find_horizontal_borders(
 	image: np.ndarray,
 	border_color: BorderColor = BorderColor.BLACK,
 	edge_ratio: float = 0.10,
+	offset: int = 0
 ) -> Iterator[int]:
 	"""Find border lines in the image.
 	Return: list of border ypos"""
+	if offset < 0 or offset >= image.shape[0] - 1:
+		raise ValueError("Offset is out of range!")
 
 
 	edge_len = int(image.shape[1] * edge_ratio)
@@ -318,7 +339,7 @@ def find_horizontal_borders(
 
 	def get_border_or_bg(y: int) -> bool | None:
 		# Returns True if border is found, False if background is found, else returns None
-		if np.all(image[y, :] == 255):
+		if np.all(image[y + offset, :] == 255):
 			return False
 		arr = image[y, edge_len:-edge_len]
 		if np.all(arr == border_color.value):
@@ -339,7 +360,7 @@ def find_horizontal_borders(
 
 	y = -1
 	# border_lines = []
-	for n, y in enumerate(range(image.shape[0])):
+	for n, y in enumerate(range(image.shape[0] - offset)):
 		is_border = get_border_or_bg(y)
 		if is_border:  # color == border_color:
 			yield n
@@ -370,7 +391,35 @@ class TaimeeFilter:
 		self.params = params
 		h_lines = []
 		self.bin_image = cv2.threshold(self.org_image, self.THRESHOLD, 255, cv2.THRESH_BINARY)[1]
-		self.bunch_lines = BunchLines(find_horizontal_borders(self.bin_image, border_color=BorderColor.BLACK), max_bunch=self.BORDERS_MAX)
+		leading_offset = -1
+		y = n = -1
+		bunch = NearBunch()
+		for n, y in enumerate(find_horizontal_borders(self.bin_image, border_color=BorderColor.BLACK)):
+			try:
+				bunch.add(y)
+			except NearBunchError:
+				break
+		if n < 0 or y < 0:
+			raise ValueError("No border found!")
+		self.y_offset = bunch.elems[-1] #  - 1 if n > 0 else 0
+		# self.bunch_lines = BunchList((
+		bunch = NearBunch()
+		self.bunch_list = [bunch]
+		bunches = 1
+		for n, y in enumerate(find_horizontal_borders(self.bin_image[self.y_offset + 1:, :], border_color=BorderColor.BLACK)):#, offset=self.y_offset)):
+			# y = border - self.y_offset
+			try:
+				bunch.add(y)
+			except NearBunchError:
+				bunch = NearBunch()
+				added = bunch.add(y)
+				assert added == 1, "AssertionError: bunch.add(y) failed"
+				bunches += 1
+				self.bunch_list.append(bunch)
+		if self.bunch_list[0].bunch_count == 0:
+			raise ValueError("No border found!")
+		if len(self.bunch_list) < self.BORDERS_MIN:
+			raise ValueError("Not enough bunch of lines for Taimee!")
 		distant_h_lines = DistantElems(distance=self.bin_image.shape[0] // 20)
 		n = -1
 		added_distant_borders = 0
