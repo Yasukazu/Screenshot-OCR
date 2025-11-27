@@ -402,27 +402,47 @@ class TaimeeFilter:
 		if n < 0 or y < 0:
 			raise ValueError("No border found!")
 		self.y_offset = bunch.elems[-1] + 1 #  - 1 if n > 0 else 0
-		# seek for next border
+		# seek for 2nd border
 		bunch = NearBunch()
-		last_y = -1
+		
 		for n, y in enumerate(find_horizontal_borders(self.bin_image[self.y_offset:, :], border_color=BorderColor.BLACK)):
 			try:
 				bunch.add(y)
 			except NearBunchError:
 				break
-			last_y = y
+			
 		if bunch.bunch_count == 0:
 			raise ValueError("No next border found!")
-		# show from offset to the first border
-		SUBPLOT_SIZE = 2
-		fig, ax = plt.subplots(SUBPLOT_SIZE, 1)
-		for r in range(SUBPLOT_SIZE):
-			ax[r].invert_yaxis()
-			ax[r].xaxis.tick_top()
-			ax[r].set_title(f"Row {r}")
-		ax[0].imshow(self.bin_image[self.y_offset:bunch.elems[0] + self.y_offset - 1, :])
-		plt.show()
-		breakpoint()
+		# check if avatar circle at the left side of the area between the borders(1st and 2nd)
+		## scan vertical to find the upper arc of the expecting circle 
+		scan_area = self.bin_image[self.y_offset:bunch.elems[0] + self.y_offset - 1, :]
+		for x in range(scan_area.shape[1]):
+			if np.any(scan_area[:, x] == 0):
+				break
+		x0 = x
+		for x in range(x0, scan_area.shape[1]):
+			if np.all(scan_area[:, x] == 255):
+				break
+		## scan horizontal to find the lower arc of the expecting circle
+		old_scan_area = scan_area.copy()
+		scan_area = scan_area[:, x0:x]
+		for y in range(scan_area.shape[0]):
+			if np.any(scan_area[y, :] == 0):
+				break
+		y0 = y
+		for y in range(y0, scan_area.shape[0]):
+			if np.all(scan_area[y, :] == 255):
+				break
+		circle_area = scan_area[y0:y, :]	
+		circle_area_black_count = np.count_nonzero(circle_area == 0)
+		virtual_circle_area = np.full(circle_area.shape, 255, np.uint8)
+		### draw a circle on virtual_circle_area
+		cv2.circle(virtual_circle_area, (circle_area.shape[1]//2, circle_area.shape[0]//2), circle_area.shape[1]//2, 0, -1)
+		circle_area_black_diff = np.count_nonzero(virtual_circle_area == 0) - circle_area_black_count
+
+		if abs(circle_area_black_diff) / circle_area_black_count > 0.1:
+			raise ValueError("Detected avatar circle area black diff is too large!")
+		
 		bunch = NearBunch()
 		self.bunch_list = [bunch]
 		bunches = 1
