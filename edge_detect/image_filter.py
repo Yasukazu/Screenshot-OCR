@@ -206,7 +206,14 @@ class ImageFilterAreas:
 	salary: SalaryArea # kyuuyo
 	y_offset: int = 0
 
-
+from enum import IntEnum, auto
+class ImageAreaName(IntEnum):
+	y_offset = auto()
+	heading = auto()
+	shift = auto()
+	breaktime = auto()
+	paystub = auto()
+	salary = auto()
 
 class ImageFilterParam(Enum):
 	y_offset = 0, 0
@@ -382,6 +389,17 @@ class SplitImageAreaParam(TOMLDataclass):
 	start_xpos: int = 0
 	end_xpos: int = -1
 
+@dataclass
+class AreaBeginEnd:
+	start: int
+	height: int
+	@property
+	def begin(self):
+		return self.start
+	@property
+	def end(self):
+		return self.start + self.height
+
 class TaimeeFilter:
 	THRESHOLD = 237
 	BORDERS_MIN = 3
@@ -424,7 +442,6 @@ class TaimeeFilter:
 			if np.all(scan_area[:, x] == 255):
 				break
 		## scan horizontal to find the lower arc of the expecting circle
-		old_scan_area = scan_area.copy()
 		scan_area = scan_area[:, x0:x]
 		for y in range(scan_area.shape[0]):
 			if np.any(scan_area[y, :] == 0):
@@ -442,8 +459,22 @@ class TaimeeFilter:
 
 		if abs(circle_area_black_diff) / circle_area_black_count > 0.1:
 			raise ValueError("Detected avatar circle area black diff is too large!")
-		
+		self.area_dict: dict[ImageAreaName, AreaBeginEnd] = {}
+		self.area_dict[ImageAreaName.heading] = AreaBeginEnd(self.y_offset, bunch.elems[0])
+		heading_area_end_border = bunch.elems[-1] + self.y_offset
 		bunch = NearBunch()
+		for y in find_horizontal_borders(self.bin_image[heading_area_end_border + 1:, :]):
+			try:
+				bunch.add(y)
+			except NearBunchError:
+				break
+		self.area_dict[ImageAreaName.shift] = AreaBeginEnd(heading_area_end_border + 1, bunch.elems[0])	
+
+		cv2.imshow("shift", self.bin_image[self.area_dict[ImageAreaName.shift].begin:self.area_dict[ImageAreaName.shift].end, :])
+		cv2.waitKey(0)
+		breakpoint()
+		# TODO:from here
+
 		self.bunch_list = [bunch]
 		bunches = 1
 		for n, y in enumerate(find_horizontal_borders(self.bin_image[self.y_offset:, :], border_color=BorderColor.BLACK)):#, offset=self.y_offset)):
