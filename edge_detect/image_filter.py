@@ -401,12 +401,32 @@ class TaimeeFilter:
 				break
 		if n < 0 or y < 0:
 			raise ValueError("No border found!")
-		self.y_offset = bunch.elems[-1] #  - 1 if n > 0 else 0
-		# self.bunch_lines = BunchList((
+		self.y_offset = bunch.elems[-1] + 1 #  - 1 if n > 0 else 0
+		# seek for next border
+		bunch = NearBunch()
+		last_y = -1
+		for n, y in enumerate(find_horizontal_borders(self.bin_image[self.y_offset:, :], border_color=BorderColor.BLACK)):
+			try:
+				bunch.add(y)
+			except NearBunchError:
+				break
+			last_y = y
+		if bunch.bunch_count == 0:
+			raise ValueError("No next border found!")
+		# show from offset to the first border
+		SUBPLOT_SIZE = 2
+		fig, ax = plt.subplots(SUBPLOT_SIZE, 1)
+		for r in range(SUBPLOT_SIZE):
+			ax[r].invert_yaxis()
+			ax[r].xaxis.tick_top()
+			ax[r].set_title(f"Row {r}")
+		ax[0].imshow(self.bin_image[self.y_offset:bunch.elems[0] + self.y_offset - 1, :])
+		plt.show()
+		breakpoint()
 		bunch = NearBunch()
 		self.bunch_list = [bunch]
 		bunches = 1
-		for n, y in enumerate(find_horizontal_borders(self.bin_image[self.y_offset + 1:, :], border_color=BorderColor.BLACK)):#, offset=self.y_offset)):
+		for n, y in enumerate(find_horizontal_borders(self.bin_image[self.y_offset:, :], border_color=BorderColor.BLACK)):#, offset=self.y_offset)):
 			# y = border - self.y_offset
 			try:
 				bunch.add(y)
@@ -718,14 +738,7 @@ def taimee(
 	image_filter_params[ImageFilterParam.break_time_ypos] = breaktime_border
 	hours_image = cur_image[:breaktime_border, :]
 	other_image = cur_image[breaktime_border + breaktime_border_len + 1 :, :]
-	fig, plots = plt.subplots(1, 5)
-	plots[0].imshow(cur_image)
-	plots[1].imshow(shift_images[0])
-	plots[2].imshow(shift_images[1])
-	plots[3].imshow(hours_image)
-	plots[4].imshow(other_image)
-	plt.show()
-	breakpoint()
+
 	### scan left-top area for a (non-white) shape
 	x = -1
 	non_unique = False
