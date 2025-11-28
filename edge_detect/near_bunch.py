@@ -1,4 +1,4 @@
-class NearBunchError(ValueError):
+class NearBunchException(ValueError):
 	pass
 
 class NearBunch:
@@ -25,7 +25,7 @@ class NearBunch:
 				self.elems.append(i)
 				return 1
 			else:
-				raise NearBunchError("NearBunch over distance")
+				raise NearBunchException("NearBunch over distance")
 
 
 
