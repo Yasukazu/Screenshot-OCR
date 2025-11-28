@@ -1,4 +1,5 @@
 from io import IOBase
+from enum import IntEnum, auto
 from dataclasses import field
 
 from cv2 import UMat
@@ -18,6 +19,8 @@ import matplotlib.pyplot as plt
 from inspect import isclass
 from itertools import groupby
 from fancy_dataclass import TOMLDataclass
+
+from near_bunch import NearBunch, NearBunchError
 
 cwd = Path(__file__).resolve().parent
 sys.path.append(str(cwd.parent))
@@ -100,6 +103,11 @@ class ImageFilterItemArea(TOMLDataclass):
 		if (self.height < -1 or self.height == 0) or (self.width < -1 or self.width == 0):
 			raise InvalidValueError("height and width must be larger than 0 except -1")
 
+	@classmethod
+	def from_image(cls, image: np.ndarray) -> "ImageFilterItemArea":
+		height, width = image.shape[:2]
+		return cls(ypos=0, height=height, xpos=0, width=width)
+
 	@property
 	def param(self)-> Int4:
 		return (self.ypos, self.height, self.xpos, self.width)
@@ -120,6 +128,89 @@ class OffsetArea:
 @dataclass
 class HeadingArea(ImageFilterItemArea):
 	'''Necessary named parameters: ypos, height, xpos '''
+
+	@classmethod
+	def from_image(cls, image: np.ndarray) -> "ImageFilterItemArea":
+		x, y = cls.check_image(image)
+		return cls(ypos=0, height=y, xpos=x, width=-1)
+
+	@classmethod
+	def check_image(cls, image: np.ndarray)-> tuple[int, int]:
+		'''returns (x, y) as heading_area'''
+		# check if avatar circle at the left side of the area between the borders(1st and 2nd)
+		## scan vertically to find the upper arc of the expecting circle 
+
+		x = -1
+		black_found = False
+		for x in range(image.shape[1]):
+			if np.any(image[:, x] == 0):
+				black_found = True
+				break
+		if not black_found:
+			raise ValueError("No black found in scan area!")
+		x0 = x
+		white_found = False
+		for x in range(x0, image.shape[1]):
+			if np.all(image[:, x] == 255):
+				white_found = True
+				break
+		if not white_found:
+			raise ValueError("No white found in scan area!")
+		## scan horizontally to find the lower arc of the expecting circle
+		scan_area = image[:, x0:x]
+		y = -1
+		black_found = False
+		for y in range(scan_area.shape[0]):
+			if np.any(scan_area[y, :] == 0):
+				black_found = True
+				break
+		if not black_found:
+			raise ValueError("No black found in scan area(2)!")
+		y0 = y
+		white_found = False
+		for y in range(y0, scan_area.shape[0]):
+			if np.all(scan_area[y, :] == 255):
+				white_found = True
+				break
+		if not white_found:
+			raise ValueError("No white found in scan area(2)!")
+		circle_area = scan_area[y0:y, :]	
+		circle_area_black_count = np.count_nonzero(circle_area == 0)
+		virtual_circle_area = np.full(circle_area.shape, 255, np.uint8)
+		### draw a circle on virtual_circle_area
+		cv2.circle(virtual_circle_area, (circle_area.shape[1]//2, circle_area.shape[0]//2), circle_area.shape[1]//2, 0, -1)
+		circle_area_black_diff = np.count_nonzero(virtual_circle_area == 0) - circle_area_black_count
+		if abs(circle_area_black_diff) / circle_area_black_count > 0.1:
+			raise ValueError("Detected avatar circle area black diff is too large!")
+		# scan button like shape from bottom
+		scan_area = image[:, x:]
+		cv2.imshow("scan_area", scan_area)
+		cv2.waitKey(0)
+		heading_h, heading_w = scan_area.shape[:2]
+		button_w_min = heading_w // 3
+		def get_line(line: Sequence[int]):
+			for (k, g) in groupby(line):
+				if k == 0 and (w:=len(list(g))) >= button_w_min:
+					return w
+
+		button_bottom_line = None
+		for y in range(heading_h - 1, 0, -1):
+			if (w:=get_line(scan_area[y, :].tolist())):
+				button_bottom_line = w
+				break
+		if not button_bottom_line:
+			raise ValueError("No button found in heading bottom area!")
+		scan_area[0, :] = 255
+		y2 = -1
+		bg_found = False
+		for y2 in range(y, 0, -1):
+			if np.all(scan_area[y2, x:] == 255):
+				bg_found = True
+				break
+		if not bg_found:
+			raise ValueError("No bg above button shape!")
+		return x, y2
+
 	def to_toml(self, fp: IOBase, **kwargs):
 		fp.write(f"{self.__class__.__name__} = {str(list(self.param))}\n")
 
@@ -206,7 +297,6 @@ class ImageFilterAreas:
 	salary: SalaryArea # kyuuyo
 	y_offset: int = 0
 
-from enum import IntEnum, auto
 class ImageAreaName(IntEnum):
 	y_offset = auto()
 	heading = auto()
@@ -262,62 +352,8 @@ class DistantElems:
 				self.excluded.append(i)
 				return 0
 
-class NearBunchError(ValueError):
-	pass
 
-class NearBunch:
-	def __init__(self, distance: int = 10):
-		self.distance = distance
-		self.elems: list[int] = []
 
-	@property
-	def bunch_count(self):
-		return len(self.elems)
-
-	def add(self, i: int) -> int:
-		'''returns 1 if added'''
-		if i < 0:
-			raise ValueError("i must be non-negative") 
-		if len(self.elems) == 0:
-			self.elems.append(i)
-			return 1
-		else:
-			last_elem = self.elems[-1]
-			if i == last_elem:
-				return 0
-			if i - last_elem <= self.distance:
-				self.elems.append(i)
-				return 1
-			else:
-				raise NearBunchError("NearBunch over distance")
-
-class NotEnoughBunch(ValueError):
-	pass
-
-class BunchList:
-	def __init__(self, iter: Iterator[int], distance: int = 5, max_bunch: int = 4):
-		self.bunch_list: list[NearBunch] = [NearBunch(distance)]
-		self.distance = distance
-		self.max_bunch = max_bunch
-		bunch = self.bunch_list[-1]
-		for y in iter:
-			try:
-				bunch.add(y)
-			except NearBunchError:
-				if len(self.bunch_list) >= self.max_bunch:
-					return # raise BunchOverFlow("Maximum number of bunches exceeded")
-				bunch = NearBunch(self.distance)
-				bunch.add(y)
-				self.bunch_list.append(bunch)
-
-	
-	@property
-	def main_bunch(self):
-		return self.bunch_list[0]
-	
-	@property
-	def trailing_bunches(self):
-		return self.bunch_list[1:]
 
 
 class BorderColor(Enum):
@@ -367,10 +403,10 @@ def find_horizontal_borders(
 
 	y = -1
 	# border_lines = []
-	for n, y in enumerate(range(image.shape[0] - offset)):
+	for y in (range(image.shape[0] - offset)):
 		is_border = get_border_or_bg(y)
 		if is_border:  # color == border_color:
-			yield n
+			yield y
 			# border_lines.append(n)
 	# return border_lines
 
@@ -410,7 +446,11 @@ class TaimeeFilter:
 		h_lines = []
 		self.bin_image = cv2.threshold(self.org_image, self.THRESHOLD, 255, cv2.THRESH_BINARY)[1]
 		leading_offset = -1
-		y = n = -1
+		first_horizontal_border = find_horizontal_border_from_image(self.bin_image)
+		if first_horizontal_border.bunch_count == 0:
+			raise ValueError("No border found!")
+		self.y_offset = first_horizontal_border.elems[-1] + 1
+		'''y = n = -1
 		bunch = NearBunch()
 		for n, y in enumerate(find_horizontal_borders(self.bin_image, border_color=BorderColor.BLACK)):
 			try:
@@ -419,49 +459,24 @@ class TaimeeFilter:
 				break
 		if n < 0 or y < 0:
 			raise ValueError("No border found!")
-		self.y_offset = bunch.elems[-1] + 1 #  - 1 if n > 0 else 0
+		self.y_offset = bunch.elems[-1] + 1 #  - 1 if n > 0 else 0'''
 		# seek for 2nd border
-		bunch = NearBunch()
-		
+		second_horizontal_border = find_horizontal_border_from_image(self.bin_image[self.y_offset:, :])
+		'''bunch = NearBunch()
 		for n, y in enumerate(find_horizontal_borders(self.bin_image[self.y_offset:, :], border_color=BorderColor.BLACK)):
 			try:
 				bunch.add(y)
 			except NearBunchError:
 				break
-			
 		if bunch.bunch_count == 0:
-			raise ValueError("No next border found!")
-		# check if avatar circle at the left side of the area between the borders(1st and 2nd)
-		## scan vertical to find the upper arc of the expecting circle 
-		scan_area = self.bin_image[self.y_offset:bunch.elems[0] + self.y_offset - 1, :]
-		for x in range(scan_area.shape[1]):
-			if np.any(scan_area[:, x] == 0):
-				break
-		x0 = x
-		for x in range(x0, scan_area.shape[1]):
-			if np.all(scan_area[:, x] == 255):
-				break
-		## scan horizontal to find the lower arc of the expecting circle
-		scan_area = scan_area[:, x0:x]
-		for y in range(scan_area.shape[0]):
-			if np.any(scan_area[y, :] == 0):
-				break
-		y0 = y
-		for y in range(y0, scan_area.shape[0]):
-			if np.all(scan_area[y, :] == 255):
-				break
-		circle_area = scan_area[y0:y, :]	
-		circle_area_black_count = np.count_nonzero(circle_area == 0)
-		virtual_circle_area = np.full(circle_area.shape, 255, np.uint8)
-		### draw a circle on virtual_circle_area
-		cv2.circle(virtual_circle_area, (circle_area.shape[1]//2, circle_area.shape[0]//2), circle_area.shape[1]//2, 0, -1)
-		circle_area_black_diff = np.count_nonzero(virtual_circle_area == 0) - circle_area_black_count
-
-		if abs(circle_area_black_diff) / circle_area_black_count > 0.1:
-			raise ValueError("Detected avatar circle area black diff is too large!")
+			raise ValueError("No next border found!")'''
+		scan_area = self.bin_image[self.y_offset:second_horizontal_border.elems[0] + self.y_offset - 1, :]
+		heading_area = HeadingArea.from_image(scan_area)
+		self.area_list: list[ImageFilterItemArea] = [heading_area]
+		self.areaname_to_area_and_offset: dict[ImageAreaName, tuple[ImageFilterItemArea, int]] = {ImageAreaName.heading: (heading_area, self.y_offset)}
 		self.area_dict: dict[ImageAreaName, AreaBeginEnd] = {}
-		self.area_dict[ImageAreaName.heading] = AreaBeginEnd(self.y_offset, bunch.elems[0])
-		heading_area_end_border = bunch.elems[-1] + self.y_offset
+		self.area_dict[ImageAreaName.heading] = AreaBeginEnd(self.y_offset, second_horizontal_border.elems[0])
+		heading_area_end_border = second_horizontal_border.elems[-1] + self.y_offset
 		bunch = NearBunch()
 		for y in find_horizontal_borders(self.bin_image[heading_area_end_border + 1:, :]):
 			try:
@@ -1128,4 +1143,13 @@ def merge_nearby_elems(elems: Sequence[int], thresh=9) -> Iterator[int]:
 	if sent:
 		yield elem0
 
-
+def find_horizontal_border_from_image(bin_image: np.ndarray, y_offset:int=0, bunch_thresh: int=10) -> NearBunch:
+		bunch = NearBunch(bunch_thresh)
+		for y in (find_horizontal_borders(bin_image[y_offset:, :], border_color=BorderColor.BLACK)):
+			try:
+				bunch.add(y)
+			except NearBunchError:
+				break
+		if bunch.bunch_count == 0:
+			raise ValueError("No next border found!")
+		return bunch
