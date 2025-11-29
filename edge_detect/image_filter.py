@@ -158,15 +158,15 @@ class HeadingAreaParam(ImageAreaParam):
 				break
 		if not white_found:
 			raise ValueError("No white found in scan area!")
-		'''# count black pixel in the shape-detected area
+		# count black pixel in the shape-detected area
+		scan_area_width = x - x0
 		acc = 0
 		for line in range(image.shape[0]):#x - x0):
 			v = image[line, x0:x]
-			ac = 0
-			black_groups = [len(list(g)) for is_true, g in groupby(v, lambda x: x==0) if is_true]
-			if len(black_groups) == 1:
-				ac += black_groups[0]
-			acc += ac'''
+			black_groups = [(is_true, list(g)) for is_true, g in groupby(v, lambda x: x!=0)]# if is_true]
+			if len(black_groups) > 2 and black_groups[0][0] and black_groups[-1][0]:
+				acc += scan_area_width - (len(list(black_groups[0][1])) + len(list(black_groups[-1][1])))
+		# acc = 19432
 		## scan horizontal lines to find the vertical range of the shape
 		scan_area = image[:, x0:x]
 		y = -1
