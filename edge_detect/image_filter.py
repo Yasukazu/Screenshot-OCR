@@ -91,7 +91,7 @@ type Int4 = tuple[int, int, int, int]
 # type ItemAreaParamType = Int4 | Sequence[Int4]
 
 @dataclass
-class ImageFilterItemArea(TOMLDataclass):
+class ImageAreaParam(TOMLDataclass):
 	ypos: int = 0
 	height: int = -1
 	xpos: int = 0
@@ -106,7 +106,7 @@ class ImageFilterItemArea(TOMLDataclass):
 			raise InvalidValueError("height and width must be larger than 0 except -1")
 
 	@classmethod
-	def from_image(cls, image: np.ndarray, offset:int=0) -> "ImageFilterItemArea":
+	def from_image(cls, image: np.ndarray, offset:int=0) -> "ImageAreaParam":
 		height, width = image.shape[:2]
 		return cls(ypos=offset, height=height, xpos=0, width=width)
 
@@ -128,11 +128,11 @@ class OffsetArea:
 	height: int
 
 @dataclass
-class HeadingArea(ImageFilterItemArea):
+class HeadingAreaParam(ImageAreaParam):
 	'''Necessary named parameters: ypos, height, xpos '''
 
 	@classmethod
-	def from_image(cls, image: np.ndarray, offset: int = 0) -> "ImageFilterItemArea":
+	def from_image(cls, image: np.ndarray, offset: int = 0) -> "ImageAreaParam":
 		x, y = cls.check_image(image)
 		return cls(ypos=offset, height=y, xpos=x, width=-1)
 
@@ -219,7 +219,7 @@ class HeadingArea(ImageFilterItemArea):
 
 
 @dataclass
-class ShiftArea(ImageFilterItemArea):
+class ShiftAreaParam(ImageAreaParam):
 	'''Needs to initialize using named parameters::
 	start_width: as xpos
 	end_xpos: as width
@@ -236,11 +236,11 @@ class ShiftArea(ImageFilterItemArea):
 	def end_xpos(self)-> int: # end-by time
 		return self.width
 @dataclass
-class ShiftStartArea(ImageFilterItemArea):
+class ShiftStartAreaParam(ImageAreaParam):
 	pass
 
 @dataclass
-class ShiftEndArea(ImageFilterItemArea):
+class ShiftEndAreaParam(ImageAreaParam):
 	pass
 
 	def crop_image(self, image: np.ndarray) -> Iterator[np.ndarray]:
@@ -248,16 +248,16 @@ class ShiftEndArea(ImageFilterItemArea):
 			yield image[param[0]:param[1], param[2]:param[3]]
 
 @dataclass
-class BreaktimeArea(ImageFilterItemArea):
+class BreaktimeAreaParam(ImageAreaParam):
 	def to_toml(self, fp: IOBase, **kwargs):
 		fp.write(f"{self.__class__.__name__} = {str(list(self.param))}\n")
 
 @dataclass
-class PaystubArea(ImageFilterItemArea):
+class PaystubAreaParam(ImageAreaParam):
 	def to_toml(self, fp: IOBase, **kwargs):
 		fp.write(f"{self.__class__.__name__} = {str(list(self.param))}\n")
 @dataclass
-class SalaryArea(ImageFilterItemArea):
+class SalaryAreaParam(ImageAreaParam):
 	def to_toml(self, fp: IOBase, **kwargs):
 		fp.write(f"{self.__class__.__name__} = {str(list(self.param))}\n")
 
@@ -286,27 +286,26 @@ class ImageFilterAreas:
 
 	areas = {
 		ImageDictKey.y_offset: OffsetArea,
-		ImageDictKey.heading: HeadingArea,
-		ImageDictKey.shift_start: ShiftStartArea,
-		ImageDictKey.shift_end: ShiftEndArea,
-		ImageDictKey.break_time: BreaktimeArea,
-		ImageDictKey.payslip: PaystubArea,
-		ImageDictKey.salary: SalaryArea,
+		ImageDictKey.heading: HeadingAreaParam,
+		ImageDictKey.shift_start: ShiftStartAreaParam,
+		ImageDictKey.shift_end: ShiftEndAreaParam,
+		ImageDictKey.break_time: BreaktimeAreaParam,
+		ImageDictKey.payslip: PaystubAreaParam,
+		ImageDictKey.salary: SalaryAreaParam,
 	}
-	heading: HeadingArea # midashi
-	shift: ShiftArea # syuugyou jikan
-	break_time: BreaktimeArea # kyuukei jikan
-	payslip: PaystubArea # meisai
-	salary: SalaryArea # kyuuyo
+	heading: HeadingAreaParam # midashi
+	shift: ShiftAreaParam # syuugyou jikan
+	break_time: BreaktimeAreaParam # kyuukei jikan
+	paystub: PaystubAreaParam # meisai
+	salary: SalaryAreaParam # kyuuyo
 	y_offset: int = 0
 
-class ImageAreaName(IntEnum):
-	y_offset = auto()
-	heading = auto()
-	shift = auto()
-	breaktime = auto()
-	paystub = auto()
-	salary = auto()
+class ImageAreaName(Enum):
+	heading = HeadingAreaParam
+	shift = ShiftAreaParam
+	breaktime = BreaktimeAreaParam
+	paystub = PaystubAreaParam
+	salary = SalaryAreaParam
 
 class ImageFilterParam(Enum):
 	y_offset = 0, 0
@@ -413,12 +412,7 @@ def find_horizontal_borders(
 			# border_lines.append(n)
 	# return border_lines
 
-@dataclass
-class ImageAreaParam(TOMLDataclass):
-	ypos: int = 0
-	height: int = -1
-	xpos: int = 0
-	width: int = -1
+
 
 @dataclass
 class SplitImageAreaParam(TOMLDataclass):
@@ -463,73 +457,69 @@ class TaimeeFilter:
 	THRESHOLD = 237
 	BORDERS_MIN = 3
 	BORDERS_MAX = 4
-	def __init__(self, given_image: np.ndarray | Path | str, params: dict[ImageFilterParam, int] = {}):
-		self.org_image = given_image if isinstance(given_image, np.ndarray) else cv2.imread(str(given_image))
+	def __init__(self, image: np.ndarray | Path | str, params: dict[ImageAreaName, ImageFilterParam] = {}, show_check=False):
+		self.image = image if isinstance(image, np.ndarray) else cv2.imread(str(image))
+		if self.image is None:
+			raise ValueError("Failed to load image")
 		self.params = params
-		# h_lines = []
-		self.bin_image = cv2.threshold(self.org_image, self.THRESHOLD, 255, cv2.THRESH_BINARY)[1]
-		# leading_offset = -1
+		bin_image = cv2.threshold(self.image, self.THRESHOLD, 255, cv2.THRESH_BINARY)[1]
 		# find 1st border	
 		try:
-			horizontal_border = find_horizontal_border_from_image(self.bin_image)
+			horizontal_border = find_horizontal_border_from_image(bin_image)
 		except NoBunchException:
 			raise ValueError("No border found!")
 		y_offset = OffsetInt(
 			horizontal_border.elems[-1] + 1,
-			self.bin_image.shape[0]
+			limit=bin_image.shape[0] # height
 		)
-		horizontal_borders: list[tuple[NearBunch, int]] = [(horizontal_border, y_offset.value)] # deque(maxlen=2)
+		horizontal_borders: list[NearBunch] = [horizontal_border] # deque(maxlen=2)
+		# save y-axis offset into a self variable
+		self.y_offset = y_offset.value
 		# seek for 2nd border
-		self.y_offset = old_y_offset = y_offset.value
 		try:
-			horizontal_border = find_horizontal_border_from_image(self.bin_image, y_offset)
+			horizontal_border = find_horizontal_border_from_image(bin_image, y_offset)
 		except NoBunchException:
 			raise ValueError("No border found!")
-		# y_offset.inc(horizontal_border.elems[-1] + 1)
-		horizontal_borders.append((horizontal_border, old_y_offset))
-		scan_area = self.bin_image[old_y_offset : old_y_offset + horizontal_border.elems[0], :]
-		cv2.imshow("scan area", scan_area)
-		cv2.waitKey(0)
-		heading_area = HeadingArea.from_image(scan_area, offset=old_y_offset)
-		'''heading_area_image = self.org_image[self.y_offset: self.y_offset + heading_area.height, heading_area.xpos:]	
-		cv2.imshow("heading area", heading_area_image)
-		cv2.waitKey(0)'''
-		self.area_list: list[ImageFilterItemArea] = [heading_area]
-		self.area_offset_list: list[tuple[ImageFilterItemArea, int]] = [(heading_area, old_y_offset)]
-		# y_offset.set(horizontal_borders[-1].elems[-1] + 1)
+		horizontal_borders.append(horizontal_border)
+		bin_image = bin_image[self.y_offset:, :]
+		scan_area = bin_image[:horizontal_border.elems[0], :]
+		if show_check:
+			do_show_check("scan_area", y_offset, scan_area)
+		heading_area_param = HeadingAreaParam.from_image(scan_area, offset=0)
+		if show_check:
+			do_show_check("heading_area", heading_area_param, scan_area[heading_area_param.ypos:, heading_area_param.xpos:])
+		self.area_param_list: list[ImageAreaParam] = [heading_area_param]
 		# seek for 3rd border
-		# y_offset.set(self.y_offset + horizontal_borders[-1].elems[-1] + 1)
-		old_y_offset = y_offset.value
+		last_y_offset = y_offset.value
 		try:
-			horizontal_border = find_horizontal_border_from_image(self.bin_image, y_offset)
+			horizontal_border = find_horizontal_border_from_image(bin_image, y_offset)
 		except NoBunchException:
 			raise ValueError("No border found!")
-		horizontal_borders.append((horizontal_border, old_y_offset))
-		area_image = self.bin_image[old_y_offset: old_y_offset + horizontal_border.elems[0], :]
-		cv2.imshow("Shift area", area_image)
-		cv2.waitKey(0)
-		shift_area = ShiftArea.from_image(area_image, offset=old_y_offset)
-		self.area_list.append(shift_area)
-		self.area_offset_list.append((shift_area, old_y_offset))
+		horizontal_borders.append(horizontal_border)
+		area_image = bin_image[last_y_offset: last_y_offset + horizontal_border.elems[0], :]
+		shift_area_param = ShiftAreaParam.from_image(area_image, offset=last_y_offset)
+		if show_check:
+			do_show_check("shift_area", shift_area_param, area_image)
+		self.area_param_list.append(shift_area_param)
 		# seek for 4th border
-		old_y_offset = y_offset.value
+		last_y_offset = y_offset.value
 		try:
-			horizontal_border = find_horizontal_border_from_image(self.bin_image, y_offset)
+			horizontal_border = find_horizontal_border_from_image(bin_image, y_offset)
 		except NoBunchException:
 			raise ValueError("No border found!")
-		horizontal_borders.append((horizontal_border, old_y_offset))
-		area_image = self.bin_image[old_y_offset: old_y_offset + horizontal_border.elems[0], :]
-		cv2.imshow("Breaktime area", area_image)
-		cv2.waitKey(0)
-		breaktime_area = BreaktimeArea.from_image(area_image, offset=old_y_offset)
-		self.area_list.append(breaktime_area)
-		self.area_offset_list.append((breaktime_area, old_y_offset))
-		paystub_area = PaystubArea(ypos=old_y_offset + horizontal_border.elems[-1] + 1)
-		area_image = self.bin_image[paystub_area.ypos:]
-		cv2.imshow("Paystub area", area_image)
-		cv2.waitKey(0)
-		self.area_list.append(paystub_area)
-		self.area_offset_list.append((paystub_area, old_y_offset + horizontal_border.elems[-1] + 1))
+		horizontal_borders.append(horizontal_border)
+		area_image = bin_image[last_y_offset: last_y_offset + horizontal_border.elems[0], :]
+		breaktime_area_param = BreaktimeAreaParam.from_image(area_image, offset=y_offset.value)
+		if show_check:
+			do_show_check("breaktime_area", breaktime_area_param, area_image)
+		self.area_param_list.append(breaktime_area_param)
+		paystub_area_param = PaystubAreaParam(ypos=last_y_offset + horizontal_border.elems[-1] + 1)
+		area_image = bin_image[paystub_area_param.ypos:]
+		if show_check:
+			do_show_check("paystub_area", paystub_area_param, area_image)
+		self.area_param_list.append(paystub_area_param)
+		if show_check:
+			cv2.destroyAllWindows()
 		
 	def extract_heading(self, params: dict[ImageDictKey, tuple[int, int]] | None = None, seek_button_shape: bool = False, button_text: Optional[list[str]] = None) -> ImageAreaParam|tuple[ImageAreaParam, str]:
 		'''Return: (ypos, height, x_start)
@@ -538,7 +528,7 @@ class TaimeeFilter:
 			raise ValueError("No nearby borders found")
 		if self.y_offset >= self.distant_array[0]:
 			raise ValueError("Y offset is not less than non-nearby array first element")
-		heading_area = self.bin_image[self.y_offset:self.distant_array[0] + self.y_offset, :].copy()
+		heading_area = bin_image[self.y_offset:self.distant_array[0] + self.y_offset, :].copy()
 		for y in self.horizontal_lines:
 			if y >= heading_area.shape[0]:
 				break
@@ -709,7 +699,7 @@ class BinaryImage:
 	'''
 		else:
 			self.auto_thresh_val = 0
-			self.bin_image = self.mono_image'''
+			bin_image = self.mono_image'''
 
 
 def taimee(
@@ -768,7 +758,7 @@ def taimee(
 	heading_elem = non_nearby_elems[0]
 	# from image_filter import TaimeeFilter
 	taimee_filter = TaimeeFilter(b_image, horizontal_borders)
-	heading_area = taimee_filter.area_list[0]
+	heading_area = taimee_filter.area_param_list[0]
 	# heading_ypos, heading_height, heading_xpos = taimee_filter.extract_heading()
 	# heading_area_xpos = TaimeeFilter.get_heading_avatar_end_xpos(b_image[leading_height:heading_elem+leading_height, :], borders=horizontal_borders)
 	ocr_image = mono_image[taimee_filter.y_offset: taimee_filter.y_offset+heading_area.height, heading_area.xpos:]
@@ -796,7 +786,7 @@ def taimee(
 	except NoBorderError:
 		raise ValueError("No heading border found!")
 	pre_h_image = b_image[:head_border, :]
-	heading_area: HeadingArea = trim_heading(pre_h_image, image_filter_params)#, return_as_cuts=True)
+	heading_area: HeadingAreaParam = trim_heading(pre_h_image, image_filter_params)#, return_as_cuts=True)
 	h_image = pre_h_image[:heading_area.height, heading_area.xpos:]
 	h_image2 = heading_area.crop_image(pre_h_image)
 	cur_image = b_image[head_border + head_border_len + 1 :, :]
@@ -1042,7 +1032,7 @@ def trim_heading(
 	min_width: int = 8,
 	min_height: int = 8,
 	# return_as_cuts: bool = False,
-) -> HeadingArea:
+) -> HeadingAreaParam:
 	"""h_image: binarized i.e. 0 or 255
 	background is 255
 	Return: trimmed heading or list of trimmed headings(return_as_cuts=True) as HeadingCuts(bottom_cut_height, left_cut_width)
@@ -1094,13 +1084,13 @@ def trim_heading(
 			raise ValueError("Not enough valid height(%d) for the heading!" % y)
 		heading_height = y  # + 1
 		params[ImageFilterParam.heading_height] = heading_height
-	return HeadingArea(ypos=0, height=heading_height, xpos=left_pad) # if return_as_cuts else h_image[:heading_height, left_pad:]
+	return HeadingAreaParam(ypos=0, height=heading_height, xpos=left_pad) # if return_as_cuts else h_image[:heading_height, left_pad:]
 
 
 def get_split_shifts(
 	image: np.ndarray, params: dict[ImageFilterParam, int] = {}, set_params=True, 
 return_as_cuts: bool = False, center_rate = 0.5
-) -> tuple[np.ndarray, np.ndarray] | ShiftArea:
+) -> tuple[np.ndarray, np.ndarray] | ShiftAreaParam:
 	"""Split image into left and right;black-filled shape's x position is center_rate;
 	Args: h_image: binarized i.e. 0 or 255
 	background is 255(white);
@@ -1135,7 +1125,7 @@ return_as_cuts: bool = False, center_rate = 0.5
 	if set_params:
 		params[ImageFilterParam.shift_from_width] = left_area_width
 		params[ImageFilterParam.shift_until_xpos] = right_area_xpos
-	return ShiftArea(ypos=0, height=image.shape[0], start_width=left_area_width, end_xpos=right_area_xpos) if return_as_cuts else (image[:, :left_area_width], image[:, right_area_xpos:])
+	return ShiftAreaParam(ypos=0, height=image.shape[0], start_width=left_area_width, end_xpos=right_area_xpos) if return_as_cuts else (image[:, :left_area_width], image[:, right_area_xpos:])
 
 
 
@@ -1177,3 +1167,75 @@ def find_horizontal_border_from_image(bin_image: np.ndarray, y_offset:OffsetInt|
 	if y_offset is not None:
 		y_offset.inc(bunch.elems[-1] + 1)
 	return bunch
+
+def do_show_check(msg, param, img):
+	cv2.imshow(f"{msg}::{param}", img)
+	cv2.waitKey(0)
+
+if __name__ == "__main__":
+	from pprint import pprint, pp
+	import numpy as np
+	from pathlib import Path
+	from dotenv import dotenv_values
+	import tomllib
+
+	cwd = Path(__file__).resolve().parent
+	sys.path.append(str(cwd.parent))
+	from set_logger import set_logger
+	logger = set_logger(__name__)
+	import os
+
+	APP_STR = "taimee"
+	FILTER_TOML_PATH_STR = "FILTER_TOML_PATH"
+	filter_toml_path = getattr(os.environ, FILTER_TOML_PATH_STR, None) 
+	ENV_FILE_NAME = ".env"
+	env_file = Path(ENV_FILE_NAME)
+	try: # if env_file.exists():
+		with env_file.open('r') as f:
+			env_filter_toml_path = dotenv_values(stream=f)[FILTER_TOML_PATH_STR]
+			if env_filter_toml_path:
+				filter_toml_path = env_filter_toml_path
+	except KeyError:
+		logger.warning("KeyError: '%s' not found in %s", FILTER_TOML_PATH_STR, ENV_FILE_NAME)
+	except FileNotFoundError:
+		logger.warning("FileNotFoundError: '%s' not found", ENV_FILE_NAME)
+	if not filter_toml_path:
+		raise ValueError("Error: failed to load 'filter_toml_path'!")
+	try:
+		with open(filter_toml_path, 'rb') as f:
+			filter_config = tomllib.load(f)
+
+		image_path_config = filter_config['image-path']
+		image_dir = Path(image_path_config['dir']).expanduser() # home dir starts with tilde(~)
+		if not image_dir.exists():
+			raise ValueError("Error: image_dir not found: %s" % image_dir)
+		image_config_filename = image_path_config[APP_STR]['filename']
+		filename_path = Path(image_config_filename)
+		if '*' in filename_path.stem or '?' in filename_path.stem:
+			logger.info("Trying to expand filename with wildcard: %s" % image_config_filename)
+			glob_path = Path(image_dir)
+			file_list = [f for f in glob_path.glob(image_config_filename) if f.is_file()]
+			if len(file_list) == 0:
+				raise ValueError("Error: No files found with wildcard: %s" % image_config_filename)
+			logger.info("%d file found", len(file_list))
+			logger.info("Files: %s", file_list)
+			nth = 1
+			logger.info("Choosing the %d-th file.", nth)
+			image_config_filename = file_list[nth - 1].name
+			logger.info("Selected file: %s", image_config_filename)
+		image_path = Path(image_dir) / image_config_filename
+		if not image_path.exists():
+			raise ValueError("Error: image_path not found: %s" % image_path)
+		image_fullpath = image_path.resolve()
+	except KeyError as err:
+		raise ValueError("Error: key not found!\n%s" % err)
+	except FileNotFoundError as err:
+		raise ValueError("Error: file not found!\n%s" % err)
+	except tomllib.TOMLDecodeError as err:
+		raise ValueError("Error: failed to TOML decode!\n%s" % err)
+	image = cv2.imread(str(image_fullpath), cv2.IMREAD_GRAYSCALE) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
+	if image is None:
+		raise ValueError("Error: Could not load image: %s" % image_fullpath)
+	filter_param_dict: dict[ImageAreaName, ImageFilterParam] = {}
+	taimee_filter = TaimeeFilter(image=image, params=filter_param_dict, show_check=True)
+	pp(taimee_filter)

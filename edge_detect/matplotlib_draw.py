@@ -64,7 +64,7 @@ except tomllib.TOMLDecodeError as err:
 image = cv2.imread(str(image_fullpath), cv2.IMREAD_GRAYSCALE) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
 if image is None:
 	raise ValueError("Error: Could not load image: %s" % image_fullpath)
-from image_filter import ImageDictKey, taimee, BinaryImage, TaimeeFilter, ImageFilterParam, ImageAreaParam
+from image_filter import ImageDictKey, taimee, BinaryImage, TaimeeFilter, ImageFilterParam, ImageAreaParam, ImageAreaName
 from typing import Any
 # import image_filter
 '''title_window = 'Binary Iimage'
@@ -88,8 +88,8 @@ for r in range(SUBPLOT_SIZE):
 	ax[r].xaxis.tick_top()
 	ax[r].set_title(f"Row {r+1}")
 ax[0].imshow(b_image, cmap='gray')'''
-filter_param_dict: dict[ImageFilterParam, Any] = {}
-taimee_filter = TaimeeFilter(given_image=image, params=filter_param_dict)
+filter_param_dict: dict[ImageAreaName, ImageFilterParam] = {}
+taimee_filter = TaimeeFilter(image=image, params=filter_param_dict)
 heading_param_dict: dict[ImageDictKey, ImageAreaParam|str] = {}
 #heading_ypos, heading_height, heading_xpos, heading_width 
 t_leading_y = taimee_filter.y_offset
