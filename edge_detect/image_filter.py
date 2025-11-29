@@ -496,40 +496,40 @@ class TaimeeFilter:
 			horizontal_border.elems[-1] + 1,
 			limit=bin_image.shape[0] # height
 		)
-		horizontal_borders: list[NearBunch] = [horizontal_border] # deque(maxlen=2)
+		# horizontal_borders: list[NearBunch] = [horizontal_border] # deque(maxlen=2)
 		# save y-axis offset into a self variable
 		self.y_offset = y_offset.value
 		bin_image = bin_image[self.y_offset:, :]
+		'''cv2.imshow("bin_image", bin_image)
+		cv2.waitKey()'''
+		horizontal_borders = get_horizontal_borders_from_image(bin_image, bunch_count=3)
+		# horizontal_borders += trailing_horizontal_borders
+
 		# get heading area
+		# params[ImageAreaName.heading] = None
 		try:
 			heading_area_param = HeadingAreaParam(*params[ImageAreaName.heading]) #HeadingAreaParam
-		except KeyError:
-			# seek for 2nd border
-			try:
-				horizontal_border = find_horizontal_border_from_image(bin_image, y_offset)
-			except NoBunchException:
-				raise ValueError("No border found!")
-			horizontal_borders.append(horizontal_border)
-			if show_check:
-				scan_area = bin_image[:horizontal_border.elems[0], :]
-				do_show_check("scan_area", y_offset, scan_area)
-			heading_area_param = HeadingAreaParam.from_image(scan_area, offset=0)
+		except (KeyError, TypeError):
+			area_end = horizontal_borders[0].elems[0]
+			heading_area_param = HeadingAreaParam.from_image(bin_image[0:area_end, :])
+
 		if show_check:
 			show_image = bin_image[:heading_area_param.height, heading_area_param.xpos:]
 			do_show_check("heading_area", heading_area_param, show_image)
 		self.area_param_list: list[ImageAreaParam] = [heading_area_param]
-		# seek for 3rd border
-		last_y_offset = y_offset.value
+		# get shift area
+		params[ImageAreaName.shift] = None
 		try:
-			horizontal_border = find_horizontal_border_from_image(bin_image, y_offset)
-		except NoBunchException:
-			raise ValueError("No border found!")
-		horizontal_borders.append(horizontal_border)
-		area_image = bin_image[last_y_offset: last_y_offset + horizontal_border.elems[0], :]
-		shift_area_param = ShiftAreaParam.from_image(area_image, offset=last_y_offset)
+			area_param = ShiftAreaParam(*params[ImageAreaName.shift])
+		except (KeyError, TypeError):
+			area_start = horizontal_borders[0].elems[-1] + 1
+			area_end = horizontal_borders[1].elems[0]
+			area_param = ShiftAreaParam(ypos=area_start, height=area_end - area_start)
+
 		if show_check:
-			do_show_check("shift_area", shift_area_param, area_image)
-		self.area_param_list.append(shift_area_param)
+			area_image = bin_image[area_param.ypos:area_param.ypos + area_param.height, :]
+			do_show_check("shift_area", area_param, area_image)
+		self.area_param_list.append(area_param)
 		# seek for 4th border
 		last_y_offset = y_offset.value
 		try:
@@ -1184,16 +1184,18 @@ def merge_nearby_elems(elems: Sequence[int], thresh=9) -> Iterator[int]:
 	if sent:
 		yield elem0
 
-'''def get_horizontal_borders_from_image(bin_image: np.ndarray, y_offset:int=0, bunch_thresh: int=10, bunch_count:int=2) -> list[NearBunch]:
+def get_horizontal_borders_from_image(bin_image: np.ndarray, y_offset:int=0, bunch_thresh: int=10, bunch_count:int=2) -> list[NearBunch]:
 	bunches: list[NearBunch] = []
 	for n in range(bunch_count):
 		try:
 			bunch = find_horizontal_border_from_image(bin_image[y_offset:, :], bunch_thresh=bunch_thresh)
 		except	NoBunchException:
 			raise NotEnoughBordersException("Not enough borders found!")
+		for n, e in enumerate(bunch.elems):
+			bunch.elems[n] = e + y_offset
 		bunches.append(bunch)
 		y_offset += bunch.elems[-1] + 1
-	return bunches'''
+	return bunches
 
 def find_horizontal_border_from_image(bin_image: np.ndarray, y_offset:OffsetInt|None=None, bunch_thresh: int=10) -> NearBunch:
 	''' Increment Y_offset as bunch.elems[-1] + 1 '''
