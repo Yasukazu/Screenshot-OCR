@@ -1,4 +1,7 @@
-class NearBunchException(ValueError):
+class NearBunchException(Exception):
+	pass
+
+class NoBunchException(Exception):
 	pass
 
 class NearBunch:

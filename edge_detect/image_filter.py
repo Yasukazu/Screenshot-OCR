@@ -20,7 +20,7 @@ from inspect import isclass
 from itertools import groupby
 from fancy_dataclass import TOMLDataclass
 
-from near_bunch import NearBunch, NearBunchException
+from near_bunch import NearBunch, NearBunchException, NoBunchException
 
 cwd = Path(__file__).resolve().parent
 sys.path.append(str(cwd.parent))
@@ -28,6 +28,8 @@ from set_logger import set_logger
 
 logger = set_logger(__name__)
 
+class NotEnoughBordersException(Exception):
+	pass
 
 @dataclass
 class ImageFilterConfig:
@@ -251,7 +253,7 @@ class BreaktimeArea(ImageFilterItemArea):
 		fp.write(f"{self.__class__.__name__} = {str(list(self.param))}\n")
 
 @dataclass
-class PayslipArea(ImageFilterItemArea):
+class PaystubArea(ImageFilterItemArea):
 	def to_toml(self, fp: IOBase, **kwargs):
 		fp.write(f"{self.__class__.__name__} = {str(list(self.param))}\n")
 @dataclass
@@ -288,13 +290,13 @@ class ImageFilterAreas:
 		ImageDictKey.shift_start: ShiftStartArea,
 		ImageDictKey.shift_end: ShiftEndArea,
 		ImageDictKey.break_time: BreaktimeArea,
-		ImageDictKey.payslip: PayslipArea,
+		ImageDictKey.payslip: PaystubArea,
 		ImageDictKey.salary: SalaryArea,
 	}
 	heading: HeadingArea # midashi
 	shift: ShiftArea # syuugyou jikan
 	break_time: BreaktimeArea # kyuukei jikan
-	payslip: PayslipArea # meisai
+	payslip: PaystubArea # meisai
 	salary: SalaryArea # kyuuyo
 	y_offset: int = 0
 
@@ -464,48 +466,70 @@ class TaimeeFilter:
 	def __init__(self, given_image: np.ndarray | Path | str, params: dict[ImageFilterParam, int] = {}):
 		self.org_image = given_image if isinstance(given_image, np.ndarray) else cv2.imread(str(given_image))
 		self.params = params
-		h_lines = []
+		# h_lines = []
 		self.bin_image = cv2.threshold(self.org_image, self.THRESHOLD, 255, cv2.THRESH_BINARY)[1]
-		leading_offset = -1
-		from collections import deque
-		horizontal_border = find_horizontal_border_from_image(self.bin_image)
-		if horizontal_border.bunch_count == 0:
+		# leading_offset = -1
+		# find 1st border	
+		try:
+			horizontal_border = find_horizontal_border_from_image(self.bin_image)
+		except NoBunchException:
 			raise ValueError("No border found!")
 		y_offset = OffsetInt(
 			horizontal_border.elems[-1] + 1,
 			self.bin_image.shape[0]
 		)
-		horizontal_borders: list[NearBunch] = [horizontal_border] # deque(maxlen=2)
+		horizontal_borders: list[tuple[NearBunch, int]] = [(horizontal_border, y_offset.value)] # deque(maxlen=2)
 		# seek for 2nd border
-		horizontal_border = find_horizontal_border_from_image(self.bin_image[y_offset.value :, :])
-		if horizontal_border.bunch_count == 0:
-			raise ValueError("No next border found!")	
-		horizontal_borders.append(horizontal_border)
-		scan_area = self.bin_image[y_offset.value : y_offset.value + horizontal_borders[1].elems[0] - 1, :]
-		heading_area = HeadingArea.from_image(scan_area, offset=y_offset.value)
-		self.area_list: list[ImageFilterItemArea] = [heading_area]
-		self.area_offset_list: list[tuple[ImageFilterItemArea, int]] = [(heading_area, y_offset.value)]
-		self.y_offset = y_offset.value
-		# seek for 3rd and 4th borders
-		y_offset.set(horizontal_borders[-1].elems[-1] + 1)
-		horizontal_borders.clear()
-		horizontal_border = find_horizontal_border_from_image(self.bin_image[y_offset.value :, :])
-		if horizontal_border.bunch_count == 0:
-			raise ValueError("No next border found!")
-		horizontal_borders.append(horizontal_border)
-		y_offset.inc(horizontal_borders[-1].elems[-1] + 1)
-		horizontal_border = find_horizontal_border_from_image(self.bin_image[y_offset.value :, :])
-		if horizontal_border.bunch_count == 0:
-			raise ValueError("No next border found!")
-		horizontal_borders.append(horizontal_border)
-		# new area: ShiftArea
-		shift_area_image =self.bin_image[y_offset.value : y_offset.value + horizontal_borders[-1].elems[0] - 1, :] 
-		shift_area = ShiftArea.from_image(shift_area_image, offset=y_offset.value)
-		cv2.imshow("shift area", shift_area_image)
+		self.y_offset = old_y_offset = y_offset.value
+		try:
+			horizontal_border = find_horizontal_border_from_image(self.bin_image, y_offset)
+		except NoBunchException:
+			raise ValueError("No border found!")
+		# y_offset.inc(horizontal_border.elems[-1] + 1)
+		horizontal_borders.append((horizontal_border, old_y_offset))
+		scan_area = self.bin_image[old_y_offset : old_y_offset + horizontal_border.elems[0], :]
+		cv2.imshow("scan area", scan_area)
 		cv2.waitKey(0)
-		breakpoint()
+		heading_area = HeadingArea.from_image(scan_area, offset=old_y_offset)
+		'''heading_area_image = self.org_image[self.y_offset: self.y_offset + heading_area.height, heading_area.xpos:]	
+		cv2.imshow("heading area", heading_area_image)
+		cv2.waitKey(0)'''
+		self.area_list: list[ImageFilterItemArea] = [heading_area]
+		self.area_offset_list: list[tuple[ImageFilterItemArea, int]] = [(heading_area, old_y_offset)]
+		# y_offset.set(horizontal_borders[-1].elems[-1] + 1)
+		# seek for 3rd border
+		# y_offset.set(self.y_offset + horizontal_borders[-1].elems[-1] + 1)
+		old_y_offset = y_offset.value
+		try:
+			horizontal_border = find_horizontal_border_from_image(self.bin_image, y_offset)
+		except NoBunchException:
+			raise ValueError("No border found!")
+		horizontal_borders.append((horizontal_border, old_y_offset))
+		area_image = self.bin_image[old_y_offset: old_y_offset + horizontal_border.elems[0], :]
+		cv2.imshow("Shift area", area_image)
+		cv2.waitKey(0)
+		shift_area = ShiftArea.from_image(area_image, offset=old_y_offset)
 		self.area_list.append(shift_area)
-		self.area_offset_list.append((shift_area, y_offset.value))
+		self.area_offset_list.append((shift_area, old_y_offset))
+		# seek for 4th border
+		old_y_offset = y_offset.value
+		try:
+			horizontal_border = find_horizontal_border_from_image(self.bin_image, y_offset)
+		except NoBunchException:
+			raise ValueError("No border found!")
+		horizontal_borders.append((horizontal_border, old_y_offset))
+		area_image = self.bin_image[old_y_offset: old_y_offset + horizontal_border.elems[0], :]
+		cv2.imshow("Breaktime area", area_image)
+		cv2.waitKey(0)
+		breaktime_area = BreaktimeArea.from_image(area_image, offset=old_y_offset)
+		self.area_list.append(breaktime_area)
+		self.area_offset_list.append((breaktime_area, old_y_offset))
+		paystub_area = PaystubArea(ypos=old_y_offset + horizontal_border.elems[-1] + 1)
+		area_image = self.bin_image[paystub_area.ypos:]
+		cv2.imshow("Paystub area", area_image)
+		cv2.waitKey(0)
+		self.area_list.append(paystub_area)
+		self.area_offset_list.append((paystub_area, old_y_offset + horizontal_border.elems[-1] + 1))
 		
 	def extract_heading(self, params: dict[ImageDictKey, tuple[int, int]] | None = None, seek_button_shape: bool = False, button_text: Optional[list[str]] = None) -> ImageAreaParam|tuple[ImageAreaParam, str]:
 		'''Return: (ypos, height, x_start)
@@ -744,12 +768,16 @@ def taimee(
 	heading_elem = non_nearby_elems[0]
 	# from image_filter import TaimeeFilter
 	taimee_filter = TaimeeFilter(b_image, horizontal_borders)
-	heading_ypos, heading_height, heading_xpos = taimee_filter.extract_heading()
+	heading_area = taimee_filter.area_list[0]
+	# heading_ypos, heading_height, heading_xpos = taimee_filter.extract_heading()
 	# heading_area_xpos = TaimeeFilter.get_heading_avatar_end_xpos(b_image[leading_height:heading_elem+leading_height, :], borders=horizontal_borders)
+	ocr_image = mono_image[taimee_filter.y_offset: taimee_filter.y_offset+heading_area.height, heading_area.xpos:]
+	cv2.imshow("OCR image", ocr_image)
+	cv2.waitKey(0)
 	ocr = TesseractOCR()
 	# from pandas import DataFrame
 	from pytesseract import Output as TesseractOutput
-	ocr_dataframe = ocr.exec(mono_image[taimee_filter.y_offset: taimee_filter.y_offset+heading_height, heading_xpos:], output_type=TesseractOutput.DATAFRAME)
+	ocr_dataframe = ocr.exec(ocr_image, output_type=TesseractOutput.DATAFRAME)
 	heading_text = ocr_dataframe[ocr_dataframe['conf'] > 0]['text']	
 	## cut preceding bump area
 	try:
@@ -1125,13 +1153,27 @@ def merge_nearby_elems(elems: Sequence[int], thresh=9) -> Iterator[int]:
 	if sent:
 		yield elem0
 
-def find_horizontal_border_from_image(bin_image: np.ndarray, y_offset:int=0, bunch_thresh: int=10) -> NearBunch:
-		bunch = NearBunch(bunch_thresh)
-		for y in (find_horizontal_borders(bin_image[y_offset:, :], border_color=BorderColor.BLACK)):
-			try:
-				bunch.add(y)
-			except NearBunchException:
-				break
-		if bunch.bunch_count == 0:
-			raise ValueError("No next border found!")
-		return bunch
+'''def get_horizontal_borders_from_image(bin_image: np.ndarray, y_offset:int=0, bunch_thresh: int=10, bunch_count:int=2) -> list[NearBunch]:
+	bunches: list[NearBunch] = []
+	for n in range(bunch_count):
+		try:
+			bunch = find_horizontal_border_from_image(bin_image[y_offset:, :], bunch_thresh=bunch_thresh)
+		except	NoBunchException:
+			raise NotEnoughBordersException("Not enough borders found!")
+		bunches.append(bunch)
+		y_offset += bunch.elems[-1] + 1
+	return bunches'''
+
+def find_horizontal_border_from_image(bin_image: np.ndarray, y_offset:OffsetInt|None=None, bunch_thresh: int=10) -> NearBunch:
+	''' Increment Y_offset as bunch.elems[-1] + 1 '''
+	bunch = NearBunch(bunch_thresh)
+	for y in find_horizontal_borders(bin_image[y_offset.value if y_offset else 0:, :], border_color=BorderColor.BLACK):
+		try:
+			bunch.add(y)
+		except NearBunchException:
+			break
+	if bunch.bunch_count == 0:
+		raise NoBunchException("No next border found!")
+	if y_offset is not None:
+		y_offset.inc(bunch.elems[-1] + 1)
+	return bunch
