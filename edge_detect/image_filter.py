@@ -140,7 +140,7 @@ class HeadingAreaParam(ImageAreaParam):
 	def check_image(cls, image: np.ndarray, image_check=False)-> tuple[int, int]:
 		'''returns (x, y) as heading_area'''
 		# check if avatar circle at the left side of the area between the borders(1st and 2nd)
-		## scan vertically to find the upper arc of the expecting circle 
+		## scan vertical lines to find the horizontal range of the shape (expetcing as a circle)
 
 		x = -1
 		black_found = False
@@ -158,7 +158,16 @@ class HeadingAreaParam(ImageAreaParam):
 				break
 		if not white_found:
 			raise ValueError("No white found in scan area!")
-		## scan horizontally to find the lower arc of the expecting circle
+		'''# count black pixel in the shape-detected area
+		acc = 0
+		for line in range(image.shape[0]):#x - x0):
+			v = image[line, x0:x]
+			ac = 0
+			black_groups = [len(list(g)) for is_true, g in groupby(v, lambda x: x==0) if is_true]
+			if len(black_groups) == 1:
+				ac += black_groups[0]
+			acc += ac'''
+		## scan horizontal lines to find the vertical range of the shape
 		scan_area = image[:, x0:x]
 		y = -1
 		black_found = False
@@ -176,15 +185,15 @@ class HeadingAreaParam(ImageAreaParam):
 				break
 		if not white_found:
 			raise ValueError("No white found in scan area(2)!")
-		circle_area = scan_area[y0:y, :]	
-		circle_area_black_count = np.count_nonzero(circle_area == 0)
-		virtual_circle_area = np.full(circle_area.shape, 255, np.uint8)
+		shape_area = scan_area[y0:y, :]	
+		shape_area_black_count = np.count_nonzero(shape_area == 0)
+		shape_area_copy_as_white = np.full(shape_area.shape, 255, np.uint8)
 		### draw a circle on virtual_circle_area
-		cv2.circle(virtual_circle_area, (circle_area.shape[1]//2, circle_area.shape[0]//2), circle_area.shape[1]//2, 0, -1)
-		circle_area_black_diff = np.count_nonzero(virtual_circle_area == 0) - circle_area_black_count
-		if abs(circle_area_black_diff) / circle_area_black_count > 0.1:
+		cv2.circle(shape_area_copy_as_white, (shape_area.shape[1]//2, shape_area.shape[0]//2), shape_area.shape[1]//2, 0, -1)
+		shape_area_black_diff = np.count_nonzero(shape_area_copy_as_white == 0) - shape_area_black_count
+		if abs(shape_area_black_diff) / shape_area_black_count > 0.1:
 			raise ValueError("Detected avatar circle area black diff is too large!")
-		# scan button like shape from bottom
+		# scan button-like shape from bottom beside the circle-expecting area
 		scan_area = image[:, x:]
 		if image_check:
 			cv2.imshow("scan_area", scan_area)
@@ -496,61 +505,48 @@ class TaimeeFilter:
 			horizontal_border.elems[-1] + 1,
 			limit=bin_image.shape[0] # height
 		)
-		# horizontal_borders: list[NearBunch] = [horizontal_border] # deque(maxlen=2)
 		# save y-axis offset into a self variable
 		self.y_offset = y_offset.value
 		bin_image = bin_image[self.y_offset:, :]
-		'''cv2.imshow("bin_image", bin_image)
-		cv2.waitKey()'''
 		horizontal_borders = get_horizontal_borders_from_image(bin_image, bunch_count=3)
-		# horizontal_borders += trailing_horizontal_borders
-
 		# get heading area
-		# params[ImageAreaName.heading] = None
 		try:
-			heading_area_param = HeadingAreaParam(*params[ImageAreaName.heading]) #HeadingAreaParam
+			heading_area_param = HeadingAreaParam(*params[ImageAreaName.heading])
 		except (KeyError, TypeError):
 			area_end = horizontal_borders[0].elems[0]
 			heading_area_param = HeadingAreaParam.from_image(bin_image[0:area_end, :])
-
 		if show_check:
 			show_image = self.image[self.y_offset:self.y_offset + heading_area_param.height, heading_area_param.xpos:]
 			do_show_check("heading_area", heading_area_param, show_image)
 		self.area_param_list: list[ImageAreaParam] = [heading_area_param]
 		# get shift area
-		params[ImageAreaName.shift] = None
 		try:
 			area_param = ShiftAreaParam(*params[ImageAreaName.shift])
 		except (KeyError, TypeError):
 			area_start = horizontal_borders[0].elems[-1] + 1
 			area_end = horizontal_borders[1].elems[0]
 			area_param = ShiftAreaParam(ypos=area_start, height=area_end - area_start)
-
 		if show_check:
 			area_image = bin_image[area_param.ypos:area_param.ypos + area_param.height, :]
 			do_show_check("shift_area", area_param, area_image)
 		self.area_param_list.append(area_param)
 		# get breaktime area
-		params[ImageAreaName.breaktime] = None
 		try:
 			area_param = BreaktimeAreaParam(*params[ImageAreaName.breaktime])
 		except (KeyError, TypeError):
 			area_start = horizontal_borders[1].elems[-1] + 1
 			area_end = horizontal_borders[2].elems[0]
 			area_param = BreaktimeAreaParam(ypos=area_start, height=area_end - area_start)
-
 		if show_check:
 			area_image = bin_image[area_param.ypos:area_param.ypos + area_param.height, :]
 			do_show_check("breaktime area", area_param, area_image)
 		self.area_param_list.append(area_param)
 		# get paystub area
-		# params[ImageAreaName.paystub] = None
 		try:
 			area_param = PaystubAreaParam(*params[ImageAreaName.paystub])
 		except (KeyError, TypeError):
 			area_start = horizontal_borders[2].elems[-1] + 1
 			area_param = BreaktimeAreaParam(ypos=area_start)
-
 		if show_check:
 			area_image = bin_image[area_param.ypos:, :]
 			do_show_check("paystub area", area_param, area_image)
@@ -1284,12 +1280,12 @@ if __name__ == "__main__":
 	if image is None:
 		raise ValueError("Error: Could not load image: %s" % image_fullpath)
 	filter_param_dict: dict[ImageAreaName, ImageFilterParam] = {
-		ImageAreaName.heading:filter_area_param_dict['HeadingAreaParam'],
+		# ImageAreaName.heading:filter_area_param_dict['HeadingAreaParam'],
 		ImageAreaName.breaktime:filter_area_param_dict['BreaktimeAreaParam'],
 		ImageAreaName.shift:filter_area_param_dict['ShiftAreaParam'],
 		ImageAreaName.paystub:filter_area_param_dict['PaystubAreaParam'],
 	}
-	taimee_filter = TaimeeFilter(image=image, params=filter_param_dict, show_check=True)
+	taimee_filter = TaimeeFilter(image=image, params=filter_param_dict, show_check=False)
 	print("[ocr-filter.taimee]")	
 	# print(f"{para.__class__.__name__:para.as_toml() for para in taimee_filter.area_param_list}")
 	print('\n'.join([param.as_toml() for param in taimee_filter.area_param_list]))
