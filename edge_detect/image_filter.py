@@ -514,7 +514,7 @@ class TaimeeFilter:
 			heading_area_param = HeadingAreaParam.from_image(bin_image[0:area_end, :])
 
 		if show_check:
-			show_image = bin_image[:heading_area_param.height, heading_area_param.xpos:]
+			show_image = self.image[self.y_offset:self.y_offset + heading_area_param.height, heading_area_param.xpos:]
 			do_show_check("heading_area", heading_area_param, show_image)
 		self.area_param_list: list[ImageAreaParam] = [heading_area_param]
 		# get shift area
@@ -530,23 +530,31 @@ class TaimeeFilter:
 			area_image = bin_image[area_param.ypos:area_param.ypos + area_param.height, :]
 			do_show_check("shift_area", area_param, area_image)
 		self.area_param_list.append(area_param)
-		# seek for 4th border
-		last_y_offset = y_offset.value
+		# get breaktime area
+		params[ImageAreaName.breaktime] = None
 		try:
-			horizontal_border = find_horizontal_border_from_image(bin_image, y_offset)
-		except NoBunchException:
-			raise ValueError("No border found!")
-		horizontal_borders.append(horizontal_border)
-		area_image = bin_image[last_y_offset: last_y_offset + horizontal_border.elems[0], :]
-		breaktime_area_param = BreaktimeAreaParam.from_image(area_image, offset=last_y_offset)
+			area_param = BreaktimeAreaParam(*params[ImageAreaName.breaktime])
+		except (KeyError, TypeError):
+			area_start = horizontal_borders[1].elems[-1] + 1
+			area_end = horizontal_borders[2].elems[0]
+			area_param = BreaktimeAreaParam(ypos=area_start, height=area_end - area_start)
+
 		if show_check:
-			do_show_check("breaktime_area", breaktime_area_param, area_image)
-		self.area_param_list.append(breaktime_area_param)
-		paystub_area_param = PaystubAreaParam(ypos=last_y_offset + horizontal_border.elems[-1] + 1)
-		area_image = bin_image[paystub_area_param.ypos:]
+			area_image = bin_image[area_param.ypos:area_param.ypos + area_param.height, :]
+			do_show_check("breaktime area", area_param, area_image)
+		self.area_param_list.append(area_param)
+		# get paystub area
+		# params[ImageAreaName.paystub] = None
+		try:
+			area_param = PaystubAreaParam(*params[ImageAreaName.paystub])
+		except (KeyError, TypeError):
+			area_start = horizontal_borders[2].elems[-1] + 1
+			area_param = BreaktimeAreaParam(ypos=area_start)
+
 		if show_check:
-			do_show_check("paystub_area", paystub_area_param, area_image)
-		self.area_param_list.append(paystub_area_param)
+			area_image = bin_image[area_param.ypos:, :]
+			do_show_check("paystub area", area_param, area_image)
+		self.area_param_list.append(area_param)
 		if show_check:
 			cv2.destroyAllWindows()
 		
