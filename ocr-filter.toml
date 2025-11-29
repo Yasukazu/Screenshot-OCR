@@ -1,0 +1,9 @@
+[image-path]
+dir = "~/github/screen/DATA/2025/10"
+[image-path.taimee]
+filename = '*_jp.co.taimee.png'
+[ocr-filter.taimee]
+HeadingAreaParam = [0, 111, 196, -1]
+ShiftAreaParam = [319, 167, 0, 720]
+BreaktimeAreaParam = [488, 224, 0, 720]
+PaystubAreaParam = [714, -1, 0, -1]

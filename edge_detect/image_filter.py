@@ -215,7 +215,12 @@ class HeadingAreaParam(ImageAreaParam):
 		return x, y2
 
 	def to_toml(self, fp: IOBase, **kwargs):
-		fp.write(f"{self.__class__.__name__} = {str(list(self.param))}\n")
+		fp.write(self.as_toml() + '\n')
+
+	def as_toml(self, **kwargs):
+		name = kwargs.get('name', '').strip()
+		name_str = f".{name}" if name else ""
+		return f"{self.__class__.__name__}{name_str} = {str(list(self.param))}"
 
 
 @dataclass
@@ -227,7 +232,12 @@ class ShiftAreaParam(ImageAreaParam):
 	'''
 
 	def to_toml(self, fp: IOBase, **kwargs):
-		fp.write(f"{self.__class__.__name__} = {str(list(self.param))}\n")
+		fp.write(self.as_toml() + '\n')
+
+	def as_toml(self, **kwargs):
+		name = kwargs.get('name', '').strip()
+		name_str = f".{name}" if name else ""
+		return f"{self.__class__.__name__}{name_str} = {str(list(self.param))}"
 	@property
 	def start_width(self)-> int: # start-from time
 		return self.xpos
@@ -250,16 +260,30 @@ class ShiftEndAreaParam(ImageAreaParam):
 @dataclass
 class BreaktimeAreaParam(ImageAreaParam):
 	def to_toml(self, fp: IOBase, **kwargs):
-		fp.write(f"{self.__class__.__name__} = {str(list(self.param))}\n")
+		fp.write(self.as_toml() + '\n')
+
+	def as_toml(self, **kwargs):
+		name = kwargs.get('name', '').strip()
+		name_str = f".{name}" if name else ""
+		return f"{self.__class__.__name__}{name_str} = {str(list(self.param))}"
 
 @dataclass
 class PaystubAreaParam(ImageAreaParam):
 	def to_toml(self, fp: IOBase, **kwargs):
-		fp.write(f"{self.__class__.__name__} = {str(list(self.param))}\n")
+		fp.write(self.as_toml() + '\n')
+
+	def as_toml(self, **kwargs):
+		name = kwargs.get('name', '').strip()
+		name_str = f".{name}" if name else ""
+		return f"{self.__class__.__name__}{name_str} = {str(list(self.param))}"
 @dataclass
 class SalaryAreaParam(ImageAreaParam):
+	def as_toml(self, **kwargs):
+		name = kwargs.get('name', '').strip()
+		name_str = f".{name}" if name else ""
+		return f"{self.__class__.__name__}{name_str} = {str(list(self.param))}"
 	def to_toml(self, fp: IOBase, **kwargs):
-		fp.write(f"{self.__class__.__name__} = {str(list(self.param))}\n")
+		fp.write(self.as_toml() + '\n')
 
 
 @dataclass
@@ -475,19 +499,24 @@ class TaimeeFilter:
 		horizontal_borders: list[NearBunch] = [horizontal_border] # deque(maxlen=2)
 		# save y-axis offset into a self variable
 		self.y_offset = y_offset.value
-		# seek for 2nd border
-		try:
-			horizontal_border = find_horizontal_border_from_image(bin_image, y_offset)
-		except NoBunchException:
-			raise ValueError("No border found!")
-		horizontal_borders.append(horizontal_border)
 		bin_image = bin_image[self.y_offset:, :]
-		scan_area = bin_image[:horizontal_border.elems[0], :]
+		# get heading area
+		try:
+			heading_area_param = HeadingAreaParam(*params[ImageAreaName.heading]) #HeadingAreaParam
+		except KeyError:
+			# seek for 2nd border
+			try:
+				horizontal_border = find_horizontal_border_from_image(bin_image, y_offset)
+			except NoBunchException:
+				raise ValueError("No border found!")
+			horizontal_borders.append(horizontal_border)
+			if show_check:
+				scan_area = bin_image[:horizontal_border.elems[0], :]
+				do_show_check("scan_area", y_offset, scan_area)
+			heading_area_param = HeadingAreaParam.from_image(scan_area, offset=0)
 		if show_check:
-			do_show_check("scan_area", y_offset, scan_area)
-		heading_area_param = HeadingAreaParam.from_image(scan_area, offset=0)
-		if show_check:
-			do_show_check("heading_area", heading_area_param, scan_area[heading_area_param.ypos:, heading_area_param.xpos:])
+			show_image = bin_image[:heading_area_param.height, heading_area_param.xpos:]
+			do_show_check("heading_area", heading_area_param, show_image)
 		self.area_param_list: list[ImageAreaParam] = [heading_area_param]
 		# seek for 3rd border
 		last_y_offset = y_offset.value
@@ -509,7 +538,7 @@ class TaimeeFilter:
 			raise ValueError("No border found!")
 		horizontal_borders.append(horizontal_border)
 		area_image = bin_image[last_y_offset: last_y_offset + horizontal_border.elems[0], :]
-		breaktime_area_param = BreaktimeAreaParam.from_image(area_image, offset=y_offset.value)
+		breaktime_area_param = BreaktimeAreaParam.from_image(area_image, offset=last_y_offset)
 		if show_check:
 			do_show_check("breaktime_area", breaktime_area_param, area_image)
 		self.area_param_list.append(breaktime_area_param)
@@ -1074,16 +1103,28 @@ def trim_heading(
 		for dy in reversed(range(height)):
 			if np.any(h_image[dy, left_pad:] != 255):
 				break
-		assert dy >= 0
+		env_filter_toml_path = dotenv_values(stream=f)[FILTER_TOML_PATH_STR]
+		if env_filter_toml_path:
+				filter_toml_path = env_filter_toml_path
+	except KeyError:
+		logger.warning("KeyError: '%s' not found in %s", FILTER_TOML_PATH_STR, ENV_FILE_NAME)
+	except FileNotFoundError:
+		logger.warning("FileNotFoundError: '%s' not found", ENV_FILE_NAME)
+	if not filter_toml_path:
+		raise ValueError("Error: failed to load 'filter_toml_path'!")
+	try:
+		with open(filter_toml_path, 'rb') as f:
 		## skip bottom shape
-		y = -1
-		for y in range(dy, 0, -1):
-			if np.all(h_image[y, left_pad:] == 255):
-				break
-		if y < min_height:
-			raise ValueError("Not enough valid height(%d) for the heading!" % y)
-		heading_height = y  # + 1
-		params[ImageFilterParam.heading_height] = heading_height
+			y = -1
+			for y in range(dy, 0, -1):
+				if np.all(h_image[y, left_pad:] == 255):
+					break
+			if y < min_height:
+				raise ValueError("Not enough valid height(%d) for the heading!" % y)
+			heading_height = y  # + 1
+			params[ImageFilterParam.heading_height] = heading_height
+	except FileNotFoundError:
+		raise ValueError("Error: failed to load 'filter_toml_path'!")
 	return HeadingAreaParam(ypos=0, height=heading_height, xpos=left_pad) # if return_as_cuts else h_image[:heading_height, left_pad:]
 
 
@@ -1173,11 +1214,17 @@ def do_show_check(msg, param, img):
 	cv2.waitKey(0)
 
 if __name__ == "__main__":
+	from argparse import ArgumentParser
 	from pprint import pprint, pp
 	import numpy as np
 	from pathlib import Path
 	from dotenv import dotenv_values
 	import tomllib
+
+	parser = ArgumentParser()
+	parser.add_argument('--app', default='taimee', help='Application name')
+	parser.add_argument('--toml', default='ocr-filter.toml', help='Configuration toml file name')
+	args = parser.parse_args()
 
 	cwd = Path(__file__).resolve().parent
 	sys.path.append(str(cwd.parent))
@@ -1185,24 +1232,13 @@ if __name__ == "__main__":
 	logger = set_logger(__name__)
 	import os
 
-	APP_STR = "taimee"
-	FILTER_TOML_PATH_STR = "FILTER_TOML_PATH"
-	filter_toml_path = getattr(os.environ, FILTER_TOML_PATH_STR, None) 
-	ENV_FILE_NAME = ".env"
-	env_file = Path(ENV_FILE_NAME)
+	APP_STR = args.app or "taimee"
+	FILTER_TOML = args.toml + '.toml' if not args.toml.endswith('.toml') else ''
+	FILTER_TOML_PATH = Path(FILTER_TOML).resolve()
+
 	try: # if env_file.exists():
-		with env_file.open('r') as f:
-			env_filter_toml_path = dotenv_values(stream=f)[FILTER_TOML_PATH_STR]
-			if env_filter_toml_path:
-				filter_toml_path = env_filter_toml_path
-	except KeyError:
-		logger.warning("KeyError: '%s' not found in %s", FILTER_TOML_PATH_STR, ENV_FILE_NAME)
-	except FileNotFoundError:
-		logger.warning("FileNotFoundError: '%s' not found", ENV_FILE_NAME)
-	if not filter_toml_path:
-		raise ValueError("Error: failed to load 'filter_toml_path'!")
-	try:
-		with open(filter_toml_path, 'rb') as f:
+		with FILTER_TOML_PATH.open('rb') as f:
+
 			filter_config = tomllib.load(f)
 
 		image_path_config = filter_config['image-path']
@@ -1227,6 +1263,7 @@ if __name__ == "__main__":
 		if not image_path.exists():
 			raise ValueError("Error: image_path not found: %s" % image_path)
 		image_fullpath = image_path.resolve()
+		filter_area_param_dict = filter_config['ocr-filter']['taimee']
 	except KeyError as err:
 		raise ValueError("Error: key not found!\n%s" % err)
 	except FileNotFoundError as err:
@@ -1236,6 +1273,13 @@ if __name__ == "__main__":
 	image = cv2.imread(str(image_fullpath), cv2.IMREAD_GRAYSCALE) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
 	if image is None:
 		raise ValueError("Error: Could not load image: %s" % image_fullpath)
-	filter_param_dict: dict[ImageAreaName, ImageFilterParam] = {}
+	filter_param_dict: dict[ImageAreaName, ImageFilterParam] = {
+		ImageAreaName.heading:filter_area_param_dict['HeadingAreaParam'],
+		ImageAreaName.breaktime:filter_area_param_dict['BreaktimeAreaParam'],
+		ImageAreaName.shift:filter_area_param_dict['ShiftAreaParam'],
+		ImageAreaName.paystub:filter_area_param_dict['PaystubAreaParam'],
+	}
 	taimee_filter = TaimeeFilter(image=image, params=filter_param_dict, show_check=True)
-	pp(taimee_filter)
+	print("[ocr-filter.taimee]")	
+	# print(f"{para.__class__.__name__:para.as_toml() for para in taimee_filter.area_param_list}")
+	print('\n'.join([param.as_toml() for param in taimee_filter.area_param_list]))
