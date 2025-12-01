@@ -141,7 +141,6 @@ class HeadingAreaParam(ImageAreaParam):
 		'''returns (x, y) as heading_area'''
 		# check if avatar circle at the left side of the area between the borders(1st and 2nd)
 		## scan vertical lines to find the horizontal range of the shape (expetcing as a circle)
-
 		x = -1
 		black_found = False
 		for x in range(image.shape[1]):
@@ -159,14 +158,6 @@ class HeadingAreaParam(ImageAreaParam):
 		if not white_found:
 			raise ValueError("No white found in scan area!")
 		# count black pixel in the shape-detected area
-		scan_area_width = x - x0
-		acc = 0
-		for line in range(image.shape[0]):#x - x0):
-			v = image[line, x0:x]
-			black_groups = [(is_true, list(g)) for is_true, g in groupby(v, lambda x: x!=0)]# if is_true]
-			if len(black_groups) > 2 and black_groups[0][0] and black_groups[-1][0]:
-				acc += scan_area_width - (len(list(black_groups[0][1])) + len(list(black_groups[-1][1])))
-		# acc = 19432
 		## scan horizontal lines to find the vertical range of the shape
 		scan_area = image[:, x0:x]
 		y = -1
@@ -185,7 +176,18 @@ class HeadingAreaParam(ImageAreaParam):
 				break
 		if not white_found:
 			raise ValueError("No white found in scan area(2)!")
+		# check black pixel in the shape area
 		shape_area = scan_area[y0:y, :]	
+		canvas = np.full(shape_area.shape[:2], 0, np.uint8)
+		for line in range(shape_area.shape[0]):
+			v = shape_area[line, :]
+			black_pos = np.where(v == 0)
+			if black_pos[0].size > 0:
+				canvas[line, :black_pos[0][0]] = 255
+				canvas[line, black_pos[0][-1]:] = 255
+		cv2.imshow("canvas", canvas)
+		cv2.waitKey(0)
+		breakpoint()
 		shape_area_black_count = np.count_nonzero(shape_area == 0)
 		shape_area_copy_as_white = np.full(shape_area.shape, 255, np.uint8)
 		### draw a circle on virtual_circle_area
@@ -239,6 +241,37 @@ class ShiftAreaParam(ImageAreaParam):
 	end_xpos: as width
 	while start_xpos is 0 and end_width is -1
 	'''
+	@classmethod
+	def check_image(cls, image: np.ndarray, image_check=False)-> tuple[int, int]:
+		'''returns (left_end, right_start)'''
+		# check if avatar circle at the left side of the area between the borders(1st and 2nd)
+		## scan vertical lines to find the horizontal range of the shape (expetcing as a black filled rectangle of left side flat)
+
+		x = -1
+		all_white = False
+		for x in range(image.shape[1] // 2 - 1, 0, -1):
+			if np.all(image[:, x] != 0):
+				all_white = True
+				break
+		if not all_white:
+			raise ValueError("No all white found in left half of scan area!")
+		x0 = x
+		all_white = False
+		for x in range(image.shape[1] // 2, image.shape[1]):
+			if np.all(image[:, x] != 0):
+				all_white = True
+				break
+		if not all_white:
+			raise ValueError("No all white found in right half of scan area!")
+		if image_check:
+			cv2.imshow("image", image[:, x0:x])
+			cv2.waitKey(0)
+		return x0, x
+
+	@classmethod
+	def from_image(cls, image: np.ndarray, offset: int, image_check=False) -> "ShiftAreaParam":
+		left, right = cls.check_image(image, image_check)
+		return cls(ypos=offset, height=image.shape[0], xpos=left, width=right)
 
 	def to_toml(self, fp: IOBase, **kwargs):
 		fp.write(self.as_toml() + '\n')
@@ -513,8 +546,8 @@ class TaimeeFilter:
 		try:
 			heading_area_param = HeadingAreaParam(*params[ImageAreaName.heading])
 		except (KeyError, TypeError):
-			area_end = horizontal_borders[0].elems[0]
-			heading_area_param = HeadingAreaParam.from_image(bin_image[0:area_end, :])
+			area_bottom = horizontal_borders[0].elems[0]
+			heading_area_param = HeadingAreaParam.from_image(bin_image[0:area_bottom, :])
 		if show_check:
 			show_image = self.image[self.y_offset:self.y_offset + heading_area_param.height, heading_area_param.xpos:]
 			do_show_check("heading_area", heading_area_param, show_image)
@@ -523,9 +556,10 @@ class TaimeeFilter:
 		try:
 			area_param = ShiftAreaParam(*params[ImageAreaName.shift])
 		except (KeyError, TypeError):
-			area_start = horizontal_borders[0].elems[-1] + 1
-			area_end = horizontal_borders[1].elems[0]
-			area_param = ShiftAreaParam(ypos=area_start, height=area_end - area_start)
+			area_top = horizontal_borders[0].elems[-1] + 1
+			area_bottom = horizontal_borders[1].elems[0]
+			scan_image = bin_image[area_top:area_bottom, :]
+			area_param = ShiftAreaParam.from_image(scan_image, offset=area_top, image_check=show_check)
 		if show_check:
 			area_image = bin_image[area_param.ypos:area_param.ypos + area_param.height, :]
 			do_show_check("shift_area", area_param, area_image)
@@ -534,9 +568,9 @@ class TaimeeFilter:
 		try:
 			area_param = BreaktimeAreaParam(*params[ImageAreaName.breaktime])
 		except (KeyError, TypeError):
-			area_start = horizontal_borders[1].elems[-1] + 1
-			area_end = horizontal_borders[2].elems[0]
-			area_param = BreaktimeAreaParam(ypos=area_start, height=area_end - area_start)
+			area_top = horizontal_borders[1].elems[-1] + 1
+			area_bottom = horizontal_borders[2].elems[0]
+			area_param = BreaktimeAreaParam(ypos=area_top, height=area_bottom - area_top)
 		if show_check:
 			area_image = bin_image[area_param.ypos:area_param.ypos + area_param.height, :]
 			do_show_check("breaktime area", area_param, area_image)
@@ -545,8 +579,8 @@ class TaimeeFilter:
 		try:
 			area_param = PaystubAreaParam(*params[ImageAreaName.paystub])
 		except (KeyError, TypeError):
-			area_start = horizontal_borders[2].elems[-1] + 1
-			area_param = BreaktimeAreaParam(ypos=area_start)
+			area_top = horizontal_borders[2].elems[-1] + 1
+			area_param = BreaktimeAreaParam(ypos=area_top)
 		if show_check:
 			area_image = bin_image[area_param.ypos:, :]
 			do_show_check("paystub area", area_param, area_image)
@@ -1285,7 +1319,13 @@ if __name__ == "__main__":
 		ImageAreaName.shift:filter_area_param_dict['ShiftAreaParam'],
 		ImageAreaName.paystub:filter_area_param_dict['PaystubAreaParam'],
 	}
-	taimee_filter = TaimeeFilter(image=image, params=filter_param_dict, show_check=False)
+	taimee_filter = TaimeeFilter(image=image, params=filter_param_dict, show_check=True)
 	print("[ocr-filter.taimee]")	
 	# print(f"{para.__class__.__name__:para.as_toml() for para in taimee_filter.area_param_list}")
 	print('\n'.join([param.as_toml() for param in taimee_filter.area_param_list]))
+	# --toml ocr-filter
+	'''[ocr-filter.taimee]
+HeadingAreaParam = [0, 111, 196, -1]
+ShiftAreaParam = [219, 267, 345, 373]
+BreaktimeAreaParam = [488, 224, 0, 720]
+PaystubAreaParam = [714, -1, 0, -1]'''
