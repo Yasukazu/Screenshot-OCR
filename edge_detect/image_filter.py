@@ -149,6 +149,7 @@ class HeadingAreaParam(ImageAreaParam):
 				break
 		if not black_found:
 			raise ValueError("No black found in scan area!")
+		h_range = [x]
 		x0 = x
 		white_found = False
 		for x in range(x0, image.shape[1]):
@@ -157,7 +158,7 @@ class HeadingAreaParam(ImageAreaParam):
 				break
 		if not white_found:
 			raise ValueError("No white found in scan area!")
-		# count black pixel in the shape-detected area
+		h_range.append(x)
 		## scan horizontal lines to find the vertical range of the shape
 		scan_area = image[:, x0:x]
 		y = -1
@@ -168,6 +169,7 @@ class HeadingAreaParam(ImageAreaParam):
 				break
 		if not black_found:
 			raise ValueError("No black found in scan area(2)!")
+		v_range = [y]
 		y0 = y
 		white_found = False
 		for y in range(y0, scan_area.shape[0]):
@@ -176,39 +178,47 @@ class HeadingAreaParam(ImageAreaParam):
 				break
 		if not white_found:
 			raise ValueError("No white found in scan area(2)!")
+		v_range.append(y)
 		# check black pixel in the shape area
-		shape_area = scan_area[y0:y, :]	
-		canvas = np.full(shape_area.shape[:2], 0, np.uint8)
+		shape_area = scan_area[v_range[0]:v_range[1], h_range[0]:h_range[1]]
+		# shape_area_copy_as_white = np.full(shape_area.shape, 255, np.uint8)
+		canvas = np.full(shape_area.shape[:2], 255, np.uint8)
+		cv2.circle(canvas, (shape_area.shape[1]//2, shape_area.shape[0]//2 - 1), shape_area.shape[1]//2, 0, -1)
+		# compare shape_area with circle edges(left ang right)
+		abs_diff_list = []
 		for line in range(shape_area.shape[0]):
 			v = shape_area[line, :]
 			black_pos = np.where(v == 0)
-			if black_pos[0].size > 0:
-				canvas[line, :black_pos[0][0]] = 255
-				canvas[line, black_pos[0][-1] + 1:] = 255
-		shape_area_copy_as_white = np.full(shape_area.shape, 255, np.uint8)
-		cv2.circle(shape_area_copy_as_white, (shape_area.shape[1]//2, shape_area.shape[0]//2), shape_area.shape[1]//2, 0, -1)
-		diff_image = cv2.bitwise_xor(canvas, shape_area_copy_as_white)
+			if black_pos[0].size > 1:
+				l_diff = shape_area[line, black_pos[0][0]] - canvas[line, black_pos[0][0]]
+				r_diff = shape_area[line, black_pos[0][-1]] - canvas[line, black_pos[0][-1]]
+				abs_diff_list.append(abs(l_diff)+ abs(r_diff))
+		abs_diff_sum = sum(abs_diff_list)
+		abs_diff_sum_ratio = abs_diff_sum / shape_area.size
+		if abs_diff_sum_ratio > 0.1:
+			raise ValueError("Detected avatar circle area black diff is too large!")
+		# shape_area_copy_as_white = np.full(shape_area.shape, 255, np.uint8)
+		# cv2.circle(shape_area_copy_as_white, (shape_area.shape[1]//2, shape_area.shape[0]//2), shape_area.shape[1]//2, 0, -1)
+		# diff_image = cv2.bitwise_xor(canvas, shape_area_copy_as_white)
 		### draw a circle on virtual_circle_area
-		SUBPLOT_SIZE = 3
+		'''SUBPLOT_SIZE = 3
 		fig, ax = plt.subplots(SUBPLOT_SIZE, 1)#, figsize=(10, 4*SUBPLOT_SIZE))
 		for r in range(SUBPLOT_SIZE):
 			ax[r].invert_yaxis()
 			ax[r].xaxis.tick_top()
 			ax[r].set_title(f"Row {r+1}")
 		ax[0].imshow(canvas, cmap='gray')
-		ax[1].imshow(shape_area_copy_as_white, cmap='gray')
-		ax[2].imshow(diff_image, cmap='gray')
+		ax[1].imshow(shape_area, cmap='gray')
+		ax[2].imshow(abs_diff_list, cmap='gray')
 		plt.show()
-		'''cv2.imshow("canvas", canvas)
-		cv2.waitKey(0)'''
 		diff_white_count = np.count_nonzero(diff_image != 0)
 		diff_white_percentage = diff_white_count * 100 / diff_image.size
 		if diff_white_percentage > 5:
 			raise ValueError("Detected avatar circle area white diff is too large!")
 		shape_area_black_count = np.count_nonzero(shape_area == 0)
-		shape_area_black_diff = np.count_nonzero(shape_area_copy_as_white == 0) - shape_area_black_count
-		if abs(shape_area_black_diff) / shape_area_black_count > 0.1:
+		if abs_diff_sum / shape_area_black_count > 0.1:
 			raise ValueError("Detected avatar circle area black diff is too large!")
+		'''
 		# scan button-like shape from bottom beside the circle-expecting area
 		scan_area = image[:, x:]
 		if image_check:
