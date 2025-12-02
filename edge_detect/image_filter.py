@@ -1,7 +1,7 @@
 from io import IOBase
 from enum import IntEnum, auto
 from dataclasses import field
-
+import matplotlib.pyplot as plt
 from cv2 import UMat
 import cv2
 from tesseract_ocr import TesseractOCR
@@ -184,14 +184,25 @@ class HeadingAreaParam(ImageAreaParam):
 			black_pos = np.where(v == 0)
 			if black_pos[0].size > 0:
 				canvas[line, :black_pos[0][0]] = 255
-				canvas[line, black_pos[0][-1]:] = 255
-		cv2.imshow("canvas", canvas)
-		cv2.waitKey(0)
-		breakpoint()
-		shape_area_black_count = np.count_nonzero(shape_area == 0)
+				canvas[line, black_pos[0][-1] + 1:] = 255
 		shape_area_copy_as_white = np.full(shape_area.shape, 255, np.uint8)
-		### draw a circle on virtual_circle_area
 		cv2.circle(shape_area_copy_as_white, (shape_area.shape[1]//2, shape_area.shape[0]//2), shape_area.shape[1]//2, 0, -1)
+		diff_image = cv2.bitwise_xor(canvas, shape_area_copy_as_white)
+		### draw a circle on virtual_circle_area
+		SUBPLOT_SIZE = 3
+		fig, ax = plt.subplots(SUBPLOT_SIZE, 1)#, figsize=(10, 4*SUBPLOT_SIZE))
+		for r in range(SUBPLOT_SIZE):
+			ax[r].invert_yaxis()
+			ax[r].xaxis.tick_top()
+			ax[r].set_title(f"Row {r+1}")
+		ax[0].imshow(canvas, cmap='gray')
+		ax[1].imshow(shape_area_copy_as_white, cmap='gray')
+		ax[2].imshow(diff_image, cmap='gray')
+		plt.show()
+		breakpoint()
+		'''cv2.imshow("canvas", canvas)
+		cv2.waitKey(0)'''
+		shape_area_black_count = np.count_nonzero(shape_area == 0)
 		shape_area_black_diff = np.count_nonzero(shape_area_copy_as_white == 0) - shape_area_black_count
 		if abs(shape_area_black_diff) / shape_area_black_count > 0.1:
 			raise ValueError("Detected avatar circle area black diff is too large!")
