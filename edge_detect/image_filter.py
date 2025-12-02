@@ -199,9 +199,12 @@ class HeadingAreaParam(ImageAreaParam):
 		ax[1].imshow(shape_area_copy_as_white, cmap='gray')
 		ax[2].imshow(diff_image, cmap='gray')
 		plt.show()
-		breakpoint()
 		'''cv2.imshow("canvas", canvas)
 		cv2.waitKey(0)'''
+		diff_white_count = np.count_nonzero(diff_image != 0)
+		diff_white_percentage = diff_white_count * 100 / diff_image.size
+		if diff_white_percentage > 5:
+			raise ValueError("Detected avatar circle area white diff is too large!")
 		shape_area_black_count = np.count_nonzero(shape_area == 0)
 		shape_area_black_diff = np.count_nonzero(shape_area_copy_as_white == 0) - shape_area_black_count
 		if abs(shape_area_black_diff) / shape_area_black_count > 0.1:
