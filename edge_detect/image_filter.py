@@ -132,7 +132,7 @@ class XOffsetHeight(NamedTuple):
 	x_offset: int
 	height: int
 
-class FromBottomFromLeft(NamedTuple):
+class XYOffset(NamedTuple):
 	from_bottom: int
 	from_left: int
 
@@ -140,6 +140,9 @@ class XYRange(NamedTuple):
 	x: range
 	y: range
 
+class XYPosition(Enum):
+	OFFSET = XYOffset
+	RANGE = XYRange
 
 @dataclass
 class HeadingAreaParam(ImageAreaParam):
@@ -153,63 +156,67 @@ class HeadingAreaParam(ImageAreaParam):
 		return cls(ypos=offset, height=y, xpos=x, width=-1)
 
 	@classmethod
-	def check_image(cls, image: np.ndarray, image_check=False, avatar_area: list[FromBottomFromLeft | XYRange] | None = None, button_area: list[FromBottomFromLeft | XYRange] | None = None, avatar_shape_check=False)-> XOffsetHeight:
+	def check_image(cls, image: np.ndarray, image_check=False, avatar_area: dict[XYPosition, XYOffset | XYRange] | None = None, button_area: dict[XYPosition, XYOffset | XYRange] | None = None, avatar_shape_check=False)-> XOffsetHeight:
 		'''
 		avatar_area | button_area: [(y_range, x_range), (from_bottom, from_left)]
 		If avatar_area or button_area was/were given as empty list, it/they are fulfilled with found ones.
 		returns (x_offset, height) as heading_area'''
 		# check if avatar_area is not None
-		if avatar_area:
+		'''if avatar_area:
 			if len(avatar_area) != 2:
 				raise ValueError("avatar_area must be a list of 2 elements")
-			if not (FromBottomFromLeft not in avatar_area or XYRange not in avatar_area):
+			if not (XYOffset not in avatar_area or XYRange not in avatar_area):
 				raise ValueError("avatar area must contain FromBottomFromLeft and XYRange")
 			for item in avatar_area:
-				if isinstance(item, FromBottomFromLeft):
+				if isinstance(item, XYOffset):
 					avatar_from_bottom_from_left = item
 				else:
-					avatar_x_y_range = item
-
+					avatar_x_y_range = item'''
 		# check if avatar circle at the left side of the area between the borders(1st and 2nd)
 		## scan vertical lines to find the horizontal range of the shape (expetcing as a circle)
-		x = -1
-		black_found = False
-		for x in range(image.shape[1]):
-			if np.any(image[:, x] == 0):
-				black_found = True
-				break
-		if not black_found:
-			raise ValueError("No black found in scan area!")
-		h_range = [x]
-		x0 = x
-		white_found = False
-		for x in range(x0, image.shape[1]):
-			if np.all(image[:, x] == 255):
-				white_found = True
-				break
-		if not white_found:
-			raise ValueError("No white found in scan area!")
-		h_range.append(x)
-		## scan horizontal lines to find the vertical range of the shape
-		scan_area = image[:, x0:x]
-		y = -1
-		black_found = False
-		for y in range(scan_area.shape[0]):
-			if np.any(scan_area[y, :] == 0):
-				black_found = True
-				break
-		if not black_found:
-			raise ValueError("No black found in scan area(2)!")
-		v_range = [y]
-		y0 = y
-		white_found = False
-		for y in range(y0, scan_area.shape[0]):
-			if np.all(scan_area[y, :] == 255):
-				white_found = True
-				break
-		if not white_found:
-			raise ValueError("No white found in scan area(2)!")
-		v_range.append(y)
+		if not avatar_area or XYPosition.RANGE not in avatar_area:
+			x = -1
+			black_found = False
+			for x in range(image.shape[1]):
+				if np.any(image[:, x] == 0):
+					black_found = True
+					break
+			if not black_found:
+				raise ValueError("No black found in scan area!")
+			h_range = [x]
+			x0 = x
+			white_found = False
+			for x in range(x0, image.shape[1]):
+				if np.all(image[:, x] == 255):
+					white_found = True
+					break
+			if not white_found:
+				raise ValueError("No white found in scan area!")
+			h_range.append(x)
+			## scan horizontal lines to find the vertical range of the shape
+			scan_area = image[:, x0:x]
+			y = -1
+			black_found = False
+			for y in range(scan_area.shape[0]):
+				if np.any(scan_area[y, :] == 0):
+					black_found = True
+					break
+			if not black_found:
+				raise ValueError("No black found in scan area(2)!")
+			v_range = [y]
+			y0 = y
+			white_found = False
+			for y in range(y0, scan_area.shape[0]):
+				if np.all(scan_area[y, :] == 255):
+					white_found = True
+					break
+			if not white_found:
+				raise ValueError("No white found in scan area(2)!")
+			v_range.append(y)
+			if not avatar_area:
+				avatar_area = {}
+			avatar_area[XYPosition.RANGE] = XYRange(range(x0, x), range(y0, y))
+
 		# check black pixel in the shape area
 		shape_area = scan_area[v_range[0]:v_range[1], h_range[0]:h_range[1]]
 		# shape_area_copy_as_white = np.full(shape_area.shape, 255, np.uint8)
