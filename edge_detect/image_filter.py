@@ -93,17 +93,18 @@ type Int4 = tuple[int, int, int, int]
 @dataclass
 class ImageAreaParam(TOMLDataclass):
 	ypos: int = 0
-	height: int = -1
+	height: int | None = None
 	xpos: int = 0
-	width: int = -1
+	width: int | None = None
 
 	# param: ItemAreaParam # NamedTuple:read only
 
 	def __post_init__(self):
 		if self.ypos < 0 or self.xpos < 0:
 			raise InvalidValueError("ypos and xpos must be positive")
-		if (self.height < -1 or self.height == 0) or (self.width < -1 or self.width == 0):
-			raise InvalidValueError("height and width must be larger than 0 except -1")
+		if (self.height is not None and self.height <= 0) or (self.width is not None and self.width <= 0):
+			if self.height != -1 or self.width != -1:
+				raise InvalidValueError("height and width must be larger than 0 except None or -1")
 
 	@classmethod
 	def from_image(cls, image: np.ndarray, offset:int=0) -> "ImageAreaParam":
@@ -112,11 +113,11 @@ class ImageAreaParam(TOMLDataclass):
 
 	@property
 	def param(self)-> Int4:
-		return (self.ypos, self.height, self.xpos, self.width)
+		return (self.ypos, self.height or -1, self.xpos, self.width or -1)
 
 
 	def as_slice_param(self) -> Sequence[Int4]:
-		return ((self.ypos, (self.ypos + self.height) if self.height > 0 else -1, self.xpos, (self.xpos + self.width) if self.width > 0 else -1),)
+		return ((self.ypos, (self.ypos + self.height) if self.height else -1, self.xpos, (self.xpos + self.width) if self.width else -1),)
 
 	def crop_image(self, image: np.ndarray) -> Iterator[np.ndarray]:
 		for param in self.as_slice_param():
@@ -127,9 +128,24 @@ class ImageAreaParam(TOMLDataclass):
 class OffsetArea:
 	height: int
 
+class XOffsetHeight(NamedTuple):
+	x_offset: int
+	height: int
+
+class FromBottomFromLeft(NamedTuple):
+	from_bottom: int
+	from_left: int
+
+class XYRange(NamedTuple):
+	x: range
+	y: range
+
+
 @dataclass
 class HeadingAreaParam(ImageAreaParam):
-	'''Necessary named parameters: ypos, height, xpos '''
+	'''
+	Only this area the height is flexible.
+	Necessary named parameters: ypos, height, xpos '''
 
 	@classmethod
 	def from_image(cls, image: np.ndarray, offset: int = 0) -> "ImageAreaParam":
@@ -137,8 +153,23 @@ class HeadingAreaParam(ImageAreaParam):
 		return cls(ypos=offset, height=y, xpos=x, width=-1)
 
 	@classmethod
-	def check_image(cls, image: np.ndarray, image_check=False)-> tuple[int, int]:
-		'''returns (x, y) as heading_area'''
+	def check_image(cls, image: np.ndarray, image_check=False, avatar_area: list[FromBottomFromLeft | XYRange] | None = None, button_area: list[FromBottomFromLeft | XYRange] | None = None, avatar_shape_check=False)-> XOffsetHeight:
+		'''
+		avatar_area | button_area: [(y_range, x_range), (from_bottom, from_left)]
+		If avatar_area or button_area was/were given as empty list, it/they are fulfilled with found ones.
+		returns (x_offset, height) as heading_area'''
+		# check if avatar_area is not None
+		if avatar_area:
+			if len(avatar_area) != 2:
+				raise ValueError("avatar_area must be a list of 2 elements")
+			if not (FromBottomFromLeft not in avatar_area or XYRange not in avatar_area):
+				raise ValueError("avatar area must contain FromBottomFromLeft and XYRange")
+			for item in avatar_area:
+				if isinstance(item, FromBottomFromLeft):
+					avatar_from_bottom_from_left = item
+				else:
+					avatar_x_y_range = item
+
 		# check if avatar circle at the left side of the area between the borders(1st and 2nd)
 		## scan vertical lines to find the horizontal range of the shape (expetcing as a circle)
 		x = -1
@@ -196,7 +227,7 @@ class HeadingAreaParam(ImageAreaParam):
 		abs_diff_sum = sum(abs_diff_list)
 		abs_diff_sum_ratio = abs_diff_sum / shape_area.size
 		if abs_diff_sum_ratio > 0.1:
-			raise ValueError("Detected avatar circle area black diff is too large!")
+			raise ValueError("Detected avatar shape is too different from circle!")
 		# shape_area_copy_as_white = np.full(shape_area.shape, 255, np.uint8)
 		# cv2.circle(shape_area_copy_as_white, (shape_area.shape[1]//2, shape_area.shape[0]//2), shape_area.shape[1]//2, 0, -1)
 		# diff_image = cv2.bitwise_xor(canvas, shape_area_copy_as_white)
