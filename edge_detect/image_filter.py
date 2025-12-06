@@ -102,9 +102,12 @@ class ImageAreaParam(TOMLDataclass):
 	def __post_init__(self):
 		if self.ypos < 0 or self.xpos < 0:
 			raise InvalidValueError("ypos and xpos must be positive")
-		if (self.height is not None and self.height <= 0) or (self.width is not None and self.width <= 0):
-			if self.height != -1 or self.width != -1:
-				raise InvalidValueError("height and width must be larger than 0 except None or -1")
+		if self.height is not None:
+			if self.height != -1 and self.height <= 0:
+				raise InvalidValueError("height must be larger than 0 except None or -1")
+		if self.width is not None:
+			if self.width != -1 and self.width <= 0:
+				raise InvalidValueError("width must be larger than 0 except None or -1")
 
 	@classmethod
 	def from_image(cls, image: np.ndarray, offset:int=0) -> "ImageAreaParam":
@@ -161,6 +164,16 @@ class HeadingAreaParam(ImageAreaParam):
 
 	@classmethod
 	def scan_image_range_x(cls, image: np.ndarray)-> range:
+		'''rt = stop = -1
+		for i, e in enumerate(np.argmax(image[:, :],axis=0)):
+			if start == -1:
+				if e == 0: # black
+					start = i
+			else:
+				if e != 0: # white
+					stop = i
+					break'''
+			
 		x = -1
 		black_found = False
 		for x in range(image.shape[1]):
@@ -220,7 +233,7 @@ class HeadingAreaParam(ImageAreaParam):
 
 	@classmethod
 	def check_image(cls, image: np.ndarray, image_check=False, figure_parts: dict[
-	FigurePart, XYRange] = {},
+	FigurePart, XYRange | int] = {},
 	avatar_shape_check=False)-> XOffsetHeight:
 		'''
 		avatar_area | label_area: (y_range, x_range), (from_bottom, from_left)]
@@ -273,35 +286,38 @@ class HeadingAreaParam(ImageAreaParam):
 		if abs_diff_sum / shape_area_black_count > 0.1:
 			raise ValueError("Detected avatar circle area black diff is too large!")
 		'''
-		# scan button-like shape from bottom beside the circle-expecting area
-		start_x = figure_parts[FigurePart.AVATAR].x.stop
-		scan_area = image[:, start_x:]
-		if image_check:
-			cv2.imshow("scan_area", scan_area)
-			cv2.waitKey(0)
-		heading_h, heading_w = scan_area.shape[:2]
-		label_w_min = heading_w // 3
-		def get_line(line: Sequence[int]):
-			for (k, g) in groupby(line):
-				if k == 0 and (w:=len(list(g))) >= label_w_min:
-					return w
+		if FigurePart.LABEL not in figure_parts:
+			# scan label-like shape from bottom, right side of the avatar area
+			start_x = figure_parts[FigurePart.AVATAR].x.stop
+			scan_area = image[:, start_x:]
+			if image_check:
+				cv2.imshow("scan_area", scan_area)
+				cv2.waitKey(0)
+			heading_h, heading_w = scan_area.shape[:2]
+			label_w_min = heading_w // 3
+			def get_line(line: Sequence[int]):
+				for (k, g) in groupby(line):
+					if k == 0 and (w:=len(list(g))) >= label_w_min:
+						return w
 
-		button_bottom_line = None
-		for y in range(heading_h - 1, 0, -1):
-			if (w:=get_line(scan_area[y, :].tolist())):
-				button_bottom_line = w
-				break
-		if not button_bottom_line:
-			raise ValueError("No button found in heading bottom area!")
-		scan_area[0, :] = 255
-		y2 = -1
-		bg_found = False
-		for y2 in range(y, 0, -1):
-			if np.all(scan_area[y2, x:] == 255):
-				bg_found = True
-				break
-		if not bg_found:
-			raise ValueError("No bg above button shape!")
+			label_bottom_line = None
+			for y in range(heading_h - 1, 0, -1):
+				if (w:=get_line(scan_area[y, :].tolist())):
+					label_bottom_line = w
+					break
+			if not label_bottom_line:
+				raise ValueError("No button found in heading bottom area!")
+			scan_area[0, :] = 255
+			y2 = -1
+			bg_found = False
+			x = figure_parts[FigurePart.AVATAR].x.stop
+			for y2 in range(y, 0, -1):
+				if np.all(scan_area[y2, x:] == 255):
+					bg_found = True
+					break
+			if not bg_found:
+				raise ValueError("No bg above button shape!")
+			figure_parts[FigurePart.LABEL] = y2
 		return x, y2
 
 	def to_toml(self, fp: IOBase, **kwargs):
