@@ -137,18 +137,22 @@ class XYOffset(NamedTuple):
 	from_left: int
 
 class XYRange(NamedTuple):
-	x: range
 	y: range
+	x: range
 
 class XYPosition(Enum):
 	OFFSET = XYOffset
 	RANGE = XYRange
 
+class FigurePart(Enum):
+	AVATAR = auto() # like (figure)
+	LABEL = auto() # like [string]
+
 @dataclass
 class HeadingAreaParam(ImageAreaParam):
 	'''
 	Only this area the height is flexible.
-	Necessary named parameters: ypos, height, xpos '''
+	Necessary named parameters: ypos, height, xpos'''
 
 	@classmethod
 	def from_image(cls, image: np.ndarray, offset: int = 0) -> "ImageAreaParam":
@@ -156,10 +160,71 @@ class HeadingAreaParam(ImageAreaParam):
 		return cls(ypos=offset, height=y, xpos=x, width=-1)
 
 	@classmethod
-	def check_image(cls, image: np.ndarray, image_check=False, avatar_area: dict[XYPosition, XYOffset | XYRange] | None = None, button_area: dict[XYPosition, XYOffset | XYRange] | None = None, avatar_shape_check=False)-> XOffsetHeight:
+	def scan_image_range_x(cls, image: np.ndarray)-> range:
+		x = -1
+		black_found = False
+		for x in range(image.shape[1]):
+			if np.any(image[:, x] == 0):
+				black_found = True
+				break
+		if not black_found:
+			raise ValueError("No black found in scan area!")
+		x0 = x
+		white_found = False
+		for x in range(x0, image.shape[1]):
+			if np.all(image[:, x] == 255):
+				white_found = True
+				break
+		if not white_found:
+			raise ValueError("No white found in scan area!")		
+		return range(x0, x)
+
+	@classmethod
+	def scan_image_range_y(cls, scan_area: np.ndarray)-> range:
+		## scan horizontal lines to find the vertical range of the shape
+		y = -1
+		black_found = False
+		for y in range(scan_area.shape[0]):
+			if np.any(scan_area[y, :] == 0):
+				black_found = True
+				break
+		if not black_found:
+			raise ValueError("No black found in scan area(2)!")
+		y0 = y
+		white_found = False
+		for y in range(y0, scan_area.shape[0]):
+			if np.all(scan_area[y, :] == 255):
+				white_found = True
+				break
+		if not white_found:
+			raise ValueError("No white found in scan area(2)!")
+		return range(y0, y)
+
+	@classmethod
+	def image_shape_check_circle(cls, shape_area: np.ndarray, diff_ratio:float=0.1) -> None:
+		canvas = np.full(shape_area.shape[:2], 255, np.uint8)
+		cv2.circle(canvas, (shape_area.shape[1]//2, shape_area.shape[0]//2 - 1), shape_area.shape[1]//2, 0, -1)
+		# compare shape_area with circle edges(left ang right)
+		abs_diff_list = []
+		for line in range(shape_area.shape[0]):
+			v = shape_area[line, :]
+			black_pos = np.where(v == 0)
+			if black_pos[0].size > 1:
+				l_diff = shape_area[line, black_pos[0][0]] - canvas[line, black_pos[0][0]]
+				r_diff = shape_area[line, black_pos[0][-1]] - canvas[line, black_pos[0][-1]]
+				abs_diff_list.append(abs(l_diff)+ abs(r_diff))
+		abs_diff_sum = sum(abs_diff_list)
+		abs_diff_sum_ratio = abs_diff_sum / shape_area.size
+		if abs_diff_sum_ratio > diff_ratio:
+			raise ValueError("Detected avatar shape is too different from circle!")
+
+	@classmethod
+	def check_image(cls, image: np.ndarray, image_check=False, figure_parts: dict[
+	FigurePart, XYRange] = {},
+	avatar_shape_check=False)-> XOffsetHeight:
 		'''
-		avatar_area | button_area: [(y_range, x_range), (from_bottom, from_left)]
-		If avatar_area or button_area was/were given as empty list, it/they are fulfilled with found ones.
+		avatar_area | label_area: (y_range, x_range), (from_bottom, from_left)]
+		If avatar_area or label_area was/were given as empty list, it/they are fulfilled with found ones.
 		returns (x_offset, height) as heading_area'''
 		# check if avatar_area is not None
 		'''if avatar_area:
@@ -174,67 +239,18 @@ class HeadingAreaParam(ImageAreaParam):
 					avatar_x_y_range = item'''
 		# check if avatar circle at the left side of the area between the borders(1st and 2nd)
 		## scan vertical lines to find the horizontal range of the shape (expetcing as a circle)
-		if not avatar_area or XYPosition.RANGE not in avatar_area:
-			x = -1
-			black_found = False
-			for x in range(image.shape[1]):
-				if np.any(image[:, x] == 0):
-					black_found = True
-					break
-			if not black_found:
-				raise ValueError("No black found in scan area!")
-			h_range = [x]
-			x0 = x
-			white_found = False
-			for x in range(x0, image.shape[1]):
-				if np.all(image[:, x] == 255):
-					white_found = True
-					break
-			if not white_found:
-				raise ValueError("No white found in scan area!")
-			h_range.append(x)
-			## scan horizontal lines to find the vertical range of the shape
-			scan_area = image[:, x0:x]
-			y = -1
-			black_found = False
-			for y in range(scan_area.shape[0]):
-				if np.any(scan_area[y, :] == 0):
-					black_found = True
-					break
-			if not black_found:
-				raise ValueError("No black found in scan area(2)!")
-			v_range = [y]
-			y0 = y
-			white_found = False
-			for y in range(y0, scan_area.shape[0]):
-				if np.all(scan_area[y, :] == 255):
-					white_found = True
-					break
-			if not white_found:
-				raise ValueError("No white found in scan area(2)!")
-			v_range.append(y)
-			if not avatar_area:
-				avatar_area = {}
-			avatar_area[XYPosition.RANGE] = XYRange(range(x0, x), range(y0, y))
+		if FigurePart.AVATAR not in figure_parts:
+			x_range = cls.scan_image_range_x(image)
+			y_range = cls.scan_image_range_y(image[:, x_range.start:x_range.stop])
+			figure_parts[FigurePart.AVATAR] = XYRange(y=y_range, x=x_range)
 
-		# check black pixel in the shape area
-		shape_area = scan_area[v_range[0]:v_range[1], h_range[0]:h_range[1]]
-		# shape_area_copy_as_white = np.full(shape_area.shape, 255, np.uint8)
-		canvas = np.full(shape_area.shape[:2], 255, np.uint8)
-		cv2.circle(canvas, (shape_area.shape[1]//2, shape_area.shape[0]//2 - 1), shape_area.shape[1]//2, 0, -1)
-		# compare shape_area with circle edges(left ang right)
-		abs_diff_list = []
-		for line in range(shape_area.shape[0]):
-			v = shape_area[line, :]
-			black_pos = np.where(v == 0)
-			if black_pos[0].size > 1:
-				l_diff = shape_area[line, black_pos[0][0]] - canvas[line, black_pos[0][0]]
-				r_diff = shape_area[line, black_pos[0][-1]] - canvas[line, black_pos[0][-1]]
-				abs_diff_list.append(abs(l_diff)+ abs(r_diff))
-		abs_diff_sum = sum(abs_diff_list)
-		abs_diff_sum_ratio = abs_diff_sum / shape_area.size
-		if abs_diff_sum_ratio > 0.1:
-			raise ValueError("Detected avatar shape is too different from circle!")
+		if avatar_shape_check:
+			# check black pixel in the shape area
+			y_range = figure_parts[FigurePart.AVATAR].y
+			x_range = figure_parts[FigurePart.AVATAR].x
+			shape_area = image[y_range.start:y_range.stop, x_range.start:x_range.stop] #scan_area[v_range[0]:v_range[1], h_range[0]:h_range[1]]
+			cls.image_shape_check_circle(shape_area)
+
 		# shape_area_copy_as_white = np.full(shape_area.shape, 255, np.uint8)
 		# cv2.circle(shape_area_copy_as_white, (shape_area.shape[1]//2, shape_area.shape[0]//2), shape_area.shape[1]//2, 0, -1)
 		# diff_image = cv2.bitwise_xor(canvas, shape_area_copy_as_white)
@@ -258,15 +274,16 @@ class HeadingAreaParam(ImageAreaParam):
 			raise ValueError("Detected avatar circle area black diff is too large!")
 		'''
 		# scan button-like shape from bottom beside the circle-expecting area
-		scan_area = image[:, x:]
+		start_x = figure_parts[FigurePart.AVATAR].x.stop
+		scan_area = image[:, start_x:]
 		if image_check:
 			cv2.imshow("scan_area", scan_area)
 			cv2.waitKey(0)
 		heading_h, heading_w = scan_area.shape[:2]
-		button_w_min = heading_w // 3
+		label_w_min = heading_w // 3
 		def get_line(line: Sequence[int]):
 			for (k, g) in groupby(line):
-				if k == 0 and (w:=len(list(g))) >= button_w_min:
+				if k == 0 and (w:=len(list(g))) >= label_w_min:
 					return w
 
 		button_bottom_line = None
