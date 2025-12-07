@@ -631,25 +631,26 @@ class TaimeeFilter:
 		# find borders as bunches
 		border_offsets = []
 		_horizontal_border_offset_list: list[BunchOffset] = list( get_horizontal_border_bunches(bin_image, min_bunch=3, offset_list=border_offsets))
-		y_offset = 0
+		y_offset = last_offset = 0
 		if len(_horizontal_border_offset_list) > 3:
 			horizontal_border_offset_list = []
 			for n, (b, o) in enumerate(_horizontal_border_offset_list):
 				if n == 0:
-					y_offset = o
-				elif n == 1:
-					horizontal_border_offset_list.append(BunchOffset(b, b.elems[0] - 1))
+					y_offset = b.elems[-1] + 1
+				# elif n == 1: horizontal_border_offset_list.append(BunchOffset(b, b.elems[0] - 1))
 				else:
-					horizontal_border_offset_list.append(BunchOffset(b, o - y_offset))
+					horizontal_border_offset_list.append(BunchOffset(b, last_offset))
+					last_offset = o - y_offset
 		else:
 			horizontal_border_offset_list = _horizontal_border_offset_list
 		self.y_offset = y_offset
-		'''canvas = bin_image[ofst:, :].copy()
-		canvas[:, 0] = 255
+		canvas = bin_image[y_offset:, :].copy()
+		canvas[:, 0:16] = 255
 		for n, (bunch, offset) in enumerate(horizontal_border_offset_list):
 			# t = offset if n > 0 else offset - (bunch.elems[-1]-bunch.elems[0])
 			# cv2.rectangle(canvas, (2, t - 3), (canvas.shape[1] // 2, t + 3), 0, 1)
-			canvas[offset, 0] = 0
+			canvas[offset, 0:8] = 0
+			canvas[bunch.elems[0]-1, 8:16] = 0
 		SUBPLOT_SIZE = 2
 		fig, ax = plt.subplots(1, SUBPLOT_SIZE)
 		for r in range(SUBPLOT_SIZE):
@@ -659,6 +660,7 @@ class TaimeeFilter:
 		ax[0].imshow(bin_image, cmap='gray')
 		ax[1].imshow(canvas, cmap='gray')
 		plt.show()
+		'''
 		# find 1st border	
 		try:
 			horizontal_border = find_horizontal_border_bunch(bin_image)
@@ -1360,6 +1362,7 @@ class BunchOffset(NamedTuple):
 def get_horizontal_border_bunches(bin_image: np.ndarray, y_offset:int=0, bunch_thresh: int=10, min_bunch:int=3, max_bunch:int=10, offset_list: list[int] | None = None) -> Iterator[BunchOffset]: # tuple[NearBunch, int]]:
 	# bunches: list[NearBunch] = []
 	offseter = OffsetInt(y_offset, limit=bin_image.shape[0])
+	last_offset = offseter.value
 	for n in range(max_bunch):
 		try:
 			bunch = find_horizontal_border_bunch(bin_image, bunch_thresh=bunch_thresh, y_offset=offseter)
@@ -1372,7 +1375,8 @@ def get_horizontal_border_bunches(bin_image: np.ndarray, y_offset:int=0, bunch_t
 				return # break
 			
 		# for n, e in enumerate(bunch.elems): bunch.elems[n] = e + y_offset
-		yield BunchOffset(bunch, offseter.value) # bunches.append(bunch)
+		yield BunchOffset(bunch, last_offset)
+		last_offset += offseter.value
 		# y_offset += bunch.elems[-1] + 1
 	# return bunches
 
