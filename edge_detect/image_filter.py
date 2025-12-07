@@ -629,11 +629,27 @@ class TaimeeFilter:
 		bin_image = cv2.threshold(self.image, self.THRESHOLD, 255, cv2.THRESH_BINARY)[1]
 
 		# find borders as bunches
-		horizontal_borders = get_horizontal_border_bunches(bin_image, bunch_count=3)
-		canvas = bin_image.copy()
-		for b in horizontal_borders:
-			t = b.elems[0]
-			cv2.line(canvas, (0, t), (canvas.shape[1] // 2, t), 0, 4)
+		border_offsets = []
+		_horizontal_border_offset_list: list[BunchOffset] = list( get_horizontal_border_bunches(bin_image, min_bunch=3, offset_list=border_offsets))
+		y_offset = 0
+		if len(_horizontal_border_offset_list) > 3:
+			horizontal_border_offset_list = []
+			for n, (b, o) in enumerate(_horizontal_border_offset_list):
+				if n == 0:
+					y_offset = o
+				elif n == 1:
+					horizontal_border_offset_list.append(BunchOffset(b, b.elems[0] - 1))
+				else:
+					horizontal_border_offset_list.append(BunchOffset(b, o - y_offset))
+		else:
+			horizontal_border_offset_list = _horizontal_border_offset_list
+		self.y_offset = y_offset
+		'''canvas = bin_image[ofst:, :].copy()
+		canvas[:, 0] = 255
+		for n, (bunch, offset) in enumerate(horizontal_border_offset_list):
+			# t = offset if n > 0 else offset - (bunch.elems[-1]-bunch.elems[0])
+			# cv2.rectangle(canvas, (2, t - 3), (canvas.shape[1] // 2, t + 3), 0, 1)
+			canvas[offset, 0] = 0
 		SUBPLOT_SIZE = 2
 		fig, ax = plt.subplots(1, SUBPLOT_SIZE)
 		for r in range(SUBPLOT_SIZE):
@@ -653,15 +669,16 @@ class TaimeeFilter:
 			limit=bin_image.shape[0] # height
 		)
 		# save y-axis offset into a self variable
-		self.y_offset = y_offset.value
+		self.y_offset = y_offset.value'''
 		bin_image = bin_image[self.y_offset:, :]
-		horizontal_borders = get_horizontal_border_bunches(bin_image, bunch_count=3)
+		# horizontal_border_offset_list = get_horizontal_border_bunches(bin_image, min_bunch=3)
 		# get heading area
+		border_offset = horizontal_border_offset_list[0]
 		try:
 			heading_area_param = HeadingAreaParam(*params[ImageAreaName.heading])
 		except (KeyError, TypeError):
-			area_bottom = horizontal_borders[0].elems[0]
-			heading_area_param = HeadingAreaParam.from_image(bin_image[0:area_bottom, :])
+			area_bottom = border_offset.offset
+			heading_area_param = HeadingAreaParam.from_image(bin_image[:area_bottom, :])
 		if show_check:
 			show_image = self.image[self.y_offset:self.y_offset + heading_area_param.height, heading_area_param.xpos:]
 			do_show_check("heading_area", heading_area_param, show_image)
@@ -670,8 +687,8 @@ class TaimeeFilter:
 		try:
 			area_param = ShiftAreaParam(*params[ImageAreaName.shift])
 		except (KeyError, TypeError):
-			area_top = horizontal_borders[0].elems[-1] + 1
-			area_bottom = horizontal_borders[1].elems[0]
+			area_top = horizontal_border_offset_list[0].elems[-1] + 1
+			area_bottom = horizontal_border_offset_list[1].elems[0]
 			scan_image = bin_image[area_top:area_bottom, :]
 			area_param = ShiftAreaParam.from_image(scan_image, offset=area_top, image_check=show_check)
 		if show_check:
@@ -682,8 +699,8 @@ class TaimeeFilter:
 		try:
 			area_param = BreaktimeAreaParam(*params[ImageAreaName.breaktime])
 		except (KeyError, TypeError):
-			area_top = horizontal_borders[1].elems[-1] + 1
-			area_bottom = horizontal_borders[2].elems[0]
+			area_top = horizontal_border_offset_list[1].elems[-1] + 1
+			area_bottom = horizontal_border_offset_list[2].elems[0]
 			area_param = BreaktimeAreaParam(ypos=area_top, height=area_bottom - area_top)
 		if show_check:
 			area_image = bin_image[area_param.ypos:area_param.ypos + area_param.height, :]
@@ -693,7 +710,7 @@ class TaimeeFilter:
 		try:
 			area_param = PaystubAreaParam(*params[ImageAreaName.paystub])
 		except (KeyError, TypeError):
-			area_top = horizontal_borders[2].elems[-1] + 1
+			area_top = horizontal_border_offset_list[2].elems[-1] + 1
 			area_param = BreaktimeAreaParam(ypos=area_top)
 		if show_check:
 			area_image = bin_image[area_param.ypos:, :]
@@ -1336,22 +1353,28 @@ def merge_nearby_elems(elems: Sequence[int], thresh=9) -> Iterator[int]:
 	if sent:
 		yield elem0
 
-def get_horizontal_border_bunches(bin_image: np.ndarray, y_offset:int=0, bunch_thresh: int=10, bunch_count:int=3, max_bunch_count:int=10) -> list[NearBunch]:
-	bunches: list[NearBunch] = []
-	for n in range(max_bunch_count):
+class BunchOffset(NamedTuple):
+	bunch: NearBunch
+	offset: int
+
+def get_horizontal_border_bunches(bin_image: np.ndarray, y_offset:int=0, bunch_thresh: int=10, min_bunch:int=3, max_bunch:int=10, offset_list: list[int] | None = None) -> Iterator[BunchOffset]: # tuple[NearBunch, int]]:
+	# bunches: list[NearBunch] = []
+	offseter = OffsetInt(y_offset, limit=bin_image.shape[0])
+	for n in range(max_bunch):
 		try:
-			bunch = find_horizontal_border_bunch(bin_image[y_offset:, :], bunch_thresh=bunch_thresh)
+			bunch = find_horizontal_border_bunch(bin_image, bunch_thresh=bunch_thresh, y_offset=offseter)
+			if offset_list is not None:
+				offset_list.append(bunch.elems[-1] + 0)
 		except	NoBunchException:
-			if n < bunch_count:
+			if n < min_bunch:
 				raise NotEnoughBordersException("Not enough borders found!")
 			else:
-				break
+				return # break
 			
-		for n, e in enumerate(bunch.elems):
-			bunch.elems[n] = e + y_offset
-		bunches.append(bunch)
-		y_offset += bunch.elems[-1] + 1
-	return bunches
+		# for n, e in enumerate(bunch.elems): bunch.elems[n] = e + y_offset
+		yield BunchOffset(bunch, offseter.value) # bunches.append(bunch)
+		# y_offset += bunch.elems[-1] + 1
+	# return bunches
 
 def find_horizontal_border_bunch(bin_image: np.ndarray, y_offset:OffsetInt|None=None, bunch_thresh: int=10) -> NearBunch:
 	''' Increment Y_offset as bunch.elems[-1] + 1 '''
