@@ -28,7 +28,10 @@ from set_logger import set_logger
 
 logger = set_logger(__name__)
 
-class NotEnoughBordersException(Exception):
+class ImageFilterException(Exception):
+	pass
+
+class NotEnoughBordersException(ImageFilterException):
 	pass
 
 @dataclass
@@ -340,7 +343,7 @@ class ShiftAreaParam(ImageAreaParam):
 	def check_image(cls, image: np.ndarray, image_check=False)-> tuple[int, int]:
 		'''returns (left_end, right_start)'''
 		# check if avatar circle at the left side of the area between the borders(1st and 2nd)
-		## scan vertical lines to find the horizontal range of the shape (expetcing as a black filled rectangle of left side flat)
+		## scan vertical lines to find the horizontal range		 of the shape (expetcing as a black filled rectangle of left side flat)
 
 		x = -1
 		all_white = False
@@ -359,7 +362,7 @@ class ShiftAreaParam(ImageAreaParam):
 		if not all_white:
 			raise ValueError("No all white found in right half of scan area!")
 		if image_check:
-			cv2.imshow("image", image[:, x0:x])
+			cv2.imshow("				image", image[:, x0:x])
 			cv2.waitKey(0)
 		return x0, x
 
@@ -382,7 +385,7 @@ class ShiftAreaParam(ImageAreaParam):
 	@property
 	def end_xpos(self)-> int: # end-by time
 		return self.width
-@dataclass
+@dataclass		
 class ShiftStartAreaParam(ImageAreaParam):
 	pass
 
@@ -524,7 +527,7 @@ class BorderColor(Enum):
 	BLACK = 0
 
 
-class NoBorderError(Exception):
+class NoBorderError(ImageFilterException):
 	pass
 
 def find_horizontal_borders(
@@ -545,7 +548,7 @@ def find_horizontal_borders(
 
 	def get_border_or_bg(y: int) -> bool | None:
 		# Returns True if border is found, False if background is found, else returns None
-		if np.all(image[y + offset, :] == 255):
+		if np.all(image[		y + offset, :] == 255):
 			return False
 		arr = image[y, edge_len:-edge_len]
 		if np.all(arr == border_color.value):
@@ -624,9 +627,25 @@ class TaimeeFilter:
 			raise ValueError("Failed to load image")
 		self.params = params
 		bin_image = cv2.threshold(self.image, self.THRESHOLD, 255, cv2.THRESH_BINARY)[1]
+
+		# find borders as bunches
+		horizontal_borders = get_horizontal_border_bunches(bin_image, bunch_count=3)
+		canvas = bin_image.copy()
+		for b in horizontal_borders:
+			t = b.elems[0]
+			cv2.line(canvas, (0, t), (canvas.shape[1] // 2, t), 0, 4)
+		SUBPLOT_SIZE = 2
+		fig, ax = plt.subplots(1, SUBPLOT_SIZE)
+		for r in range(SUBPLOT_SIZE):
+			ax[r].invert_yaxis()
+			ax[r].xaxis.tick_top()
+			ax[r].set_title(f"Row {r+1}")
+		ax[0].imshow(bin_image, cmap='gray')
+		ax[1].imshow(canvas, cmap='gray')
+		plt.show()
 		# find 1st border	
 		try:
-			horizontal_border = find_horizontal_border_from_image(bin_image)
+			horizontal_border = find_horizontal_border_bunch(bin_image)
 		except NoBunchException:
 			raise ValueError("No border found!")
 		y_offset = OffsetInt(
@@ -636,7 +655,7 @@ class TaimeeFilter:
 		# save y-axis offset into a self variable
 		self.y_offset = y_offset.value
 		bin_image = bin_image[self.y_offset:, :]
-		horizontal_borders = get_horizontal_borders_from_image(bin_image, bunch_count=3)
+		horizontal_borders = get_horizontal_border_bunches(bin_image, bunch_count=3)
 		# get heading area
 		try:
 			heading_area_param = HeadingAreaParam(*params[ImageAreaName.heading])
@@ -1317,20 +1336,24 @@ def merge_nearby_elems(elems: Sequence[int], thresh=9) -> Iterator[int]:
 	if sent:
 		yield elem0
 
-def get_horizontal_borders_from_image(bin_image: np.ndarray, y_offset:int=0, bunch_thresh: int=10, bunch_count:int=2) -> list[NearBunch]:
+def get_horizontal_border_bunches(bin_image: np.ndarray, y_offset:int=0, bunch_thresh: int=10, bunch_count:int=3, max_bunch_count:int=10) -> list[NearBunch]:
 	bunches: list[NearBunch] = []
-	for n in range(bunch_count):
+	for n in range(max_bunch_count):
 		try:
-			bunch = find_horizontal_border_from_image(bin_image[y_offset:, :], bunch_thresh=bunch_thresh)
+			bunch = find_horizontal_border_bunch(bin_image[y_offset:, :], bunch_thresh=bunch_thresh)
 		except	NoBunchException:
-			raise NotEnoughBordersException("Not enough borders found!")
+			if n < bunch_count:
+				raise NotEnoughBordersException("Not enough borders found!")
+			else:
+				break
+			
 		for n, e in enumerate(bunch.elems):
 			bunch.elems[n] = e + y_offset
 		bunches.append(bunch)
 		y_offset += bunch.elems[-1] + 1
 	return bunches
 
-def find_horizontal_border_from_image(bin_image: np.ndarray, y_offset:OffsetInt|None=None, bunch_thresh: int=10) -> NearBunch:
+def find_horizontal_border_bunch(bin_image: np.ndarray, y_offset:OffsetInt|None=None, bunch_thresh: int=10) -> NearBunch:
 	''' Increment Y_offset as bunch.elems[-1] + 1 '''
 	bunch = NearBunch(bunch_thresh)
 	for y in find_horizontal_borders(bin_image[y_offset.value if y_offset else 0:, :], border_color=BorderColor.BLACK):
