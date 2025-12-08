@@ -79,6 +79,7 @@ class ImageDictKey(Enum):
 	salary = (KeyUnit.MONEY, 1)  # "salary"
 	payslip = (KeyUnit.TEXT, 2)  # "other"
 
+
 class InvalidValueError(ValueError):
 	"""Raised when a value is invalid."""
 	pass
@@ -138,9 +139,16 @@ class XOffsetHeight(NamedTuple):
 	x_offset: int
 	height: int
 
-class XYOffset(NamedTuple):
-	from_bottom: int
-	from_left: int
+@dataclass
+class XYOffset:
+	x: int
+	y: int
+	@property
+	def from_bottom(self)->int:
+		return -self.y
+	@property
+	def from_left(self)->int:
+		return self.x
 
 class XYRange(NamedTuple):
 	y: range
@@ -236,8 +244,8 @@ class HeadingAreaParam(ImageAreaParam):
 
 	@classmethod
 	def check_image(cls, image: np.ndarray, image_check=False, figure_parts: dict[
-	FigurePart, XYRange | int] = {},
-	avatar_shape_check=False)-> XOffsetHeight:
+	FigurePart, XYRange|int] = {},
+	avatar_shape_check=False) -> XYOffset:
 		'''
 		avatar_area | label_area: (y_range, x_range), (from_bottom, from_left)]
 		If avatar_area or label_area was/were given as empty list, it/they are fulfilled with found ones.
@@ -296,21 +304,21 @@ class HeadingAreaParam(ImageAreaParam):
 			if image_check:
 				cv2.imshow("scan_area", scan_area)
 				cv2.waitKey(0)
-			heading_h, heading_w = scan_area.shape[:2]
-			label_w_min = heading_w // 3
+			scan_h, scan_w = scan_area.shape[:2]
+			label_w_min = scan_w // 4
 			def get_line(line: Sequence[int]):
-				for (k, g) in groupby(line):
-					if k == 0 and (w:=len(list(g))) >= label_w_min:
+				for n, (k, g) in enumerate(groupby(line)):
+					if n == 1 and k == 0 and (w:=len(list(g))) >= label_w_min:
 						return w
 
 			label_bottom_line = None
-			for y in range(heading_h - 1, 0, -1):
+			for y in range(scan_h - 1, 0, -1):
 				if (w:=get_line(scan_area[y, :].tolist())):
 					label_bottom_line = w
 					break
 			if not label_bottom_line:
-				raise ValueError("No button found in heading bottom area!")
-			scan_area[0, :] = 255
+				raise ValueError("No label-like shape's bottom line found in heading bottom area!")
+			# scan_area[0, :] = 255
 			y2 = -1
 			bg_found = False
 			x = figure_parts[FigurePart.AVATAR].x.stop
@@ -319,9 +327,9 @@ class HeadingAreaParam(ImageAreaParam):
 					bg_found = True
 					break
 			if not bg_found:
-				raise ValueError("No bg above button shape!")
-			figure_parts[FigurePart.LABEL] = y2
-		return x, y2
+				raise ValueError("No b.g. above label-like shape!")
+			figure_parts[FigurePart.LABEL] = y2 - scan_area.shape[0]
+		return XYOffset(x=figure_parts[FigurePart.AVATAR].x.stop, y=figure_parts[FigurePart.LABEL])
 
 	def to_toml(self, fp: IOBase, **kwargs):
 		fp.write(self.as_toml() + '\n')
@@ -633,24 +641,26 @@ class TaimeeFilter:
 		_horizontal_border_offset_list: list[BunchOffset] = list( get_horizontal_border_bunches(bin_image, min_bunch=3, offset_list=border_offsets))
 		y_offset = last_offset = 0
 		if len(_horizontal_border_offset_list) > 3:
-			horizontal_border_offset_list = []
+			horizontal_border_offset_list: list[BunchOffset] = []
 			for n, (b, o) in enumerate(_horizontal_border_offset_list):
 				if n == 0:
 					y_offset = b.elems[-1] + 1
+					last_b_end = b.elems[-1]
 				# elif n == 1: horizontal_border_offset_list.append(BunchOffset(b, b.elems[0] - 1))
 				else:
 					horizontal_border_offset_list.append(BunchOffset(b, last_offset))
-					last_offset = o - y_offset
+					last_offset += b.elems[-1] + 1
 		else:
 			horizontal_border_offset_list = _horizontal_border_offset_list
 		self.y_offset = y_offset
+		# debug 
+		'''
 		canvas = bin_image[y_offset:, :].copy()
-		canvas[:, 0:16] = 255
+		canvas[:, 0:8] = 255
 		for n, (bunch, offset) in enumerate(horizontal_border_offset_list):
 			# t = offset if n > 0 else offset - (bunch.elems[-1]-bunch.elems[0])
 			# cv2.rectangle(canvas, (2, t - 3), (canvas.shape[1] // 2, t + 3), 0, 1)
-			canvas[offset, 0:8] = 0
-			canvas[bunch.elems[0]-1, 8:16] = 0
+			canvas[offset:offset + bunch.elems[0]-1, 2*n:2*(n+1)] = 0
 		SUBPLOT_SIZE = 2
 		fig, ax = plt.subplots(1, SUBPLOT_SIZE)
 		for r in range(SUBPLOT_SIZE):
@@ -659,7 +669,7 @@ class TaimeeFilter:
 			ax[r].set_title(f"Row {r+1}")
 		ax[0].imshow(bin_image, cmap='gray')
 		ax[1].imshow(canvas, cmap='gray')
-		plt.show()
+		plt.show()'''
 		'''
 		# find 1st border	
 		try:
@@ -1376,7 +1386,7 @@ def get_horizontal_border_bunches(bin_image: np.ndarray, y_offset:int=0, bunch_t
 			
 		# for n, e in enumerate(bunch.elems): bunch.elems[n] = e + y_offset
 		yield BunchOffset(bunch, last_offset)
-		last_offset += offseter.value
+		last_offset = offseter.value
 		# y_offset += bunch.elems[-1] + 1
 	# return bunches
 
