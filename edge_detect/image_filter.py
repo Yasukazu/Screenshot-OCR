@@ -173,6 +173,10 @@ class HeadingAreaParam(ImageAreaParam):
 	Necessary named parameters: height, xpos'''
 
 	@classmethod
+	def get_label_text_start(cls) -> str:
+		return "LABEL TEXT START"
+
+	@classmethod
 	def from_image(cls, image: np.ndarray, offset: int = 0, figure_parts: dict[
 	FigurePart, XYRange|FromBottomLabelRange] = {}, image_check=False, label_check=True) -> "HeadingAreaParam":
 		xy_offset = cls.check_image(image, figure_parts=figure_parts, image_check=image_check, label_check=label_check)
@@ -343,8 +347,8 @@ class HeadingAreaParam(ImageAreaParam):
 				ocr_area = image[image.shape[0] + from_bottom_label_range.from_bottom:, start_x:]
 				ocr_result = ocr.exec(ocr_area, output_type=Output.DATAFRAME, psm=7)
 				label_text = ''.join(list(ocr_result[ocr_result['conf'] > 50]['text']))
-				if label_text[:3] != 'この店':
-					raise ValueError("Improper text!")
+				if not (lts:=cls.get_label_text_start()).startswith(label_text):
+					raise ValueError("Improper text start: " + lts)
 			figure_parts[FigurePart.LABEL] = from_bottom_label_range
 		return XYOffset(x=figure_parts[FigurePart.AVATAR].x.stop, y=image.shape[0] - figure_parts[FigurePart.LABEL])
 
@@ -356,6 +360,11 @@ class HeadingAreaParam(ImageAreaParam):
 		name_str = f".{name}" if name else ""
 		return f"{self.__class__.__name__}{name_str} = {str(list(self.param))}"
 
+@dataclass
+class TaimeeHeadingAreaParam(HeadingAreaParam):
+	@classmethod
+	def get_label_text_start(cls) -> str:
+		return 'この店'
 
 @dataclass
 class ShiftAreaParam(ImageAreaParam):
@@ -646,6 +655,8 @@ class TaimeeFilter:
 	THRESHOLD = 237
 	BORDERS_MIN = 3
 	BORDERS_MAX = 4
+	LABEL_TEXT_START = 'この店'
+
 	def __init__(self, image: np.ndarray | Path | str, params: dict[ImageAreaName, ImageFilterParam] = {}, show_check=False):
 		self.image = image if isinstance(image, np.ndarray) else cv2.imread(str(image))
 		if self.image is None:
@@ -705,10 +716,10 @@ class TaimeeFilter:
 		border_offset = horizontal_border_offset_list[0]
 		heading_area_figure_parts = {}
 		try:
-			heading_area_param = HeadingAreaParam(*params[ImageAreaName.heading])
+			heading_area_param = TaimeeHeadingAreaParam(*params[ImageAreaName.heading])
 		except (KeyError, TypeError):
 			area_bottom = border_offset.bunch.elems[0]
-			heading_area_param = HeadingAreaParam.from_image(bin_image[:area_bottom, :], figure_parts=heading_area_figure_parts)
+			heading_area_param = TaimeeHeadingAreaParam.from_image(bin_image[:area_bottom, :], figure_parts=heading_area_figure_parts)
 		if show_check:
 			show_image = self.image[self.y_offset:self.y_offset + heading_area_param.height, heading_area_param.xpos:]
 			do_show_check("heading_area", heading_area_param, show_image)
