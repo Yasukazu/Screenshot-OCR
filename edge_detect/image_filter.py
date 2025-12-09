@@ -106,12 +106,12 @@ class ImageAreaParam(TOMLDataclass):
 	def __post_init__(self):
 		if self.ypos < 0 or self.xpos < 0:
 			raise InvalidValueError("ypos and xpos must be positive")
-		if self.height is not None:
+		'''if self.height is not None:
 			if self.height != -1 and self.height <= 0:
 				raise InvalidValueError("height must be larger than 0 except None or -1")
 		if self.width is not None:
 			if self.width != -1 and self.width <= 0:
-				raise InvalidValueError("width must be larger than 0 except None or -1")
+				raise InvalidValueError("width must be larger than 0 except None or -1")'''
 
 	@classmethod
 	def from_image(cls, image: np.ndarray, offset:int=0) -> "ImageAreaParam":
@@ -154,6 +154,10 @@ class XYRange(NamedTuple):
 	y: range
 	x: range
 
+class FromBottomLabelRange(NamedTuple):
+	from_bottom: int
+	label_range: range
+
 class XYPosition(Enum):
 	OFFSET = XYOffset
 	RANGE = XYRange
@@ -165,13 +169,14 @@ class FigurePart(Enum):
 @dataclass
 class HeadingAreaParam(ImageAreaParam):
 	'''
-	Only this area the height is flexible.
-	Necessary named parameters: ypos, height, xpos'''
+	Only this area the height value is negative. It means to trim the bottom part as height's absolute value.
+	Necessary named parameters: height, xpos'''
 
 	@classmethod
-	def from_image(cls, image: np.ndarray, offset: int = 0) -> "ImageAreaParam":
-		x, y = cls.check_image(image)
-		return cls(ypos=offset, height=y, xpos=x, width=-1)
+	def from_image(cls, image: np.ndarray, offset: int = 0, figure_parts: dict[
+	FigurePart, XYRange|FromBottomLabelRange] = {}, image_check=False, label_check=True) -> "HeadingAreaParam":
+		xy_offset = cls.check_image(image, figure_parts=figure_parts, image_check=image_check, label_check=label_check)
+		return cls(ypos=offset, height=xy_offset.y, xpos=xy_offset.x, width=-1)
 
 	@classmethod
 	def scan_image_range_x(cls, image: np.ndarray)-> range:
@@ -244,12 +249,12 @@ class HeadingAreaParam(ImageAreaParam):
 
 	@classmethod
 	def check_image(cls, image: np.ndarray, image_check=False, figure_parts: dict[
-	FigurePart, XYRange|int] = {},
-	avatar_shape_check=False) -> XYOffset:
+	FigurePart, XYRange|FromBottomLabelRange] = {},
+	avatar_shape_check=False, label_check=True) -> XYOffset:
 		'''
 		avatar_area | label_area: (y_range, x_range), (from_bottom, from_left)]
 		If avatar_area or label_area was/were given as empty list, it/they are fulfilled with found ones.
-		returns (x_offset, height) as heading_area'''
+		returns (x_offset, y_trim) for heading_area should offset x and trim height: y_trim is a negative value, so, adding it to image height'''
 		# check if avatar_area is not None
 		'''if avatar_area:
 			if len(avatar_area) != 2:
@@ -306,18 +311,21 @@ class HeadingAreaParam(ImageAreaParam):
 				cv2.waitKey(0)
 			scan_h, scan_w = scan_area.shape[:2]
 			label_w_min = scan_w // 4
-			def get_line(line: Sequence[int]):
+			def get_run_length(line: Sequence[int]):
 				for n, (k, g) in enumerate(groupby(line)):
-					if n == 1 and k == 0 and (w:=len(list(g))) >= label_w_min:
-						return w
+					if n == 0:
+						_g = g
+					elif n == 1 and k == 0 and (w:=len(list(g))) >= label_w_min:
+						return _g, w
 
 			label_bottom_line = None
 			for y in range(scan_h - 1, 0, -1):
-				if (w:=get_line(scan_area[y, :].tolist())):
-					label_bottom_line = w
+				if (g_w := get_run_length(scan_area[y, :].tolist())):
+					label_bottom_line = g_w[1]
 					break
 			if not label_bottom_line:
 				raise ValueError("No label-like shape's bottom line found in heading bottom area!")
+			label_bottom_x_offset = len(list(g_w[0]))
 			# scan_area[0, :] = 255
 			y2 = -1
 			bg_found = False
@@ -328,8 +336,17 @@ class HeadingAreaParam(ImageAreaParam):
 					break
 			if not bg_found:
 				raise ValueError("No b.g. above label-like shape!")
-			figure_parts[FigurePart.LABEL] = y2 - scan_area.shape[0]
-		return XYOffset(x=figure_parts[FigurePart.AVATAR].x.stop, y=figure_parts[FigurePart.LABEL])
+			from_bottom_label_range = FromBottomLabelRange(y2 - scan_area.shape[0], range(start_x + label_bottom_x_offset, start_x + label_bottom_x_offset + label_bottom_line))
+			if label_check:
+				from tesseract_ocr import TesseractOCR, Output
+				ocr = TesseractOCR()
+				ocr_area = image[image.shape[0] + from_bottom_label_range.from_bottom:, start_x:]
+				ocr_result = ocr.exec(ocr_area, output_type=Output.DATAFRAME, psm=7)
+				label_text = ''.join(list(ocr_result[ocr_result['conf'] > 50]['text']))
+				if label_text[:3] != 'この店':
+					raise ValueError("Improper text!")
+			figure_parts[FigurePart.LABEL] = from_bottom_label_range
+		return XYOffset(x=figure_parts[FigurePart.AVATAR].x.stop, y=image.shape[0] - figure_parts[FigurePart.LABEL])
 
 	def to_toml(self, fp: IOBase, **kwargs):
 		fp.write(self.as_toml() + '\n')
@@ -686,11 +703,12 @@ class TaimeeFilter:
 		# horizontal_border_offset_list = get_horizontal_border_bunches(bin_image, min_bunch=3)
 		# get heading area
 		border_offset = horizontal_border_offset_list[0]
+		heading_area_figure_parts = {}
 		try:
 			heading_area_param = HeadingAreaParam(*params[ImageAreaName.heading])
 		except (KeyError, TypeError):
-			area_bottom = border_offset.offset
-			heading_area_param = HeadingAreaParam.from_image(bin_image[:area_bottom, :])
+			area_bottom = border_offset.bunch.elems[0]
+			heading_area_param = HeadingAreaParam.from_image(bin_image[:area_bottom, :], figure_parts=heading_area_figure_parts)
 		if show_check:
 			show_image = self.image[self.y_offset:self.y_offset + heading_area_param.height, heading_area_param.xpos:]
 			do_show_check("heading_area", heading_area_param, show_image)
