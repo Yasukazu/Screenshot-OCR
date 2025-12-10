@@ -169,18 +169,38 @@ class FigurePart(Enum):
 @dataclass
 class HeadingAreaParam(ImageAreaParam):
 	'''
-	Only this area the y_offset value is negative. It means to trim the bottom part as height's absolute value.
+	Only this area the y_offset value is negative. It means to trim the bottom part i.e.: image[0:(image.shape[0] + y_offset)].
 	Necessary named parameters: height, xpos'''
 
 	@classmethod
 	def get_label_text_start(cls) -> str:
 		return "LABEL TEXT START"
 
+
+
+	def to_toml(self, fp: IOBase, **kwargs):
+		fp.write(self.as_toml() + '\n')
+
+	def as_toml(self, **kwargs):
+		name = kwargs.get('name', '').strip()
+		name_str = f".{name}" if name else ""
+		return f"{self.__class__.__name__}{name_str} = {str(list(self.param))}"
+
+@dataclass
+class TaimeeHeadingAreaParam(HeadingAreaParam):
+	@classmethod
+	def get_label_text_start(cls) -> str:
+		return 'この店'
+
 	@classmethod
 	def from_image(cls, image: np.ndarray, offset: int = 0, figure_parts: dict[
-	FigurePart, XYRange|FromBottomLabelRange] = {}, image_check=False, label_check=True) -> "HeadingAreaParam":
+	FigurePart, XYRange|FromBottomLabelRange] = {}, image_check=False, label_check=True) -> "TaimeeHeadingAreaParam":
 		xy_offset = cls.check_image(image, figure_parts=figure_parts, image_check=image_check, label_check=label_check)
-		return cls(y_offset=xy_offset.from_bottom, height=-1, x_offset=xy_offset.from_left, width=-1)
+		return cls(y_offset=xy_offset.y, x_offset=xy_offset.x)
+
+	@classmethod
+	def crop_image(cls, image: np.ndarray, from_bottom: int, x_offset: int) -> np.ndarray:
+		return image[0:image.shape[0] - abs(from_bottom), x_offset:]
 
 	@classmethod
 	def scan_image_range_x(cls, image: np.ndarray)-> range:
@@ -352,20 +372,6 @@ class HeadingAreaParam(ImageAreaParam):
 					raise ValueError("Improper text start: " + lts)
 			figure_parts[FigurePart.LABEL] = from_bottom_label_range
 		return XYOffset(x=figure_parts[FigurePart.AVATAR].x.stop, y=figure_parts[FigurePart.LABEL].from_bottom)
-
-	def to_toml(self, fp: IOBase, **kwargs):
-		fp.write(self.as_toml() + '\n')
-
-	def as_toml(self, **kwargs):
-		name = kwargs.get('name', '').strip()
-		name_str = f".{name}" if name else ""
-		return f"{self.__class__.__name__}{name_str} = {str(list(self.param))}"
-
-@dataclass
-class TaimeeHeadingAreaParam(HeadingAreaParam):
-	@classmethod
-	def get_label_text_start(cls) -> str:
-		return 'この店'
 
 @dataclass
 class ShiftAreaParam(ImageAreaParam):
@@ -658,11 +664,11 @@ class TaimeeFilter:
 	BORDERS_MAX = 4
 	LABEL_TEXT_START = 'この店'
 
-	def __init__(self, image: np.ndarray | Path | str, params: dict[ImageAreaName, ImageFilterParam] = {}, show_check=False):
+	def __init__(self, image: np.ndarray | Path | str, param_dict: dict[ImageAreaName, ImageFilterParam] = {}, show_check=False):
 		self.image = image if isinstance(image, np.ndarray) else cv2.imread(str(image))
 		if self.image is None:
 			raise ValueError("Failed to load image")
-		self.params = params
+		self.params = param_dict
 		bin_image = cv2.threshold(self.image, self.THRESHOLD, 255, cv2.THRESH_BINARY)[1]
 
 		# find borders as bunches
@@ -714,24 +720,34 @@ class TaimeeFilter:
 		bin_image = bin_image[self.y_offset:, :]
 		# horizontal_border_offset_list = get_horizontal_border_bunches(bin_image, min_bunch=3)
 		# get heading area
-		border_offset = horizontal_border_offset_list[0]
+		border_and_offset = horizontal_border_offset_list[0]
+		self.y_origin = y_origin = border_and_offset.bunch.elems[0]
 		heading_area_figure_parts = {}
 		try:
-			heading_area_param = TaimeeHeadingAreaParam(*params[ImageAreaName.heading])
+			heading_area_param = TaimeeHeadingAreaParam(*param_dict[ImageAreaName.heading])
 		except (KeyError, TypeError):
-			area_bottom = border_offset.bunch.elems[0]
-			heading_area_param = TaimeeHeadingAreaParam.from_image(bin_image[:area_bottom, :], figure_parts=heading_area_figure_parts)
+			heading_area_param = TaimeeHeadingAreaParam.from_image(bin_image[:y_origin, :], figure_parts=heading_area_figure_parts)
+			if show_check:
+				SUBPLOT_SIZE = 2
+				fig, ax = plt.subplots(SUBPLOT_SIZE, 1)
+				for r in range(SUBPLOT_SIZE):
+					ax[r].invert_yaxis()
+					ax[r].xaxis.tick_top()
+					ax[r].set_title(f"Row {r+1}")
+				ax[0].imshow(TaimeeHeadingAreaParam.crop_image(bin_image[:y_origin, :],
+				from_bottom=heading_area_param.y_offset, x_offset=heading_area_param.x_offset), cmap='gray')
+				plt.show()
 		if show_check:
-			show_image = self.image[self.y_offset:self.y_offset + heading_area_param.height, heading_area_param.x_offset:]
+			show_image = self.image[self.y_offset:self.y_offset + heading_area_param.y_offset, heading_area_param.x_offset:]
 			do_show_check("heading_area", heading_area_param, show_image)
 		self.area_param_list: list[ImageAreaParam] = [heading_area_param]
 		# get shift area
 		try:
-			area_param = ShiftAreaParam(*params[ImageAreaName.shift])
+			area_param = ShiftAreaParam(*param_dict[ImageAreaName.shift])
 		except (KeyError, TypeError):
 			area_top = horizontal_border_offset_list[0].elems[-1] + 1
-			area_bottom = horizontal_border_offset_list[1].elems[0]
-			scan_image = bin_image[area_top:area_bottom, :]
+			y_origin = horizontal_border_offset_list[1].elems[0]
+			scan_image = bin_image[area_top:y_origin, :]
 			area_param = ShiftAreaParam.from_image(scan_image, offset=area_top, image_check=show_check)
 		if show_check:
 			area_image = bin_image[area_param.y_offset:area_param.y_offset + area_param.height, :]
@@ -739,18 +755,18 @@ class TaimeeFilter:
 		self.area_param_list.append(area_param)
 		# get breaktime area
 		try:
-			area_param = BreaktimeAreaParam(*params[ImageAreaName.breaktime])
+			area_param = BreaktimeAreaParam(*param_dict[ImageAreaName.breaktime])
 		except (KeyError, TypeError):
 			area_top = horizontal_border_offset_list[1].elems[-1] + 1
-			area_bottom = horizontal_border_offset_list[2].elems[0]
-			area_param = BreaktimeAreaParam(y_offset=area_top, height=area_bottom - area_top)
+			y_origin = horizontal_border_offset_list[2].elems[0]
+			area_param = BreaktimeAreaParam(y_offset=area_top, height=y_origin - area_top)
 		if show_check:
 			area_image = bin_image[area_param.y_offset:area_param.y_offset + area_param.height, :]
 			do_show_check("breaktime area", area_param, area_image)
 		self.area_param_list.append(area_param)
 		# get paystub area
 		try:
-			area_param = PaystubAreaParam(*params[ImageAreaName.paystub])
+			area_param = PaystubAreaParam(*param_dict[ImageAreaName.paystub])
 		except (KeyError, TypeError):
 			area_top = horizontal_border_offset_list[2].elems[-1] + 1
 			area_param = BreaktimeAreaParam(y_offset=area_top)
@@ -1504,7 +1520,7 @@ if __name__ == "__main__":
 		ImageAreaName.shift:filter_area_param_dict['ShiftAreaParam'],
 		ImageAreaName.paystub:filter_area_param_dict['PaystubAreaParam'],
 	}
-	taimee_filter = TaimeeFilter(image=image, params=filter_param_dict, show_check=True)
+	taimee_filter = TaimeeFilter(image=image, param_dict=filter_param_dict, show_check=True)
 	print("[ocr-filter.taimee]")	
 	# print(f"{para.__class__.__name__:para.as_toml() for para in taimee_filter.area_param_list}")
 	print('\n'.join([param.as_toml() for param in taimee_filter.area_param_list]))
