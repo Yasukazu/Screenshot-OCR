@@ -686,7 +686,7 @@ class TaimeeFilter:
 		bin_image = cv2.threshold(self.image, self.THRESHOLD, 255, cv2.THRESH_BINARY)[1]
 
 		# find borders as bunches
-		border_offsets: deque[int] = deque()
+		border_offset_list: deque[tuple[int, int]] = deque()
 		# border_offset_list: deque[BorderOffset] = deque()
 
 		# _border_offset_list: list[BorderOffset] = []
@@ -702,26 +702,28 @@ class TaimeeFilter:
 		'''
 		# last_offset = 0
 		n = -1
-		for n, (b, o) in enumerate(get_horizontal_border_bunches(bin_image, min_bunch=3, offset_list=border_offsets)):
+		for n, (b, o) in enumerate(get_horizontal_border_bunches(bin_image, min_bunch=3, offset_list=border_offset_list)):
 			# if n == 0: y_margin = b.elems[-1] + 1
 					# last_b_end = b.elems[-1]
 				# elif n == 1: horizontal_border_offset_list.append(BunchOffset(b, b.elems[0] - 1))
 			if n == 3:
 				break
 				# last_offset += b.elems[-1] + 1
-		'''canvas = bin_image.copy()
-		canvas[:, 0] = 255
-		for b in border_offsets:
-			canvas[b, 0] = 0
-		_plot([canvas])'''
+
 		# if n < 2: raise ValueError("Not enough borders(less than 4) in the image!")
 		if n == 2:
 			y_margin = None
 		else:
 			assert n == 3
-			y_margin = border_offsets.popleft()
+			y_margin = border_offset_list.popleft()[1]
 			bin_image = bin_image[y_margin:, :]
-
+		border_offsets = np.array(border_offset_list)
+		border_offsets -= border_offsets[0][0]
+		canvas = bin_image.copy()
+		canvas[:, 0:4] = 255
+		for n, (start, stop) in enumerate(border_offsets):
+			canvas[start:stop, n] = 0
+		_plot([canvas])
 		self.y_margin = y_margin
 
 		self.y_origin = y_origin = border_offsets[0]
@@ -1418,15 +1420,21 @@ class BorderOffset(NamedTuple):
 	bunch: NearBunch
 	offset: int
 
-def get_horizontal_border_bunches(bin_image: np.ndarray, y_offset:int=0, bunch_thresh: int=10, min_bunch:int=3, max_bunch:int=10, offset_list: list[int] | None = None) -> Iterator[BorderOffset]: # tuple[NearBunch, int]]:
+def get_horizontal_border_bunches(bin_image: np.ndarray, y_offset:int=0, bunch_thresh: int=10, min_bunch:int=3, max_bunch:int=10, offset_list: list[tuple[int, int]] | None = None) -> Iterator[BorderOffset]: # tuple[NearBunch, int]]:
 	# bunches: list[NearBunch] = []
 	offseter = OffsetInt(y_offset, limit=bin_image.shape[0])
-	last_offset = offseter.value
+	bunch: NearBunch | None = None
+	last_offset = 0
+	range_start: int = -1
 	for n in range(max_bunch):
+		range_start = bunch.elems[-1] + 1 if bunch else 0
+		range_start += last_offset
 		try:
+			last_offset: int = offseter.value
 			bunch = find_horizontal_border_bunch(bin_image, bunch_thresh=bunch_thresh, y_offset=offseter)
 			if offset_list is not None:
-				offset_list.append(bunch.elems[-1] + last_offset + 1)
+				range_stop = bunch.elems[0] + last_offset
+				offset_list.append((range_start, range_stop))
 		except	NoBunchException:
 			if n < min_bunch:
 				raise NotEnoughBordersException("Not enough borders found!")
@@ -1435,7 +1443,6 @@ def get_horizontal_border_bunches(bin_image: np.ndarray, y_offset:int=0, bunch_t
 			
 		# for n, e in enumerate(bunch.elems): bunch.elems[n] = e + y_offset
 		yield BorderOffset(bunch, last_offset)
-		last_offset = offseter.value
 		# y_offset += bunch.elems[-1] + 1
 	# return bunches
 
