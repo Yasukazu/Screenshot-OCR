@@ -504,7 +504,7 @@ class ImageFilterAreas:
 	salary: SalaryAreaParam # kyuuyo
 	y_offset: int = 0
 
-class ImageAreaName(Enum):
+class ImageAreaParamName(Enum):
 	heading = HeadingAreaParam
 	shift = ShiftAreaParam
 	breaktime = BreaktimeAreaParam
@@ -676,7 +676,7 @@ class TaimeeFilter:
 	BORDERS_MAX = 4
 	LABEL_TEXT_START = 'この店'
 
-	def __init__(self, image: np.ndarray | Path | str, param_dict: dict[ImageAreaName, ImageFilterParam] = {}, show_check=False):
+	def __init__(self, image: np.ndarray | Path | str, param_dict: dict[ImageAreaParamName, ImageFilterParam] = {}, show_check=False):
 		self.image = image if isinstance(image, np.ndarray) else cv2.imread(str(image))
 		if self.image is None:
 			raise ValueError("Failed to load image")
@@ -727,7 +727,7 @@ class TaimeeFilter:
 		# self.y_origin = y_origin = border_offsets[0][1]
 		heading_area_figure_parts = {}
 		try:
-			heading_area_param = TaimeeHeadingAreaParam(*param_dict[ImageAreaName.heading])
+			heading_area_param = TaimeeHeadingAreaParam(*param_dict[ImageAreaParamName.heading])
 		except (KeyError, TypeError):
 			heading_area_param = TaimeeHeadingAreaParam.from_image(bin_image[:border_offset_ranges[0].stop, :], figure_parts=heading_area_figure_parts)
 
@@ -737,7 +737,7 @@ class TaimeeFilter:
 		self.area_param_list: list[ImageAreaParam] = [heading_area_param]
 		# get shift area
 		try:
-			area_param = ShiftAreaParam(*param_dict[ImageAreaName.shift])
+			area_param = ShiftAreaParam(*param_dict[ImageAreaParamName.shift])
 		except (KeyError, TypeError):
 			area_range = border_offset_ranges[1] # list[0].elems[-1] + 1
 			# y_origin = border_offset_list[1].elems[0]
@@ -749,7 +749,7 @@ class TaimeeFilter:
 		self.area_param_list.append(area_param)
 		# get breaktime area
 		try:
-			area_param = BreaktimeAreaParam(*param_dict[ImageAreaName.breaktime])
+			area_param = BreaktimeAreaParam(*param_dict[ImageAreaParamName.breaktime])
 		except (KeyError, TypeError):
 			area_range = border_offset_ranges[2]
 			# y_origin = border_offset_list[2].elems[0]
@@ -760,7 +760,7 @@ class TaimeeFilter:
 		self.area_param_list.append(area_param)
 		# get paystub area
 		try:
-			area_param = PaystubAreaParam(*param_dict[ImageAreaName.paystub])
+			area_param = PaystubAreaParam(*param_dict[ImageAreaParamName.paystub])
 		except (KeyError, TypeError):
 			area_range = border_offset_ranges[3] # elems[-1] + 1
 			area_param = BreaktimeAreaParam(y_offset=area_range.start)
@@ -1282,6 +1282,7 @@ if __name__ == "__main__":
 	import os
 
 	APP_STR = args.app or "taimee"
+	filter_area_param_dict = {}
 	if args.file:
 		image_fullpath = Path(args.file).resolve()
 	elif args.toml:
@@ -1327,16 +1328,21 @@ if __name__ == "__main__":
 	image = cv2.imread(str(image_fullpath), cv2.IMREAD_GRAYSCALE) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
 	if image is None:
 		raise ValueError("Error: Could not load image: %s" % image_fullpath)
-	filter_param_dict: dict[ImageAreaName, ImageFilterParam] = {
-		# ImageAreaName.heading:filter_area_param_dict['HeadingAreaParam'],
-		ImageAreaName.breaktime:filter_area_param_dict['BreaktimeAreaParam'],
-		ImageAreaName.shift:filter_area_param_dict['ShiftAreaParam'],
-		ImageAreaName.paystub:filter_area_param_dict['PaystubAreaParam'],
+	filter_param_dict: dict[ImageAreaParamName, ImageAreaParam] = {
+		ImageAreaParamName.heading:filter_area_param_dict.get(ImageAreaParamName.heading.value),
+		ImageAreaParamName.breaktime:filter_area_param_dict.get('BreaktimeAreaParam'),
+		ImageAreaParamName.shift:filter_area_param_dict.get('ShiftAreaParam'),
+		ImageAreaParamName.paystub:filter_area_param_dict.get('PaystubAreaParam'),
 	}
 	taimee_filter = TaimeeFilter(image=image, param_dict=filter_param_dict, show_check=True)
 	print("[ocr-filter.taimee]")	
 	# print(f"{para.__class__.__name__:para.as_toml() for para in taimee_filter.area_param_list}")
-	print('\n'.join([param.as_toml() for param in taimee_filter.area_param_list]))
+	from io import StringIO
+	sio = StringIO()
+	for param in taimee_filter.area_param_list:
+		param.to_toml(sio)
+	sio.seek(0)
+	print(sio.read())
 	# --toml ocr-filter
 	'''[ocr-filter.taimee]
 HeadingAreaParam = [0, 111, 196, -1]
