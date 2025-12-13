@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from cv2 import UMat
 import cv2
 from tesseract_ocr import TesseractOCR
+from camel_converter import to_snake
 
 # from cvc2.typing import MatLike
 # import matplotlib.pyplot as plt
@@ -129,6 +130,10 @@ class ImageAreaParam(TOMLDataclass):
 		for param in self.as_slice_param():
 			yield image[param[0]:param[1], param[2]:param[3]]
 
+	def to_toml(self, fp: IOBase, **kwargs):
+		fp.write(self.as_toml() + '\n')
+
+
 
 @dataclass
 class OffsetArea:
@@ -165,25 +170,28 @@ class FigurePart(Enum):
 	AVATAR = auto() # like (figure)
 	LABEL = auto() # like [string]
 
+# camel-converter
 @dataclass
 class HeadingAreaParam(ImageAreaParam):
 	'''
 	Only this area the y_offset value is negative. It means to trim the bottom part i.e.: image[0:(image.shape[0] + y_offset)].
 	Necessary named parameters: height, xpos'''
+	KEY = 'heading'
 
 	@classmethod
 	def get_label_text_start(cls) -> str:
 		return "LABEL TEXT START"
 
-
-
-	def to_toml(self, fp: IOBase, **kwargs):
-		fp.write(self.as_toml() + '\n')
-
 	def as_toml(self, **kwargs):
 		name = kwargs.get('name', '').strip()
 		name_str = f".{name}" if name else ""
-		return f"{self.__class__.__name__}{name_str} = {str(list(self.param))}"
+		class_name = self.__class__.__name__
+		class_name_without_area_param = class_name[:-len("AreaParam")]
+		class_name_node = to_snake(class_name_without_area_param)
+		underscore = class_name_node.rfind("_")
+		if underscore > 0:
+			class_name_node = class_name_node[underscore+1:]
+		return f"{class_name_node}{name_str} = {str(list(self.param))}"
 
 @dataclass
 class TaimeeHeadingAreaParam(HeadingAreaParam):
@@ -197,9 +205,8 @@ class TaimeeHeadingAreaParam(HeadingAreaParam):
 		xy_offset = cls.check_image(image, figure_parts=figure_parts, image_check=image_check, label_check=label_check)
 		return cls(height=xy_offset.y, x_offset=xy_offset.x)
 
-	@classmethod
-	def crop_image(cls, image: np.ndarray, from_bottom: int, x_offset: int) -> np.ndarray:
-		return image[0:image.shape[0] - abs(from_bottom), x_offset:]
+	def as_slice_param(self) -> Sequence[Int4]:
+		return ((0, self.height, self.x_offset, -1),)
 
 	@classmethod
 	def scan_image_range_x(cls, image: np.ndarray)-> range:
@@ -372,6 +379,19 @@ class TaimeeHeadingAreaParam(HeadingAreaParam):
 			figure_parts[FigurePart.LABEL] = from_bottom_label_range
 		return XYOffset(x=figure_parts[FigurePart.AVATAR].x.stop, y=figure_parts[FigurePart.LABEL].from_bottom)
 
+def get_center_run_length(line: Sequence[int]) -> int | None:
+	kg_list = [(k, len(list(g))) for n, (k, g) in enumerate(groupby(line)) if n < 3]
+	if not kg_list:
+		raise ValueError("Empty list")
+	if len(kg_list) == 1 and kg_list[0][0] == 255 and kg_list[0][1] == len(line):
+		return -1 # white
+	if len(kg_list) == 2:
+		return
+	if sum([g for k, g in kg_list]) < len(line):
+		return
+	return kg_list[1][1]
+
+
 @dataclass
 class ShiftAreaParam(ImageAreaParam):
 	'''Needs to initialize using named parameters::
@@ -384,9 +404,40 @@ class ShiftAreaParam(ImageAreaParam):
 		'''returns (left_end, right_start)'''
 		# check if avatar circle at the left side of the area between the borders(1st and 2nd)
 		## scan vertical lines to find the horizontal range		 of the shape (expetcing as a black filled rectangle of left side flat)
+		x_center = image.shape[1] // 2
+		def trim_left() -> int | None:
+			for x in range(x_center, 0, -1):
+				if np.any(image[:, x] == 0):
+					break
+			if not (runlen:= get_center_run_length(image[:, x].tolist())):
+				return
+			for x0 in range(x, 0, -1):
+				runlen = None
+				line = image[:, x0].tolist()
+				if (runlen:= get_center_run_length(line)) < 0:
+					return x0
+		# left = trim_left()
+		def both_side_diff() -> int:
+			last_zeros = 0
+			stable = False
+			b = 0
+			for b in range(1, x_center):
+				non_zeros = np.count_nonzero(image[:, x_center - b:x_center + b])
+				zeros = image[:, x_center - b:x_center + b].size - non_zeros
+				if zeros == 0:
+					continue
+				if zeros == last_zeros:
+					stable = True
+					break 
+				last_zeros = zeros
+			return b if (b > 0 and stable) else -1
+		b = both_side_diff()
+		if b < 0:
+			raise ValueError("Center shape not found!")
+		image[:, x_center - b] = 0
+		return x_center - b, x_center + b
+		'''all_white = False
 
-		x = -1
-		all_white = False
 		for x in range(image.shape[1] // 2 - 1, 0, -1):
 			if np.all(image[:, x] != 0):
 				all_white = True
@@ -404,66 +455,63 @@ class ShiftAreaParam(ImageAreaParam):
 		if image_check:
 			cv2.imshow("Shift area center", image[:, x0:x])
 			cv2.waitKey(0)
-		return x0, x
+		return x0, x'''
 
 	@classmethod
 	def from_image(cls, image: np.ndarray, offset_range: range, image_check=False) -> "ShiftAreaParam":
 		left, right = cls.check_image(image[offset_range.start:offset_range.stop, :], image_check)
 		return cls(y_offset=offset_range.start, height=offset_range.stop - offset_range.start, x_offset=left, width=right)
 
-	def to_toml(self, fp: IOBase, **kwargs):
-		fp.write(self.as_toml() + '\n')
-
 	def as_toml(self, **kwargs):
 		name = kwargs.get('name', '').strip()
 		name_str = f".{name}" if name else ""
-		return f"{self.__class__.__name__}{name_str} = {str(list(self.param))}"
+		class_name = self.__class__.__name__
+		class_name_without_area_param = class_name[:-len("AreaParam")]
+		class_name_node = to_snake(class_name_without_area_param)
+		underscore = class_name_node.rfind("_")
+		if underscore > 0:
+			class_name_node = class_name_node[underscore+1:]
+		return f"{class_name_node}{name_str} = {str(list(self.param))}"
+
 	@property
-	def start_width(self)-> int: # start-from time
+	def start_width(self)-> int: # start-from time is until here
 		return self.x_offset
 
 	@property
-	def end_xpos(self)-> int: # end-by time
+	def end_offset(self)-> int: # end-by time is from here
 		return self.width
-@dataclass		
-class ShiftStartAreaParam(ImageAreaParam):
-	pass
 
-@dataclass
-class ShiftEndAreaParam(ImageAreaParam):
-	pass
+	def as_slice_param(self) -> Sequence[Int4]:
+		return ((self.y_offset, self.y_offset + self.height, 0, self.x_offset),(self.y_offset, self.y_offset + self.height, self.width, -1))
 
-	def crop_image(self, image: np.ndarray) -> Iterator[np.ndarray]:
-		for param in self.as_slice_param():
-			yield image[param[0]:param[1], param[2]:param[3]]
 
 @dataclass
 class BreaktimeAreaParam(ImageAreaParam):
-	def to_toml(self, fp: IOBase, **kwargs):
-		fp.write(self.as_toml() + '\n')
-
 	def as_toml(self, **kwargs):
 		name = kwargs.get('name', '').strip()
 		name_str = f".{name}" if name else ""
-		return f"{self.__class__.__name__}{name_str} = {str(list(self.param))}"
+		class_name = self.__class__.__name__
+		class_name_without_area_param = class_name[:-len("AreaParam")]
+		class_name_node = to_snake(class_name_without_area_param)
+		return f"{class_name_node}{name_str} = {str(list(self.param))}"
 
 @dataclass
 class PaystubAreaParam(ImageAreaParam):
-	def to_toml(self, fp: IOBase, **kwargs):
-		fp.write(self.as_toml() + '\n')
-
 	def as_toml(self, **kwargs):
 		name = kwargs.get('name', '').strip()
 		name_str = f".{name}" if name else ""
-		return f"{self.__class__.__name__}{name_str} = {str(list(self.param))}"
+		class_name = self.__class__.__name__
+		class_name_without_area_param = class_name[:-len("AreaParam")]
+		class_name_node = to_snake(class_name_without_area_param)
+		return f"{class_name_node}{name_str} = {str(list(self.param))}"
+
 @dataclass
 class SalaryAreaParam(ImageAreaParam):
 	def as_toml(self, **kwargs):
 		name = kwargs.get('name', '').strip()
 		name_str = f".{name}" if name else ""
 		return f"{self.__class__.__name__}{name_str} = {str(list(self.param))}"
-	def to_toml(self, fp: IOBase, **kwargs):
-		fp.write(self.as_toml() + '\n')
+
 
 
 @dataclass
@@ -483,7 +531,7 @@ class ImageFilterAreas:
 			as_dict = False
 		for key, area in self.__dict__.items():
 			if isclass(area): # area.to_toml(fp)
-				fp.write(f"{key} = ")
+				fp.write(f"{key.name} = ")
 				fp.write(f"{area.as_dict()}\n") if as_dict else fp.write(f"{list(area.param)}\n")
 
 	area_key_list = [ImageDictKey.y_offset, ImageDictKey.heading, ImageDictKey.shift_start, ImageDictKey.shift_end, ImageDictKey.break_time, ImageDictKey.payslip, ImageDictKey.salary]
@@ -676,7 +724,7 @@ class TaimeeFilter:
 	BORDERS_MAX = 4
 	LABEL_TEXT_START = 'この店'
 
-	def __init__(self, image: np.ndarray | Path | str, param_dict: dict[ImageAreaParamName, ImageFilterParam] = {}, show_check=False):
+	def __init__(self, image: np.ndarray | Path | str, param_dict: dict[ImageAreaParamName, Sequence[int]] = {}, show_check=False):
 		self.image = image if isinstance(image, np.ndarray) else cv2.imread(str(image))
 		if self.image is None:
 			raise ValueError("Failed to load image")
@@ -716,12 +764,12 @@ class TaimeeFilter:
 		del(border_offset_list)
 		border_offset_array -= y_margin # border_offsets[0][0]
 		border_offset_ranges = [range(t, p) for t, p in border_offset_array.tolist()]
-		if __debug__:
+		'''if __debug__:
 			canvas = bin_image.copy()
 			canvas[:, 0:4] = 255
 			for n, rg in enumerate(border_offset_ranges):
 				canvas[rg.start:rg.stop, n] = 0
-			_plot([canvas])
+			_plot([canvas])'''
 		self.y_margin = y_margin
 
 		# self.y_origin = y_origin = border_offsets[0][1]
@@ -734,40 +782,40 @@ class TaimeeFilter:
 		if show_check:
 			show_image = self.image[self.y_margin + heading_area_param.y_offset:self.y_margin + border_offset_ranges[0].stop + heading_area_param.height, heading_area_param.x_offset:]
 			do_show_check("heading_area", heading_area_param, show_image)
-		self.area_param_list: list[ImageAreaParam] = [heading_area_param]
+		self.area_param_dict: dict[ImageAreaParamName, ImageAreaParam] = {ImageAreaParamName.heading: heading_area_param}
 		# get shift area
 		try:
 			area_param = ShiftAreaParam(*param_dict[ImageAreaParamName.shift])
 		except (KeyError, TypeError):
 			area_range = border_offset_ranges[1] # list[0].elems[-1] + 1
 			# y_origin = border_offset_list[1].elems[0]
-			scan_image = bin_image[area_range.start:area_range.stop, :]
-			area_param = ShiftAreaParam.from_image(scan_image, offset=area_range.start, image_check=show_check)
+			# scan_image = bin_image[area_range.start:area_range.stop, :]
+			area_param = ShiftAreaParam.from_image(bin_image, offset_range=area_range, image_check=show_check)
 		if show_check:
 			area_image = bin_image[area_param.y_offset:area_param.y_offset + area_param.height, :]
 			do_show_check("shift_area", area_param, area_image)
-		self.area_param_list.append(area_param)
+		self.area_param_dict[ImageAreaParamName.shift] = area_param
 		# get breaktime area
 		try:
 			area_param = BreaktimeAreaParam(*param_dict[ImageAreaParamName.breaktime])
 		except (KeyError, TypeError):
 			area_range = border_offset_ranges[2]
 			# y_origin = border_offset_list[2].elems[0]
-			area_param = BreaktimeAreaParam(y_offset=area_range.start, height=area_range.start - area_range.stop) # y_origin - area_top)
+			area_param = BreaktimeAreaParam(y_offset=area_range.start, height=area_range.stop - area_range.start) # y_origin - area_top)
 		if show_check:
 			area_image = bin_image[area_param.y_offset:area_param.y_offset + area_param.height, :]
 			do_show_check("breaktime area", area_param, area_image)
-		self.area_param_list.append(area_param)
+		self.area_param_dict[ImageAreaParamName.breaktime] = area_param
 		# get paystub area
 		try:
 			area_param = PaystubAreaParam(*param_dict[ImageAreaParamName.paystub])
 		except (KeyError, TypeError):
-			area_range = border_offset_ranges[3] # elems[-1] + 1
-			area_param = BreaktimeAreaParam(y_offset=area_range.start)
+			# area_range = border_offset_ranges[3] # elems[-1] + 1
+			area_param = PaystubAreaParam(y_offset=border_offset_ranges[-1].stop)
 		if show_check:
 			area_image = bin_image[area_param.y_offset:, :]
 			do_show_check("paystub area", area_param, area_image)
-		self.area_param_list.append(area_param)
+		self.area_param_dict[ImageAreaParamName.paystub] = area_param
 		if show_check:
 			cv2.destroyAllWindows()
 		
@@ -872,6 +920,7 @@ class TaimeeFilter:
 		new_params = ImageAreaParam(0, y2, xpos)#, -1)
 		if params is not None:
 			params[ImageDictKey.heading] = new_params
+		self.params = params
 		return new_params
 
 		
@@ -1194,7 +1243,7 @@ return_as_cuts: bool = False, center_rate = 0.5
 	if set_params:
 		params[ImageFilterParam.shift_from_width] = left_area_width
 		params[ImageFilterParam.shift_until_xpos] = right_area_xpos
-	return ShiftAreaParam(y_offset=0, height=image.shape[0], start_width=left_area_width, end_xpos=right_area_xpos) if return_as_cuts else (image[:, :left_area_width], image[:, right_area_xpos:])
+	return ShiftAreaParam(y_offset=0, height=image.shape[0], start_width=left_area_width, end_offset=right_area_xpos) if return_as_cuts else (image[:, :left_area_width], image[:, right_area_xpos:])
 
 
 
@@ -1273,7 +1322,10 @@ if __name__ == "__main__":
 	parser.add_argument('--app', default='taimee', help='Application name')
 	parser.add_argument('--toml', default='ocr-filter.toml', help='Configuration toml file name')
 	parser.add_argument('--file', help='Image file to get parameter')
+	parser.add_argument('--show', action='store_true', help='Show image		')
+	parser.add_argument('--make', action='store_true', help='Force to make config(i.e. not load config file like "ocr-filter.toml")')
 	args = parser.parse_args()
+	
 
 	cwd = Path(__file__).resolve().parent
 	sys.path.append(str(cwd.parent))
@@ -1281,7 +1333,7 @@ if __name__ == "__main__":
 	logger = set_logger(__name__)
 	import os
 
-	APP_STR = args.app or "taimee"
+	app_name = args.app
 	filter_area_param_dict = {}
 	if args.file:
 		image_fullpath = Path(args.file).resolve()
@@ -1298,7 +1350,7 @@ if __name__ == "__main__":
 			image_dir = Path(image_path_config['dir']).expanduser() # home dir starts with tilde(~)
 			if not image_dir.exists():
 				raise ValueError("Error: image_dir not found: %s" % image_dir)
-			image_config_filename = image_path_config[APP_STR]['filename']
+			image_config_filename = image_path_config[app_name]['filename']
 			filename_path = Path(image_config_filename)
 			if '*' in filename_path.stem or '?' in filename_path.stem:
 				logger.info("Trying to expand filename with wildcard: %s" % image_config_filename)
@@ -1314,9 +1366,9 @@ if __name__ == "__main__":
 				logger.info("Selected file: %s", image_config_filename)
 			image_path = Path(image_dir) / image_config_filename
 			if not image_path.exists():
-				raise ValueError("Error: image_path not found: %s" % image_path)
+				raise ValueError("Error: i	mage_path not found: %s" % image_path)
 			image_fullpath = image_path.resolve()
-			filter_area_param_dict = filter_config['ocr-filter']['taimee']
+			filter_area_param_dict = {} if args.make else filter_config['ocr-filter'][app_name]
 		except KeyError as err:
 			raise ValueError("Error: key not found!\n%s" % err)
 		except FileNotFoundError as err:
@@ -1328,18 +1380,24 @@ if __name__ == "__main__":
 	image = cv2.imread(str(image_fullpath), cv2.IMREAD_GRAYSCALE) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
 	if image is None:
 		raise ValueError("Error: Could not load image: %s" % image_fullpath)
-	filter_param_dict: dict[ImageAreaParamName, ImageAreaParam] = {
-		ImageAreaParamName.heading:filter_area_param_dict.get(ImageAreaParamName.heading.value),
-		ImageAreaParamName.breaktime:filter_area_param_dict.get('BreaktimeAreaParam'),
-		ImageAreaParamName.shift:filter_area_param_dict.get('ShiftAreaParam'),
-		ImageAreaParamName.paystub:filter_area_param_dict.get('PaystubAreaParam'),
-	}
-	taimee_filter = TaimeeFilter(image=image, param_dict=filter_param_dict, show_check=True)
+	filter_param_dict: dict[ImageAreaParamName, dict[str, str|float|None]] = {}
+	if not args.make:
+		for key in ImageAreaParamName:
+			try:
+				filter_param_dict[key] = filter_area_param_dict[key.name]
+			except KeyError:
+				pass
+				filter_param_dict[key] = None
+		'''ImageAreaParamName.heading:filter_area_param_dict.get('heading'),
+		ImageAreaParamName.breaktime:filter_area_param_dict.get('breaktime'),
+		ImageAreaParamName.shift:filter_area_param_dict.get('shift'),
+		ImageAreaParamName.paystub:filter_area_param_dict.get('paystub'),'''
+	taimee_filter = TaimeeFilter(image=image, param_dict=filter_param_dict, show_check=args.show)
 	print("[ocr-filter.taimee]")	
 	# print(f"{para.__class__.__name__:para.as_toml() for para in taimee_filter.area_param_list}")
 	from io import StringIO
 	sio = StringIO()
-	for param in taimee_filter.area_param_list:
+	for key, param in taimee_filter.area_param_dict.items():
 		param.to_toml(sio)
 	sio.seek(0)
 	print(sio.read())
