@@ -1,8 +1,12 @@
-
-from pytesseract import pytesseract, image_to_data, image_to_boxes, Output
+from enum import Enum
+from pytesseract import pytesseract, image_to_data, image_to_boxes
 from pathlib import Path
 import numpy as np
-
+class Output(Enum):
+    BYTES = 'bytes'
+    DATAFRAME = 'data.frame'
+    DICT = 'dict'
+    STRING = 'string'
 class TesseractOCR:
 	def __init__(self, tessdata_dir = "~/.local/share/tessdata/fast", tesseract_cmd = '/usr/bin/tesseract', psm_value = 6):
 		self.tessdata_dir = tessdata_dir
@@ -21,5 +25,10 @@ class TesseractOCR:
 		tessdata_path = Path(self.tessdata_dir).expanduser()
 		return f'--tessdata-dir {tessdata_path}'
 
-	def exec_ocr(self, image: np.ndarray, lang="jpn",output_type=Output.DICT, data_or_boxes=True):
-		return image_to_data(image, lang=lang, output_type=output_type, config=' '.join([self.tessdata_dir_config, self.psm_config])) if data_or_boxes else image_to_boxes(image, lang=lang, output_type=output_type, config=' '.join([self.tessdata_dir_config, self.psm_config]))
+	def exec(self, image: np.ndarray, lang="jpn", output_type=Output.DICT, data_or_boxes=True, psm:int|None=None):
+		if psm is not None:
+			psm_value = int(psm)
+		else:
+			psm_value = self.psm_value
+		psm_config = f"--psm {psm_value}"
+		return image_to_data(image, lang=lang, output_type=output_type.value, config=' '.join([self.tessdata_dir_config, psm_config])) if data_or_boxes else image_to_boxes(image, lang=lang, output_type=output_type.value, config=' '.join([self.tessdata_dir_config, psm_config]))
