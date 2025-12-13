@@ -1334,7 +1334,7 @@ if __name__ == "__main__":
 	parser.add_argument('--file', help='Image file to get parameter')
 	parser.add_argument('--show', action='store_true', help='Show image		')
 	parser.add_argument('--make', action='store_true', help='Force to make config(i.e. not load config file like "ocr-filter.toml")')
-	parser.add_argument('--ocr', action='store_true', help='Execute OCR')
+	parser.add_argument('--no-ocr', action='store_true', default=False, help='Execute OCR')
 	args = parser.parse_args()
 	
 
@@ -1352,9 +1352,9 @@ if __name__ == "__main__":
 		try: # if env_file.exists():
 			if not args.toml.endswith('.toml'):
 				args.toml += '.toml'
-			FILTER_TOML = args.toml
-			FILTER_TOML_PATH = Path(FILTER_TOML).resolve()
-			with FILTER_TOML_PATH.open('rb') as f:
+			filter_toml = args.toml
+			filter_toml_path = Path(filter_toml).resolve()
+			with filter_toml_path.open('rb') as f:
 				filter_config = tomllib.load(f)
 
 			image_path_config = filter_config['image-path']
@@ -1405,7 +1405,7 @@ if __name__ == "__main__":
 		ImageAreaParamName.paystub:filter_area_param_dict.get('paystub'),'''
 	taimee_filter = TaimeeFilter(image=image, param_dict=filter_param_dict, show_check=args.show)
 	# print(f"{para.__class__.__name__:para.as_toml() for para in taimee_filter.area_param_list}")
-	if args.ocr:
+	if not args.no_ocr:
 		from tesseract_ocr import TesseractOCR, Output
 		ocr = TesseractOCR()
 		for k, area_param in taimee_filter.area_param_dict.items():
