@@ -710,28 +710,26 @@ class TaimeeFilter:
 				break
 				# last_offset += b.elems[-1] + 1
 
-		# if n < 2: raise ValueError("Not enough borders(less than 4) in the image!")
-		if n == 2:
-			y_margin = None
-		else:
-			assert n == 3
-			y_margin = border_offset_list.popleft()[1]
-			bin_image = bin_image[y_margin:, :]
+
+		margin_area = border_offset_list.popleft()
+		y_margin = border_offset_list[0][0]
+		bin_image = bin_image[y_margin:, :]
 		border_offsets = np.array(border_offset_list)
-		border_offsets -= border_offsets[0][0]
-		canvas = bin_image.copy()
-		canvas[:, 0:4] = 255
-		for n, (start, stop) in enumerate(border_offsets):
-			canvas[start:stop, n] = 0
-		_plot([canvas])
+		border_offsets -= y_margin # border_offsets[0][0]
+		if __debug__:
+			canvas = bin_image.copy()
+			canvas[:, 0:4] = 255
+			for n, (start, stop) in enumerate(border_offsets):
+				canvas[start:stop, n] = 0
+			_plot([canvas])
 		self.y_margin = y_margin
 
-		self.y_origin = y_origin = border_offsets[0]
+		self.y_origin = y_origin = border_offsets[0][1]
 		heading_area_figure_parts = {}
 		try:
 			heading_area_param = TaimeeHeadingAreaParam(*param_dict[ImageAreaName.heading])
 		except (KeyError, TypeError):
-			heading_area_param = TaimeeHeadingAreaParam.from_image(bin_image[:y_origin, :], figure_parts=heading_area_figure_parts)
+			heading_area_param = TaimeeHeadingAreaParam.from_image(bin_image[:self.y_origin, :], figure_parts=heading_area_figure_parts)
 			if show_check:
 				SUBPLOT_SIZE = 2
 				fig, ax = plt.subplots(SUBPLOT_SIZE, 1)
@@ -962,200 +960,7 @@ class BinaryImage:
 			self.auto_thresh_val = 0
 			bin_image = self.mono_image'''
 
-
-def taimee(
-	given_image: ndarray | Path | str,
-	thresh_type: int = cv2.THRESH_BINARY + cv2.THRESH_OTSU,
-	thresh_value: float = 150.0,
-	single: bool = False,
-	cvt_color: int = cv2.COLOR_BGR2GRAY,
-	image_dict: dict[ImageDictKey, np.ndarray] | None = None,
-	image_filter_params: dict[ImageFilterParam, int] = {},
-	b_thresh_valule: float = 235.0,
-	binarize: bool = True,
-	image_filter_areas: ImageFilterAreas | None = None,
-) -> tuple[float | Sequence[int], np.ndarray]:
-	org_image = image_fullpath = None
-	match given_image:
-		case ndarray():
-			org_image = given_image
-		case Path():
-			image_fullpath = str(given_image.resolve())
-		case str():
-			image_fullpath = str(Path(given_image).resolve())
-	if image_fullpath is not None:
-		org_image = cv2.imread(image_fullpath)
-		if org_image is None:
-			raise ValueError("Error: Could not load image: %s" % image_fullpath)
-	# assert isinstance(imagrecess_border_lene, np.ndarray) #MatLike)
-	height, width = org_image.shape[:2]
-	if height <= 0 or width <= 0:
-		raise ValueError(
-			"Error: 0 height or width image shape: %s" % org_image.shape[:2]
-		)
-	mono_image = cv2.cvtColor(org_image, cvt_color)
-	if binarize:
-		auto_thresh, pre_image = cv2.threshold(
-			mono_image, thresh=thresh_value, maxval=255, type=thresh_type
-		)
-	else:
-		auto_thresh = 0
-		pre_image = mono_image
-	b_image = cv2.threshold(
-		mono_image, thresh=b_thresh_valule, maxval=255, type=cv2.THRESH_BINARY
-	)[1]  # binary, high contrast
-	non_nearby_elems = DistantElems(distance=height // 20)
-	horizontal_borders = []
-	try:
-		for y in find_horizontal_borders(b_image):
-			non_nearby_elems.add(y)
-			horizontal_borders.append(y)
-	except NoBorderError:
-		raise ValueError("No horizontal borders found!")
-	non_nearby_elems_array = np.array(non_nearby_elems.elems)
-	leading_height = non_nearby_elems_array[0]
-	non_nearby_elems_array[:] -= leading_height
-	non_nearby_elems = non_nearby_elems_array[1:].tolist()
-	heading_elem = non_nearby_elems[0]
-	# from image_filter import TaimeeFilter
-	taimee_filter = TaimeeFilter(b_image, horizontal_borders)
-	heading_area = taimee_filter.area_param_list[0]
-	# heading_ypos, heading_height, heading_xpos = taimee_filter.extract_heading()
-	# heading_area_xpos = TaimeeFilter.get_heading_avatar_end_xpos(b_image[leading_height:heading_elem+leading_height, :], borders=horizontal_borders)
-	ocr_image = mono_image[taimee_filter.y_margin: taimee_filter.y_margin+heading_area.height, heading_area.x_offset:]
-	cv2.imshow("OCR image", ocr_image)
-	cv2.waitKey(0)
-	ocr = TesseractOCR()
-	# from pandas import DataFrame
-	from pytesseract import Output as TesseractOutput
-	ocr_dataframe = ocr.exec(ocr_image, output_type=TesseractOutput.DATAFRAME)
-	heading_text = ocr_dataframe[ocr_dataframe['conf'] > 0]['text']	
-	## cut preceding bump area
-	try:
-		bump_ypos, bump_ypos_len = find_border(b_image)
-		b_image = b_image[
-			bump_ypos + bump_ypos_len :, :
-		]  # remove pre-heading area and its closing border
-		image = pre_image[
-			bump_ypos + bump_ypos_len :, :
-		]  # remove pre-heading area and its closing border
-	except NoBorderError:
-		raise ValueError("No bump border found!")
-	image_filter_params[ImageFilterParam.heading_ypos] = bump_ypos
-	try:
-		head_border, head_border_len = find_border(b_image)
-	except NoBorderError:
-		raise ValueError("No heading border found!")
-	pre_h_image = b_image[:head_border, :]
-	heading_area: HeadingAreaParam = trim_heading(pre_h_image, image_filter_params)#, return_as_cuts=True)
-	h_image = pre_h_image[:heading_area.height, heading_area.x_offset:]
-	h_image2 = heading_area.crop_image(pre_h_image)
-	cur_image = b_image[head_border + head_border_len + 1 :, :]
-	try:
-		shift_border, shift_border_len = find_border(cur_image)
-	except NoBorderError:
-		raise ValueError("No shift border found!")
-	pre_s_image = cur_image[:shift_border, :]
-	shift_images = get_split_shifts(pre_s_image, image_filter_params)
-	cur_image = cur_image[shift_border + shift_border_len + 1 :, :]
-	try:
-		breaktime_border, breaktime_border_len = find_border(cur_image)
-	except NoBorderError:
-		raise ValueError("No hours border found!")
-	image_filter_params[ImageFilterParam.break_time_ypos] = breaktime_border
-	hours_image = cur_image[:breaktime_border, :]
-	other_image = cur_image[breaktime_border + breaktime_border_len + 1 :, :]
-
-	### scan left-top area for a (non-white) shape
-	x = -1
-	non_unique = False
-	for x in range(width):
-		v_line = h_image[:, x]
-		if len(np.unique(v_line)) > 1:
-			non_unique = True
-			break
-	if x == 0:
-		raise ValueError("h_image left starts with non-white area!")
-	if not non_unique:
-		raise ValueError("No shape found in the heading left")
-	### scan left-top area for (white) area
-	x_cd = -1
-	blank_area_found = False
-	for x_cd in range(width - x):
-		v_line = h_image[:, x_cd + x]
-		if len(np.unique(v_line)) == 1 and (v_line == 255).all():
-			blank_area_found = True
-			break
-	if x_cd == -1 or not blank_area_found:
-		raise ValueError("No blank area found at the right side of the heading shape!")
-	cut_x = x_cd + x
-	heading_area = h_image[:, cut_x + 1 :]
-	## find half-or-longer-width continuous line(black/0)
-	y = -1
-	for y in range(heading_area.shape[0]):
-		run_values, run_starts, run_lengths = find_runs(heading_area[y])
-		if (
-			len(run_values) == 3
-			and run_values[1] == 0
-			and run_lengths[1] >= heading_area.shape[1] // 2
-		):
-			break
-	if y == -1:
-		raise ValueError(
-			"No half-or-longer-width continuous line(black/0) found in the heading area!"
-		)
-	heading_area = heading_area[: y - 1, :]
-	## erase unwanted h_lines
-	for ypos in erase_ypos_list:
-		b_image[ypos, :] = 255
-	for ypos in ypos_list:
-		b_image[ypos, :] = 255
-	if single:
-		# Mask the left-top circle as a white rectangle onto image
-		cv2.rectangle(image, (0, 0), (cut_x, head_border), (255, 255, 255), -1)
-		cv2.rectangle(
-			image, (0, y - 1), (image.shape[1], image.shape[0]), (255, 255, 255), -1
-		)
-		return auto_thresh, image
-	## get area of hours_from / hours_to
-	xpos = -1
-	for xpos in reversed(range(width // 2)):
-		v_line = b_image[ypos_list[0] : ypos_list[1] - 1, xpos]
-		if (
-			np.count_nonzero(v_lishift_start_widthne == 0) == 0
-		):  # len(np.unique(v_line)) == 1 and bool((v_line == 255).all()):
-			break
-	if xpos == -1:
-		raise ValueError(
-			"No blank area found at the left side of the hours area center!"
-		)
-	xpos2 = -1
-	for xpos2 in range(width // 2, width):
-		v_line = b_image[ypos_list[0] : ypos_list[1] - 1, xpos2]
-		if (
-			np.count_nonzero(v_line == 0) == 0
-		):  # len(np.unique(v_line)) == 1 and bool((v_line == 255).all()):
-			break
-	"""b_image[:, xpos2] = 0
-	ax[5].imshow(b_image)
-	plt.show()
-	"""
-	if xpos2 == -1 or xpos2 == width or xpos2 <= xpos:
-		raise ValueError(
-			"No blank area found at the right side of the hours area center!"
-		)
-	# add the heading area to the dict
-	if image_dict is not None:
-		image_dict[ImageDictKey.heading] = heading_area
-		image_dict[ImageDictKey.work_time] = image[ypos_list[0] : ypos_list[1], :]
-		image_dict[ImageDictKey.shift_start] = image[ypos_list[0] : ypos_list[1], :xpos]
-		image_dict[ImageDictKey.shift_end] = image[
-			ypos_list[0] : ypos_list[1], xpos2:
-		]
-		image_dict[ImageDictKey.break_time] = image[ypos_list[1] : ypos_list[-1], :]
-		image_dict[ImageDictKey.payslip] = image[ypos_list[-1] :, :]
-	return ypos_list, image
-
+# end def taimee
 
 # Result
 """102
@@ -1424,13 +1229,13 @@ def get_horizontal_border_bunches(bin_image: np.ndarray, y_offset:int=0, bunch_t
 	# bunches: list[NearBunch] = []
 	offseter = OffsetInt(y_offset, limit=bin_image.shape[0])
 	bunch: NearBunch | None = None
-	last_offset = 0
+	last_offset: int = offseter.value
 	range_start: int = -1
 	for n in range(max_bunch):
 		range_start = bunch.elems[-1] + 1 if bunch else 0
 		range_start += last_offset
 		try:
-			last_offset: int = offseter.value
+			last_offset = offseter.value
 			bunch = find_horizontal_border_bunch(bin_image, bunch_thresh=bunch_thresh, y_offset=offseter)
 			if offset_list is not None:
 				range_stop = bunch.elems[0] + last_offset
@@ -1475,6 +1280,7 @@ if __name__ == "__main__":
 	parser = ArgumentParser()
 	parser.add_argument('--app', default='taimee', help='Application name')
 	parser.add_argument('--toml', default='ocr-filter.toml', help='Configuration toml file name')
+	parser.add_argument('--file', help='Image file to get parameter')
 	args = parser.parse_args()
 
 	cwd = Path(__file__).resolve().parent
@@ -1484,43 +1290,48 @@ if __name__ == "__main__":
 	import os
 
 	APP_STR = args.app or "taimee"
-	FILTER_TOML = args.toml + '.toml' if not args.toml.endswith('.toml') else ''
-	FILTER_TOML_PATH = Path(FILTER_TOML).resolve()
+	if args.file:
+		image_fullpath = Path(args.file).resolve()
+	elif args.toml:
+		try: # if env_file.exists():
+			if not args.toml.endswith('.toml'):
+				args.toml += '.toml'
+			FILTER_TOML = args.toml
+			FILTER_TOML_PATH = Path(FILTER_TOML).resolve()
+			with FILTER_TOML_PATH.open('rb') as f:
+				filter_config = tomllib.load(f)
 
-	try: # if env_file.exists():
-		with FILTER_TOML_PATH.open('rb') as f:
-
-			filter_config = tomllib.load(f)
-
-		image_path_config = filter_config['image-path']
-		image_dir = Path(image_path_config['dir']).expanduser() # home dir starts with tilde(~)
-		if not image_dir.exists():
-			raise ValueError("Error: image_dir not found: %s" % image_dir)
-		image_config_filename = image_path_config[APP_STR]['filename']
-		filename_path = Path(image_config_filename)
-		if '*' in filename_path.stem or '?' in filename_path.stem:
-			logger.info("Trying to expand filename with wildcard: %s" % image_config_filename)
-			glob_path = Path(image_dir)
-			file_list = [f for f in glob_path.glob(image_config_filename) if f.is_file()]
-			if len(file_list) == 0:
-				raise ValueError("Error: No files found with wildcard: %s" % image_config_filename)
-			logger.info("%d file found", len(file_list))
-			logger.info("Files: %s", file_list)
-			nth = 1
-			logger.info("Choosing the %d-th file.", nth)
-			image_config_filename = file_list[nth - 1].name
-			logger.info("Selected file: %s", image_config_filename)
-		image_path = Path(image_dir) / image_config_filename
-		if not image_path.exists():
-			raise ValueError("Error: image_path not found: %s" % image_path)
-		image_fullpath = image_path.resolve()
-		filter_area_param_dict = filter_config['ocr-filter']['taimee']
-	except KeyError as err:
-		raise ValueError("Error: key not found!\n%s" % err)
-	except FileNotFoundError as err:
-		raise ValueError("Error: file not found!\n%s" % err)
-	except tomllib.TOMLDecodeError as err:
-		raise ValueError("Error: failed to TOML decode!\n%s" % err)
+			image_path_config = filter_config['image-path']
+			image_dir = Path(image_path_config['dir']).expanduser() # home dir starts with tilde(~)
+			if not image_dir.exists():
+				raise ValueError("Error: image_dir not found: %s" % image_dir)
+			image_config_filename = image_path_config[APP_STR]['filename']
+			filename_path = Path(image_config_filename)
+			if '*' in filename_path.stem or '?' in filename_path.stem:
+				logger.info("Trying to expand filename with wildcard: %s" % image_config_filename)
+				glob_path = Path(image_dir)
+				file_list = [f for f in glob_path.glob(image_config_filename) if f.is_file()]
+				if len(file_list) == 0:
+					raise ValueError("Error: No files found with wildcard: %s" % image_config_filename)
+				logger.info("%d file found", len(file_list))
+				logger.info("Files: %s", file_list)
+				nth = 1
+				logger.info("Choosing the %d-th file.", nth)
+				image_config_filename = file_list[nth - 1].name
+				logger.info("Selected file: %s", image_config_filename)
+			image_path = Path(image_dir) / image_config_filename
+			if not image_path.exists():
+				raise ValueError("Error: image_path not found: %s" % image_path)
+			image_fullpath = image_path.resolve()
+			filter_area_param_dict = filter_config['ocr-filter']['taimee']
+		except KeyError as err:
+			raise ValueError("Error: key not found!\n%s" % err)
+		except FileNotFoundError as err:
+			raise ValueError("Error: file not found!\n%s" % err)
+		except tomllib.TOMLDecodeError as err:
+			raise ValueError("Error: failed to TOML decode!\n%s" % err)
+	else:
+		raise ValueError("Image filter module test to extract parameter from an image file. Needs filespec.")
 	image = cv2.imread(str(image_fullpath), cv2.IMREAD_GRAYSCALE) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
 	if image is None:
 		raise ValueError("Error: Could not load image: %s" % image_fullpath)
