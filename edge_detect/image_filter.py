@@ -105,14 +105,12 @@ class ImageAreaParam(TOMLDataclass):
 	# param: ItemAreaParam # NamedTuple:read only
 
 	def __post_init__(self):
-		if self.x_offset < 0:
-			raise InvalidValueError("x offset must be positive")
 		if self.height is not None:
-			if self.height != -1 and self.height <= 0:
-				raise InvalidValueError("height must be larger than 0 except None or -1")
+			if self.height == 0:
+				raise InvalidValueError("height must not be 0 except None")
 		if self.width is not None:
-			if self.width != -1 and self.width <= 0:
-				raise InvalidValueError("width must be larger than 0 except None or -1")
+			if self.width == 0: # != -1 and self.width <= 0:
+				raise InvalidValueError("width must not be zero except None")
 
 	@classmethod
 	def from_image(cls, image: np.ndarray, offset:int=0) -> "ImageAreaParam":
@@ -197,7 +195,7 @@ class TaimeeHeadingAreaParam(HeadingAreaParam):
 	def from_image(cls, image: np.ndarray, offset: int = 0, figure_parts: dict[
 	FigurePart, XYRange|FromBottomLabelRange] = {}, image_check=False, label_check=True) -> "TaimeeHeadingAreaParam":
 		xy_offset = cls.check_image(image, figure_parts=figure_parts, image_check=image_check, label_check=label_check)
-		return cls(y_offset=xy_offset.y, x_offset=xy_offset.x)
+		return cls(height=xy_offset.y, x_offset=xy_offset.x)
 
 	@classmethod
 	def crop_image(cls, image: np.ndarray, from_bottom: int, x_offset: int) -> np.ndarray:
@@ -404,14 +402,14 @@ class ShiftAreaParam(ImageAreaParam):
 		if not all_white:
 			raise ValueError("No all white found in right half of scan area!")
 		if image_check:
-			cv2.imshow("				image", image[:, x0:x])
+			cv2.imshow("Shift area center", image[:, x0:x])
 			cv2.waitKey(0)
 		return x0, x
 
 	@classmethod
-	def from_image(cls, image: np.ndarray, offset: int, image_check=False) -> "ShiftAreaParam":
-		left, right = cls.check_image(image, image_check)
-		return cls(ypos=offset, height=image.shape[0], xpos=left, width=right)
+	def from_image(cls, image: np.ndarray, offset_range: range, image_check=False) -> "ShiftAreaParam":
+		left, right = cls.check_image(image[offset_range.start:offset_range.stop, :], image_check)
+		return cls(y_offset=offset_range.start, height=offset_range.stop - offset_range.start, x_offset=left, width=right)
 
 	def to_toml(self, fp: IOBase, **kwargs):
 		fp.write(self.as_toml() + '\n')
@@ -714,44 +712,37 @@ class TaimeeFilter:
 		margin_area = border_offset_list.popleft()
 		y_margin = border_offset_list[0][0]
 		bin_image = bin_image[y_margin:, :]
-		border_offsets = np.array(border_offset_list)
-		border_offsets -= y_margin # border_offsets[0][0]
+		border_offset_array = np.array(border_offset_list)
+		del(border_offset_list)
+		border_offset_array -= y_margin # border_offsets[0][0]
+		border_offset_ranges = [range(t, p) for t, p in border_offset_array.tolist()]
 		if __debug__:
 			canvas = bin_image.copy()
 			canvas[:, 0:4] = 255
-			for n, (start, stop) in enumerate(border_offsets):
-				canvas[start:stop, n] = 0
+			for n, rg in enumerate(border_offset_ranges):
+				canvas[rg.start:rg.stop, n] = 0
 			_plot([canvas])
 		self.y_margin = y_margin
 
-		self.y_origin = y_origin = border_offsets[0][1]
+		# self.y_origin = y_origin = border_offsets[0][1]
 		heading_area_figure_parts = {}
 		try:
 			heading_area_param = TaimeeHeadingAreaParam(*param_dict[ImageAreaName.heading])
 		except (KeyError, TypeError):
-			heading_area_param = TaimeeHeadingAreaParam.from_image(bin_image[:self.y_origin, :], figure_parts=heading_area_figure_parts)
-			if show_check:
-				SUBPLOT_SIZE = 2
-				fig, ax = plt.subplots(SUBPLOT_SIZE, 1)
-				for r in range(SUBPLOT_SIZE):
-					ax[r].invert_yaxis()
-					ax[r].xaxis.tick_top()
-					ax[r].set_title(f"Row {r+1}")
-				ax[0].imshow(TaimeeHeadingAreaParam.crop_image(bin_image[:y_origin, :],
-				from_bottom=heading_area_param.y_offset, x_offset=heading_area_param.x_offset), cmap='gray')
-				plt.show()
+			heading_area_param = TaimeeHeadingAreaParam.from_image(bin_image[:border_offset_ranges[0].stop, :], figure_parts=heading_area_figure_parts)
+
 		if show_check:
-			show_image = self.image[self.y_origin:self.y_origin + heading_area_param.y_offset, heading_area_param.x_offset:]
+			show_image = self.image[self.y_margin + heading_area_param.y_offset:self.y_margin + border_offset_ranges[0].stop + heading_area_param.height, heading_area_param.x_offset:]
 			do_show_check("heading_area", heading_area_param, show_image)
 		self.area_param_list: list[ImageAreaParam] = [heading_area_param]
 		# get shift area
 		try:
 			area_param = ShiftAreaParam(*param_dict[ImageAreaName.shift])
 		except (KeyError, TypeError):
-			area_top = border_offset_list[0].elems[-1] + 1
-			y_origin = border_offset_list[1].elems[0]
-			scan_image = bin_image[area_top:y_origin, :]
-			area_param = ShiftAreaParam.from_image(scan_image, offset=area_top, image_check=show_check)
+			area_range = border_offset_ranges[1] # list[0].elems[-1] + 1
+			# y_origin = border_offset_list[1].elems[0]
+			scan_image = bin_image[area_range.start:area_range.stop, :]
+			area_param = ShiftAreaParam.from_image(scan_image, offset=area_range.start, image_check=show_check)
 		if show_check:
 			area_image = bin_image[area_param.y_offset:area_param.y_offset + area_param.height, :]
 			do_show_check("shift_area", area_param, area_image)
@@ -760,9 +751,9 @@ class TaimeeFilter:
 		try:
 			area_param = BreaktimeAreaParam(*param_dict[ImageAreaName.breaktime])
 		except (KeyError, TypeError):
-			area_top = border_offset_list[1].elems[-1] + 1
-			y_origin = border_offset_list[2].elems[0]
-			area_param = BreaktimeAreaParam(y_offset=area_top, height=y_origin - area_top)
+			area_range = border_offset_ranges[2]
+			# y_origin = border_offset_list[2].elems[0]
+			area_param = BreaktimeAreaParam(y_offset=area_range.start, height=area_range.start - area_range.stop) # y_origin - area_top)
 		if show_check:
 			area_image = bin_image[area_param.y_offset:area_param.y_offset + area_param.height, :]
 			do_show_check("breaktime area", area_param, area_image)
@@ -771,8 +762,8 @@ class TaimeeFilter:
 		try:
 			area_param = PaystubAreaParam(*param_dict[ImageAreaName.paystub])
 		except (KeyError, TypeError):
-			area_top = border_offset_list[2].elems[-1] + 1
-			area_param = BreaktimeAreaParam(y_offset=area_top)
+			area_range = border_offset_ranges[3] # elems[-1] + 1
+			area_param = BreaktimeAreaParam(y_offset=area_range.start)
 		if show_check:
 			area_image = bin_image[area_param.y_offset:, :]
 			do_show_check("paystub area", area_param, area_image)
@@ -1266,8 +1257,9 @@ def find_horizontal_border_bunch(bin_image: np.ndarray, y_offset:OffsetInt|None=
 	return bunch
 
 def do_show_check(msg, param, img):
-	cv2.imshow(f"{msg}::{param}", img)
-	cv2.waitKey(0)
+	if __debug__:
+		cv2.imshow(f"{msg}::{param}", img)
+		cv2.waitKey(0)
 
 if __name__ == "__main__":
 	from argparse import ArgumentParser
