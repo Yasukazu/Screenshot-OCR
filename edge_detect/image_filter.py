@@ -1334,7 +1334,7 @@ if __name__ == "__main__":
 	parser.add_argument('--toml', help=f'Configuration toml file name like {OCR_FILTER}')
 	parser.add_argument('--file', help='Image file name to commit OCR or to get parameters: *.png')
 	parser.add_argument('--dir', help='Image dir of files: ./')
-	parser.add_argument('--nth', type=int, help='Image file number of files by wildcard(default: 1)')
+	parser.add_argument('--nth', type=int, default=1, help='Rank(default: 1) of files descending sorted(the latest, the first) by modified date as wildcard(*, ?)')
 	parser.add_argument('--show', action='store_true', help='Show images to check')
 	parser.add_argument('--make', action='store_true', help=f'Force to make config(i.e. do not load config file like "{OCR_FILTER}.toml")')
 	parser.add_argument('--no-ocr', action='store_true', default=False, help='Do not execute OCR')
@@ -1382,8 +1382,8 @@ if __name__ == "__main__":
 				logger.info("Files: %s", file_list)
 				# sort by modified date descendingf
 				from os.path import getmtime
-				nth = args.nth if args.nth else 1
-				logger.info("Choosing the %d-th file from the latest in %d files.", nth, len(file_list))
+				nth = args.nth # if args.nth else 1
+				logger.info("Choosing the %d-%s file from the latest in %d files.", nth, "th" if nth > 3 else ("st", "nd", "rd")[nth - 1], len(file_list))
 				file_list.sort(key=getmtime, reverse=True)
 				image_filename = file_list[nth - 1].name
 				logger.info("Selected file: %s", image_filename)
