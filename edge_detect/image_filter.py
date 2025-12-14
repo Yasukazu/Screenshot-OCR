@@ -1334,6 +1334,7 @@ if __name__ == "__main__":
 	parser.add_argument('--toml', help=f'Configuration toml file name like {OCR_FILTER}')
 	parser.add_argument('--file', help='Image file name to commit OCR or to get parameters: *.png')
 	parser.add_argument('--dir', help='Image dir of files: ./')
+	parser.add_argument('--nth', type=int, help='Image file number of files by wildcard(default: 1)')
 	parser.add_argument('--show', action='store_true', help='Show images to check')
 	parser.add_argument('--make', action='store_true', help=f'Force to make config(i.e. do not load config file like "{OCR_FILTER}.toml")')
 	parser.add_argument('--no-ocr', action='store_true', default=False, help='Do not execute OCR')
@@ -1353,19 +1354,22 @@ if __name__ == "__main__":
 			logger.info("Filter config in [%s] as %s" % (filter_toml_path, filter_config))
 			image_path_config = filter_config['image-path']
 			try:
-				image_dir = Path(image_path_config['dir']).expanduser() # home dir starts with tilde(~)
-			except KeyError:
 				image_dir = Path(args.dir).expanduser()
+			except TypeError:
+				try:
+					image_dir = Path(image_path_config['dir']).expanduser()
+				except KeyError:
+					raise ValueError("Error: Image dir is not specified with --dir option or not found in toml file as [image-path.dir]")
 			if not image_dir.exists():
 				raise ValueError("Error: image_dir not found: %s" % image_dir)
 			try:
-				image_filename = image_path_config[app_name]['filename']
-				logger.info("Image filename is set by toml file as %s" % image_filename)
-			except KeyError:
+				image_filename = Path(args.file).expanduser()
+				logger.info("Image filename is set by args as %s" % image_filename)
+			except TypeError:
 				try:
-					image_filename = args.file
-					logger.info("Image filename is set by args as %s" % image_filename)
-				except AttributeError:
+					image_filename = image_path_config[app_name]['filename']
+					logger.info("Image filename is set by toml file as %s" % image_filename)
+				except KeyError:
 					raise ValueError("Error: Image file name is not specified with --file option or not found in toml file as [image-path.%s]\nfilename='*_jp.co.taimee.png'" % app_name)
 			filename_path = Path(image_filename)
 			if '*' in filename_path.stem or '?' in filename_path.stem:
@@ -1378,8 +1382,8 @@ if __name__ == "__main__":
 				logger.info("Files: %s", file_list)
 				# sort by modified date descendingf
 				from os.path import getmtime
-				nth = 1
-				logger.info("Choosing the latest %d-th file.", nth)
+				nth = args.nth if args.nth else 1
+				logger.info("Choosing the %d-th file from the latest in %d files.", nth, len(file_list))
 				file_list.sort(key=getmtime, reverse=True)
 				image_filename = file_list[nth - 1].name
 				logger.info("Selected file: %s", image_filename)
