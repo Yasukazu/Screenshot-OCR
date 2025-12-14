@@ -1335,8 +1335,8 @@ if __name__ == "__main__":
 	parser.add_argument('--file', help='Image file name to commit OCR or to get parameters: *.png')
 	parser.add_argument('--dir', help='Image dir of files: ./')
 	parser.add_argument('--show', action='store_true', help='Show images to check')
-	parser.add_argument('--make', action='store_true', help='Force to make config(i.e. do not load config file like "{OCR_FILTER}.toml")')
-	parser.add_argument('--no-ocr', action='store_true', default=False, help='Execute OCR')
+	parser.add_argument('--make', action='store_true', help=f'Force to make config(i.e. do not load config file like "{OCR_FILTER}.toml")')
+	parser.add_argument('--no-ocr', action='store_true', default=False, help='Do not execute OCR')
 	args = parser.parse_args()
 	
 	app_name = args.app
