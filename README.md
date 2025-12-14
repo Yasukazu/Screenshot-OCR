@@ -163,3 +163,36 @@ c.ServerApp.allow_origin = '*'
 4. Paste a script (like `matplotlib_draw.py`) into a cell of the `ipynb` notebook.
 
 5. Run the cell by clicking the *run* button (right-edged triangle icon: `|>`) in the notebook(`*.ipynb`)'s top menu.
+
+## Current development concern:
+ - edge_detect/image_filter.py: 
+
+```python
+python edge_detect/image_filter.py --help
+```
+
+```text
+usage: image_filter.py [-h] [--app APP]
+                       [--toml TOML] [--file FILE]
+                       [--dir DIR] [--nth NTH]
+                       [--show] [--make]
+                       [--no-ocr]
+
+options:
+  -h, --help   show this help message and exit
+  --app APP    Application name: taimee, ...
+  --toml TOML  Configuration toml file name like
+               ocr-filter
+  --file FILE  Image file name to commit OCR or to
+               get parameters: *.png
+  --dir DIR    Image dir of files: ./
+  --nth NTH    Rank(default: 1) of files
+               descending sorted(the latest, the
+               first) by modified date as
+               wildcard(*, ?)
+  --show       Show images to check
+  --make       Force to make config(i.e. do not
+               load config file like "ocr-
+               filter.toml")
+  --no-ocr     Do not execute OCR
+```
