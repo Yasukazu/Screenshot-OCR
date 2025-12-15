@@ -433,7 +433,8 @@ class ShiftAreaParam(ImageAreaParam):
 		return cls.__class__.__name__
 
 
-	def check_image(cls, image: np.ndarray, image_check=False)-> tuple[int, int]:
+	@classmethod
+	def check_image(cls, image: np.ndarray, image_check:bool=False)-> tuple[int, int]:
 		'''returns (left_end, right_start)'''
 		# check if avatar circle at the left side of the area between the borders(1st and 2nd)
 		## scan vertical lines to find the horizontal range		 of the shape (expetcing as a black filled rectangle of left side flat)
@@ -491,8 +492,8 @@ class ShiftAreaParam(ImageAreaParam):
 		return x0, x'''
 
 	@classmethod
-	def from_image(cls, image: np.ndarray, offset_range: range, image_check=False) -> "ShiftAreaParam":
-		left, right = cls.check_image(image[offset_range.start:offset_range.stop, :], image_check)
+	def from_image(cls, image: np.ndarray, offset_range: range, image_check:bool=False) -> "ShiftAreaParam":
+		left, right = cls.check_image(image=image[offset_range.start:offset_range.stop, :], image_check=image_check)
 		return cls(y_offset=offset_range.start, height=offset_range.stop - offset_range.start, x_offset=left, width=right)
 
 
@@ -1324,10 +1325,10 @@ def do_show_check(msg, param, img):
 		cv2.imshow(f"{msg}::{param}", img)
 		cv2.waitKey(0)
 
-if __name__ == "__main__":
-	from argparse import ArgumentParser
-	# from dotenv import dotenv_values
-	import tomllib
+from argparse import ArgumentParser
+# from dotenv import dotenv_values
+import tomllib
+def main():
 	OCR_FILTER = "ocr-filter"
 	parser = ArgumentParser()
 	parser.add_argument('--app', default='taimee', help='Application name: taimee, ...')
@@ -1338,11 +1339,15 @@ if __name__ == "__main__":
 	parser.add_argument('--show', action='store_true', help='Show images to check')
 	parser.add_argument('--make', action='store_true', help=f'Force to make config(i.e. do not load config file like "{OCR_FILTER}.toml")')
 	parser.add_argument('--no-ocr', action='store_true', default=False, help='Do not execute OCR')
+	parser.add_argument('--ocr-conf', type=int, default=55, help='Confidence threshold for OCR')
+	parser.add_argument('--psm', type=int, default=6, help='PSM value for Tesseract')
 	args = parser.parse_args()
 	
 	app_name = args.app
 	filter_area_param_dict = {}
 	# image_config_filename = (args.file) #.resolve()Path
+	image_path_config = {}
+	filter_config = {}
 	if args.toml:
 		try: # if env_file.exists():
 			if not args.toml.endswith('.toml'):
@@ -1353,62 +1358,71 @@ if __name__ == "__main__":
 				filter_config = tomllib.load(f)
 			logger.info("Filter config in [%s] as %s" % (filter_toml_path, filter_config))
 			image_path_config = filter_config['image-path']
-			try:
-				image_dir = Path(args.dir).expanduser()
-			except TypeError:
-				try:
-					image_dir = Path(image_path_config['dir']).expanduser()
-				except KeyError:
-					raise ValueError("Error: Image dir is not specified with --dir option or not found in toml file as [image-path.dir]")
-			if not image_dir.exists():
-				raise ValueError("Error: image_dir not found: %s" % image_dir)
-			try:
-				image_filename = Path(args.file).expanduser()
-				logger.info("Image filename is set by args as %s" % image_filename)
-			except TypeError:
-				try:
-					image_filename = image_path_config[app_name]['filename']
-					logger.info("Image filename is set by toml file as %s" % image_filename)
-				except KeyError:
-					raise ValueError("Error: Image file name is not specified with --file option or not found in toml file as [image-path.%s]\nfilename='*_jp.co.taimee.png'" % app_name)
-			filename_path = Path(image_filename)
-			if '*' in filename_path.stem or '?' in filename_path.stem:
-				glob_path = Path(image_dir)
-				logger.info("Trying to expand filename with wildcard: %s\n In %s" % (image_filename, glob_path))
-				file_list = [f for f in glob_path.glob(image_filename) if f.is_file()]
-				if len(file_list) == 0:
-					raise ValueError("Error: No files found with wildcard: %s" % image_filename)
-				logger.info("%d file found", len(file_list))
-				logger.info("Files: %s", file_list)
-				# sort by modified date descendingf
-				from os.path import getmtime
-				nth = args.nth # if args.nth else 1
-				logger.info("Choosing the %d-%s file from the latest in %d files.", nth, "th" if nth > 3 else ("st", "nd", "rd")[nth - 1], len(file_list))
-				file_list.sort(key=getmtime, reverse=True)
-				image_filename = file_list[nth - 1].name
-				logger.info("Selected file: %s", image_filename)
-			image_path = Path(image_dir) / image_filename
-			if not image_path.exists():
-				raise ValueError("Error: i	mage_path not found: %s" % image_path)
-			image_fullpath = image_path.resolve()
-			try:
-				filter_area_param_dict = {} if args.make else filter_config[OCR_FILTER][app_name]
-			except KeyError:
-				filter_area_param_dict = {}
-				if not args.make:
-					logger.warning("KeyError: '%s' not found in %s", app_name, filter_config)
-		except KeyError as err:
-			raise ValueError("Error: key not found!\n%s" % err)
-		except FileNotFoundError as err:
-			raise ValueError("Error: file not found!\n%s" % err)
-		except tomllib.TOMLDecodeError as err:
-			raise ValueError("Error: failed to TOML decode!\n%s" % err)
+		except KeyError:
+			logger.info("KeyError: 'image-path' not found in %s", filter_config)
+		except FileNotFoundError:
+			logger.info("FileNotFoundError: %s not found", filter_toml_path)
+		except tomllib.TOMLDecodeError:
+			logger.info("TOMLDecodeError: %s is not a valid TOML file", filter_toml_path)
+	try:
+		image_dir = Path(args.dir).expanduser()
+	except TypeError:
+		try:
+			image_dir = Path(image_path_config['dir']).expanduser()
+		except KeyError:
+			raise ValueError("Error: Image dir is not specified with --dir option or not found in toml file as [image-path.dir]")
+	if not image_dir.exists():
+		raise ValueError("Error: image_dir not found: %s" % image_dir)
+	try:
+		image_filename = Path(args.file).expanduser()
+		logger.info("Image filename is set by args as %s" % image_filename)
+	except TypeError:
+		try:
+			image_filename = image_path_config[app_name]['filename']
+			logger.info("Image filename is set by toml file as %s" % image_filename)
+		except KeyError:
+			raise ValueError("Error: Image file name is not specified with --file option or not found in toml file as [image-path.%s]\nfilename='*_jp.co.taimee.png'" % app_name)
+	filename_path = Path(image_filename)
+	if '*' in filename_path.stem or '?' in filename_path.stem:
+		glob_path = Path(image_dir)
+		logger.info("Trying to expand filename with wildcard: %s\n In %s" % (image_filename, glob_path))
+		file_list = [f for f in glob_path.glob(str(filename_path)) if f.is_file()]
+		if len(file_list) == 0:
+			raise ValueError("Error: No files found with wildcard: %s" % image_filename)
+		logger.info("%d file found", len(file_list))
+		logger.info("Files: %s", file_list)
+		# sort by modified date descendingf
+		from os.path import getmtime
+		nth = args.nth # if args.nth else 1
+		logger.info("Choosing the %d-%s file from the latest in %d files.", nth, "th" if nth > 3 else ("st", "nd", "rd")[nth - 1], len(file_list))
+		file_list.sort(key=getmtime, reverse=True)
+		image_filename = file_list[nth - 1].name
+		logger.info("Selected file: %s", image_filename)
+	image_path = Path(image_dir) / image_filename
+	if not image_path.exists():
+		raise ValueError("Error: i	mage_path not found: %s" % image_path)
+	image_fullpath = image_path.resolve()
+	try:
+		filter_area_param_dict = {} if args.make else filter_config[OCR_FILTER][app_name]
+	except KeyError:
+		filter_area_param_dict = {}
+		if not args.make:
+			logger.warning("KeyError: '%s' not found in %s", app_name, filter_config)
+	'''except KeyError as err:
+		raise ValueError("Error: key not found!\n%s" % err)
+	except FileNotFoundError as err:
+		raise ValueError("Error: file not found!\n%s" % err)
+	except tomllib.TOMLDecodeError as err:
+		raise ValueError("Error: failed to TOML decode!\n%s" % err)'''
 	# else: raise ValueError("Image filter module test to extract parameter from an image file. Needs filespec.")
 	try:
 		image_fullpath
 	except NameError:
 		try:
 			image_fullpath = Path(args.dir) / args.file
+			if '*' in args.file or '?' in args.file:
+				glob_path = Path(image_dir)
+				logger.info("Trying to expand filename with wildcard: %s\n In %s" % (image_filename, glob_path))
 		except TypeError:
 			try:
 				image_fullpath = Path(args.file)
@@ -1434,14 +1448,19 @@ if __name__ == "__main__":
 		from tesseract_ocr import TesseractOCR, Output
 		ocr = TesseractOCR()
 		for k, area_param in taimee_filter.area_param_dict.items():
-			print(f"[ocr.{k.name}]")
+			ocr_name = f"ocr-{k.name}"
+			print(f"[{ocr_name}]")
 			for ocr_area in area_param.crop_image(taimee_filter.image, taimee_filter.y_margin):
 
-				ocr_result = ocr.exec(ocr_area, output_type=Output.DATAFRAME, psm=6)
+				ocr_result = ocr.exec(ocr_area, output_type=Output.DATAFRAME, psm=args.psm)
 				max_line = max(ocr_result['line_num'])
-				def textline(n, conf=55):
-					return ''.join(ocr_result[(ocr_result['line_num'] == n) & (ocr_result['conf'] > conf)]['text'])
-				ocr_text = '\n'.join([textline(r) for r in range(1, max_line + 1)])
+				def textline(n, conf=args.ocr_conf):
+					return ocr_result[(ocr_result['line_num'] == n) & (ocr_result['conf'] > conf)]# ['text'] # return ''.join(
+				df_list = []
+				for r in range(1, max_line + 1):
+					line = textline(r) 
+					df_list.append(line) # '\n'.join(line))
+				ocr_text = '\n'.join([''.join(df['text']) for df in df_list])
 				print(ocr_text)
 
 	if args.make:
@@ -1458,3 +1477,6 @@ HeadingAreaParam = [0, 111, 196, -1]
 ShiftAreaParam = [219, 267, 345, 373]
 BreaktimeAreaParam = [488, 224, 0, 720]
 PaystubAreaParam = [714, -1, 0, -1]'''
+
+if __name__ == "__main__":
+	main()
