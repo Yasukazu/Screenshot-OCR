@@ -1328,10 +1328,17 @@ def do_show_check(msg, param, img):
 from argparse import ArgumentParser
 # from dotenv import dotenv_values
 import tomllib
+
+class APP_NAME(Enum):
+	TAIMEE = 'taimee'
+
+	def __str__(self):
+		return self.value
+
 def main():
 	OCR_FILTER = "ocr-filter"
 	parser = ArgumentParser()
-	parser.add_argument('--app', default='taimee', help='Application name: taimee, ...')
+	parser.add_argument('--app', choices=APP_NAME, type=APP_NAME, help='Application name of the screenshot to execute OCR: ' + ', '.join([str(app) for app in APP_NAME]))
 	parser.add_argument('--toml', help=f'Configuration toml file name like {OCR_FILTER}')
 	parser.add_argument('--file', help='Image file name to commit OCR or to get parameters: *.png')
 	parser.add_argument('--dir', help='Image dir of files: ./')
@@ -1343,71 +1350,76 @@ def main():
 	parser.add_argument('--psm', type=int, default=6, help='PSM value for Tesseract')
 	args = parser.parse_args()
 	
-	app_name = args.app
 	filter_area_param_dict = {}
 	# image_config_filename = (args.file) #.resolve()Path
-	image_path_config = {}
-	filter_config = {}
-	if args.toml:
-		try: # if env_file.exists():
-			if not args.toml.endswith('.toml'):
-				args.toml += '.toml'
-			filter_toml = args.toml
-			filter_toml_path = Path(filter_toml).resolve()
-			with filter_toml_path.open('rb') as f:
-				filter_config = tomllib.load(f)
-			logger.info("Filter config in [%s] as %s" % (filter_toml_path, filter_config))
-			image_path_config = filter_config['image-path']
-		except KeyError:
-			logger.info("KeyError: 'image-path' not found in %s", filter_config)
-		except FileNotFoundError:
-			logger.info("FileNotFoundError: %s not found", filter_toml_path)
-		except tomllib.TOMLDecodeError:
-			logger.info("TOMLDecodeError: %s is not a valid TOML file", filter_toml_path)
+	filter_config_is_loaded = False
+	def get_filter_config(filter_config = {}):
+		nonlocal filter_config_is_loaded
+		if args.toml and not filter_config_is_loaded:
+			try: # if env_file.exists():
+				if not args.toml.endswith('.toml'):
+					args.toml += '.toml'
+				filter_toml_path = Path(args.toml) # .resolve()
+				with filter_toml_path.open('rb') as f:
+					filter_config |= tomllib.load(f)
+				logger.info("Loaded filter config in [%s]", filter_toml_path, filter_config)
+			except FileNotFoundError:
+				logger.info("FileNotFoundError in TOML")
+			except tomllib.TOMLDecodeError:
+				logger.info("Not a valid TOML file")
+			filter_config_is_loaded = True
+		return filter_config
+
+	if not(app_name := args.app):
+		sys.exit("Needs application name spec. by '--app' option.")
 	try:
 		image_dir = Path(args.dir).expanduser()
+		logger.info("Image directory is set by args as %s", image_dir)
 	except TypeError:
 		try:
-			image_dir = Path(image_path_config['dir']).expanduser()
+			image_dir = Path(get_filter_config()['image-path']['dir']).expanduser()
 		except KeyError:
-			raise ValueError("Error: Image dir is not specified with --dir option or not found in toml file as [image-path.dir]")
+			sys.exit("Error: Image dir is not specified with --dir option or not found in TOML file as [image-path.dir]")
 	if not image_dir.exists():
-		raise ValueError("Error: image_dir not found: %s" % image_dir)
+		raise ValueError("Error: image_dir does not exist: %s" % image_dir)
 	try:
-		image_filename = Path(args.file).expanduser()
-		logger.info("Image filename is set by args as %s" % image_filename)
+		image_file = Path(args.file).expanduser()
+		logger.info("Image filename is set by args as %s", image_file)
 	except TypeError:
 		try:
-			image_filename = image_path_config[app_name]['filename']
-			logger.info("Image filename is set by toml file as %s" % image_filename)
+			image_file = get_filter_config()['image-path'][app_name.value]['filename']
+			logger.info("Image filename is set by TOML file as %s", image_file)
 		except KeyError:
 			raise ValueError("Error: Image file name is not specified with --file option or not found in toml file as [image-path.%s]\nfilename='*_jp.co.taimee.png'" % app_name)
-	filename_path = Path(image_filename)
+	filename_path = Path(image_file)
 	if '*' in filename_path.stem or '?' in filename_path.stem:
 		glob_path = Path(image_dir)
-		logger.info("Trying to expand filename with wildcard: %s\n In %s" % (image_filename, glob_path))
+		logger.info("Trying to expand filename with wildcard: %s\n In %s", image_file, glob_path)
 		file_list = [f for f in glob_path.glob(str(filename_path)) if f.is_file()]
 		if len(file_list) == 0:
-			raise ValueError("Error: No files found with wildcard: %s" % image_filename)
-		logger.info("%d file found", len(file_list))
-		logger.info("Files: %s", file_list)
+			raise ValueError("Error: No files found with wildcard: %s" % image_file)
+		logger.info("%d file%s found", len(file_list), 's' if len(file_list) > 1 else '')
+		# logger.info("Files: %s", file_list)
 		# sort by modified date descendingf
-		from os.path import getmtime
-		nth = args.nth # if args.nth else 1
-		logger.info("Choosing the %d-%s file from the latest in %d files.", nth, "th" if nth > 3 else ("st", "nd", "rd")[nth - 1], len(file_list))
-		file_list.sort(key=getmtime, reverse=True)
-		image_filename = file_list[nth - 1].name
-		logger.info("Selected file: %s", image_filename)
-	image_path = Path(image_dir) / image_filename
+		if len(file_list) > 1:
+			from os.path import getmtime
+			nth = args.nth # if args.nth else 1
+			logger.info("Choosing the %d-%s file from the latest in %d files.", nth, "th" if nth > 3 else ("st", "nd", "rd")[nth - 1], len(file_list))
+			file_list.sort(key=getmtime, reverse=True)
+			image_file = file_list[nth - 1]
+			logger.info("Selected file: %s", image_file.name)
+		else:
+			image_file = file_list[0]
+	image_path = Path(image_dir) / image_file
 	if not image_path.exists():
-		raise ValueError("Error: i	mage_path not found: %s" % image_path)
+		raise ValueError("Error: image_path not found: %s" % image_path)
 	image_fullpath = image_path.resolve()
 	try:
-		filter_area_param_dict = {} if args.make else filter_config[OCR_FILTER][app_name]
+		filter_area_param_dict = {} if args.make else get_filter_config()[OCR_FILTER][app_name.value]
 	except KeyError:
 		filter_area_param_dict = {}
 		if not args.make:
-			logger.warning("KeyError: '%s' not found in %s", app_name, filter_config)
+			logger.warning("KeyError: '%s' not found in get_filter_config()", app_name)
 	'''except KeyError as err:
 		raise ValueError("Error: key not found!\n%s" % err)
 	except FileNotFoundError as err:
@@ -1415,19 +1427,19 @@ def main():
 	except tomllib.TOMLDecodeError as err:
 		raise ValueError("Error: failed to TOML decode!\n%s" % err)'''
 	# else: raise ValueError("Image filter module test to extract parameter from an image file. Needs filespec.")
-	try:
+	'''try:
 		image_fullpath
 	except NameError:
 		try:
 			image_fullpath = Path(args.dir) / args.file
 			if '*' in args.file or '?' in args.file:
 				glob_path = Path(image_dir)
-				logger.info("Trying to expand filename with wildcard: %s\n In %s" % (image_filename, glob_path))
+				logger.info("Trying to expand filename with wildcard: %s\n In %s" % (image_file, glob_path))
 		except TypeError:
 			try:
 				image_fullpath = Path(args.file)
 			except TypeError:
-				raise ValueError("Error: Image file name is not specified with --file option or not found in toml file as [image-path.%s]\nfilename='*_jp.co.taimee.png'" % app_name)
+				raise ValueError("Error: Image file name is not specified with --file option or not found in toml file as [image-path.%s]\nfilename='*_jp.co.taimee.png'" % app_name)'''
 	image = cv2.imread(str(image_fullpath), cv2.IMREAD_GRAYSCALE) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
 	if image is None:
 		raise ValueError("Error: Could not load image: %s" % image_fullpath)
