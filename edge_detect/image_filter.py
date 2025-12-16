@@ -1328,6 +1328,7 @@ def do_show_check(msg, param, img):
 from argparse import ArgumentParser
 # from dotenv import dotenv_values
 import tomllib
+from fnmatch import fnmatch
 
 class APP_NAME(Enum):
 	TAIMEE = 'taimee'
@@ -1338,10 +1339,10 @@ class APP_NAME(Enum):
 def main():
 	OCR_FILTER = "ocr-filter"
 	parser = ArgumentParser()
-	# parser.add_argument('files', nargs='+', help='Image files to commit OCR or to get parameters. Specify like: *.png')
+	parser.add_argument('files', nargs='+', help='Image files to commit OCR or to get parameters. Specify like: *.png')
 	parser.add_argument('--app', choices=APP_NAME, type=APP_NAME, help='Application name of the screenshot to execute OCR: ' + ', '.join([str(app) for app in APP_NAME]))
 	parser.add_argument('--toml', help=f'Configuration toml file name like {OCR_FILTER}')
-	parser.add_argument('--file', help='Image file name to commit OCR or to get parameters: *.png')
+	# parser.add_argument('--file', help='Image file name to commit OCR or to get parameters: *.png')
 	parser.add_argument('--dir', help='Image dir of files: ./')
 	parser.add_argument('--nth', type=int, default=1, help='Rank(default: 1) of files descending sorted(the latest, the first) by modified date as wildcard(*, ?)')
 	parser.add_argument('--show', action='store_true', help='Show images to check')
@@ -1350,7 +1351,9 @@ def main():
 	parser.add_argument('--ocr-conf', type=int, default=55, help='Confidence threshold for OCR')
 	parser.add_argument('--psm', type=int, default=6, help='PSM value for Tesseract')
 	args = parser.parse_args()
-	
+	if not args.files:
+		parser.print_help()
+		sys.exit(1)
 	filter_area_param_dict = {}
 	# image_config_filename = (args.file) #.resolve()Path
 	filter_config_is_loaded = False
@@ -1386,32 +1389,35 @@ def main():
 			raise ValueError("args.dir expanduser failed.")
 	if image_dir and not image_dir.exists():
 		raise ValueError("Error: image_dir does not exist: %s" % image_dir)
+	is_wildcard = False
 	try:
-		image_file = args.file or get_filter_config()['image-path'][app_name.value]['filename']
-		logger.info("Image filename is set by %s as: %s", 'args'if args.file else 'TOML', image_file)
-	except KeyError:
-		raise ValueError("Error: Image file name is not specified with --file option or not found in toml file as [image-path.%s]\nfilename='*_jp.co.taimee.png'" % app_name)
-	filename_path = Path(image_file)
-	if '*' in filename_path.stem or '?' in filename_path.stem:
-		glob_path = (Path(image_dir) / image_file) if image_dir else Path(image_file)
-		logger.info("Trying to expand filename with wildcard: %s\n In %s", image_file, glob_path)
-		file_list = [f for f in glob_path.glob(str(filename_path)) if f.is_file()]
+		image_file_pattern = get_filter_config()['image-path'][app_name.value]['filename']
+		logger.info("Image filename pattern is set by %s as: %s", args.toml, image_file_pattern)
+		for c in "*?[]":
+			if c in image_file_pattern:
+				is_wildcard = True
+				break
+		file_list = [Path(f) for f in args.files if fnmatch(f, image_file_pattern)] if is_wildcard else [Path(f) for f in args.files]
 		if len(file_list) == 0:
-			raise ValueError("Error: No files found with wildcard: %s" % image_file)
-		logger.info("%d file%s found", len(file_list), 's' if len(file_list) > 1 else '')
+			sys.exit("Error: No files found %s: %s" % ('with wildcard' if is_wildcard else 'without wildcard', image_file_pattern))
+	except KeyError:
+		file_list = [Path(f) for f in args.files]
+	logger.info("%d file%s found", len(file_list), 's' if len(file_list) > 1 else '')
+		# raise ValueError("Error: Image file name is not specified with --file option or not found in toml file as [image-path.%s]\nfilename='*_jp.co.taimee.png'" % app_name)
+	# filename_path = Path(image_file_pattern)
+#glob_path.glob(str(filename_path)) if f.is_file()]
 		# logger.info("Files: %s", file_list)
 		# sort by modified date descendingf
-		if len(file_list) > 1:
-			from os.path import getmtime
-			nth = args.nth # if args.nth else 1
-			logger.info("Choosing the %d-%s file from the latest in %d files.", nth, "th" if nth > 3 else ("st", "nd", "rd")[nth - 1], len(file_list))
-			file_list.sort(key=getmtime, reverse=True)
-			image_file = file_list[nth - 1]
-			logger.info("Selected file: %s", image_file.name)
-		else:
-			image_file = file_list[0]
+	if len(file_list) > 1:
+		from os.path import getmtime
+		nth = args.nth # if args.nth else 1
+		logger.info("Choosing the %d-%s file from the latest in %d files.", nth, "th" if nth > 3 else ("st", "nd", "rd")[nth - 1], len(file_list))
+		file_list.sort(key=getmtime, reverse=True)
+		image_file = file_list[nth - 1]
+		logger.info("Selected file: %s", image_file.name)
 	else:
-		image_file = filename_path
+		image_file = file_list[0]
+	# else: image_file = filename_path
 	if not image_file.exists():
 		raise ValueError("Error: image_file not found: %s" % image_file)
 	# image_fullpath = image_path.resolve()
