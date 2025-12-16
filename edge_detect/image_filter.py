@@ -1338,6 +1338,7 @@ class APP_NAME(Enum):
 def main():
 	OCR_FILTER = "ocr-filter"
 	parser = ArgumentParser()
+	# parser.add_argument('files', nargs='+', help='Image files to commit OCR or to get parameters. Specify like: *.png')
 	parser.add_argument('--app', choices=APP_NAME, type=APP_NAME, help='Application name of the screenshot to execute OCR: ' + ', '.join([str(app) for app in APP_NAME]))
 	parser.add_argument('--toml', help=f'Configuration toml file name like {OCR_FILTER}')
 	parser.add_argument('--file', help='Image file name to commit OCR or to get parameters: *.png')
@@ -1373,27 +1374,26 @@ def main():
 	if not(app_name := args.app):
 		sys.exit("Needs application name spec. by '--app' option.")
 	try:
-		image_dir = Path(args.dir).expanduser()
-		logger.info("Image directory is set by args as %s", image_dir)
-	except TypeError:
+		image_dir = args.dir or get_filter_config()['image-path']['dir']
+	except KeyError:
+		image_dir = None
+		# sys.exit("Error: Image dir is not specified with --dir option or not found in TOML file as [image-path.dir]"))
+	else:
 		try:
-			image_dir = Path(get_filter_config()['image-path']['dir']).expanduser()
-		except KeyError:
-			sys.exit("Error: Image dir is not specified with --dir option or not found in TOML file as [image-path.dir]")
-	if not image_dir.exists():
+			image_dir = Path(image_dir).expanduser()
+			logger.info("Image directory is expanded user by args as %s", image_dir)
+		except RuntimeError:
+			raise ValueError("args.dir expanduser failed.")
+	if image_dir and not image_dir.exists():
 		raise ValueError("Error: image_dir does not exist: %s" % image_dir)
 	try:
-		image_file = Path(args.file).expanduser()
-		logger.info("Image filename is set by args as %s", image_file)
-	except TypeError:
-		try:
-			image_file = get_filter_config()['image-path'][app_name.value]['filename']
-			logger.info("Image filename is set by TOML file as %s", image_file)
-		except KeyError:
-			raise ValueError("Error: Image file name is not specified with --file option or not found in toml file as [image-path.%s]\nfilename='*_jp.co.taimee.png'" % app_name)
+		image_file = args.file or get_filter_config()['image-path'][app_name.value]['filename']
+		logger.info("Image filename is set by %s as: %s", 'args'if args.file else 'TOML', image_file)
+	except KeyError:
+		raise ValueError("Error: Image file name is not specified with --file option or not found in toml file as [image-path.%s]\nfilename='*_jp.co.taimee.png'" % app_name)
 	filename_path = Path(image_file)
 	if '*' in filename_path.stem or '?' in filename_path.stem:
-		glob_path = Path(image_dir)
+		glob_path = (Path(image_dir) / image_file) if image_dir else Path(image_file)
 		logger.info("Trying to expand filename with wildcard: %s\n In %s", image_file, glob_path)
 		file_list = [f for f in glob_path.glob(str(filename_path)) if f.is_file()]
 		if len(file_list) == 0:
@@ -1410,10 +1410,11 @@ def main():
 			logger.info("Selected file: %s", image_file.name)
 		else:
 			image_file = file_list[0]
-	image_path = Path(image_dir) / image_file
-	if not image_path.exists():
-		raise ValueError("Error: image_path not found: %s" % image_path)
-	image_fullpath = image_path.resolve()
+	else:
+		image_file = filename_path
+	if not image_file.exists():
+		raise ValueError("Error: image_file not found: %s" % image_file)
+	# image_fullpath = image_path.resolve()
 	try:
 		filter_area_param_dict = {} if args.make else get_filter_config()[OCR_FILTER][app_name.value]
 	except KeyError:
@@ -1440,9 +1441,9 @@ def main():
 				image_fullpath = Path(args.file)
 			except TypeError:
 				raise ValueError("Error: Image file name is not specified with --file option or not found in toml file as [image-path.%s]\nfilename='*_jp.co.taimee.png'" % app_name)'''
-	image = cv2.imread(str(image_fullpath), cv2.IMREAD_GRAYSCALE) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
+	image = cv2.imread(str(image_file), cv2.IMREAD_GRAYSCALE) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
 	if image is None:
-		raise ValueError("Error: Could not load image: %s" % image_fullpath)
+		raise ValueError("Error: Could not load image: %s" % image_file)
 	filter_param_dict: dict[ImageAreaParamName, dict[str, str|float|None]] = {}
 	if not args.make:
 		for key in ImageAreaParamName:
