@@ -1336,13 +1336,15 @@ class APP_NAME(Enum):
 	def __str__(self):
 		return self.value
 
+from configargparse import ArgParser, TomlConfigParser
+
 def main():
 	OCR_FILTER = "ocr-filter"
-	parser = ArgumentParser()
+	parser = ArgParser(default_config_files=[f"{OCR_FILTER}.toml"], config_file_parser_class=TomlConfigParser(['image-path', 'ocr-filter'])) # ArgumentParser()
 	parser.add_argument('files', nargs='+', help='Image files to commit OCR or to get parameters. Specify like: *.png')
 	parser.add_argument('--app', choices=APP_NAME, type=APP_NAME, help='Application name of the screenshot to execute OCR: ' + ', '.join([str(app) for app in APP_NAME]))
 	parser.add_argument('--toml', help=f'Configuration toml file name like {OCR_FILTER}')
-	# parser.add_argument('--file', help='Image file name to commit OCR or to get parameters: *.png')
+	# parser.add_argument('--file', help='Image file name to commit OCR or to get parameters. Wildcards are allowed like: *.png')
 	parser.add_argument('--dir', help='Image dir of files: ./')
 	parser.add_argument('--nth', type=int, default=1, help='Rank(default: 1) of files descending sorted(the latest, the first) by modified date as wildcard(*, ?)')
 	parser.add_argument('--show', action='store_true', help='Show images to check')
