@@ -1331,7 +1331,8 @@ import tomllib
 from fnmatch import fnmatch
 
 class APP_NAME(Enum):
-	TAIMEE = 'taimee'
+	TAIMEE = '_jp.co.taimee'
+	MERCARI = '_jp.mercari.work.android'
 
 	def __str__(self):
 		return self.value
@@ -1340,11 +1341,12 @@ def main():
 	OCR_FILTER = "ocr-filter"
 	parser = ArgumentParser()
 	parser.add_argument('files', nargs='+', help='Image files to commit OCR or to get parameters. Specify like: *.png')
-	parser.add_argument('--app', choices=APP_NAME, type=APP_NAME, help='Application name of the screenshot to execute OCR: ' + ', '.join([str(app) for app in APP_NAME]))
+	parser.add_argument('--app', choices=APP_NAME, type=APP_NAME, help=f'Application name of the screenshot to execute OCR: {APP_NAME}')
 	parser.add_argument('--toml', help=f'Configuration toml file name like {OCR_FILTER}')
 	# parser.add_argument('--file', help='Image file name to commit OCR or to get parameters: *.png')
 	parser.add_argument('--dir', help='Image dir of files: ./')
 	parser.add_argument('--nth', type=int, default=1, help='Rank(default: 1) of files descending sorted(the latest, the first) by modified date as wildcard(*, ?)')
+	parser.add_argument('--glob-max', type=int, default=60, help='Pick up file max as pattern found in TOML')
 	parser.add_argument('--show', action='store_true', help='Show images to check')
 	parser.add_argument('--make', action='store_true', help=f'Force to make config(i.e. do not load config file like "{OCR_FILTER}.toml")')
 	parser.add_argument('--no-ocr', action='store_true', default=False, help='Do not execute OCR')
@@ -1368,14 +1370,44 @@ def main():
 					filter_config |= tomllib.load(f)
 				logger.info("Loaded filter config in [%s]", filter_toml_path, filter_config)
 			except FileNotFoundError:
-				logger.info("FileNotFoundError in TOML")
+				logger.warning("FileNotFoundError in TOML")
 			except tomllib.TOMLDecodeError:
-				logger.info("Not a valid TOML file")
+				logger.warning("Not a valid TOML file")
 			filter_config_is_loaded = True
 		return filter_config
 
+	file_list_loaded = False
+	def get_files(file_list=[]):
+		if len(args.files) == 1:
+			return args.files[0]
+		else:
+			nonlocal file_list_loaded
+			if not file_list_loaded:
+				_file_list = [(Path(f), Path(f).stat().st_mtime) for f in args.files]
+				file_list += [m[0] for m in sorted(_file_list, key=lambda f: f[1], reverse=True)]
+				file_list_loaded = True
+				logger.info("Loaded file_list of %d files: %s", len(file_list), file_list)
+			return file_list
+
 	if not(app_name := args.app):
-		sys.exit("Needs application name spec. by '--app' option.")
+		class NoAppNameException(Exception):
+			"""No application name specified"""
+			pass
+		try:
+			if (_file:=get_files()[(args.nth - 1) or 0]): # try to extract app name from file name
+				for nm in APP_NAME:
+					if (_file.stem.endswith(nm.value)):
+						app_name = nm
+						break
+				if not app_name:
+					raise NoAppNameException()	
+				print(f"Application name is set as {app_name.name} from file name: {_file.name}")
+			else:
+				raise NoAppNameException()
+		except IndexError:
+			sys.exit(f"Index out of range : specified by args.nth: {args.nth}")
+		except NoAppNameException:
+			sys.exit("Needs application name spec. by '--app' option or file name(ending with {}).".format([nm.value for nm in APP_NAME]))
 	try:
 		image_dir = args.dir or get_filter_config()['image-path']['dir']
 	except KeyError:
@@ -1386,34 +1418,52 @@ def main():
 			image_dir = Path(image_dir).expanduser()
 			logger.info("Image directory is expanded user by args as %s", image_dir)
 		except RuntimeError:
-			raise ValueError("args.dir expanduser failed.")
+			raise ValueError(f"image_dir expanduser failed:{image_dir}")
+
 	if image_dir and not image_dir.exists():
 		raise ValueError("Error: image_dir does not exist: %s" % image_dir)
-	is_wildcard = False
-	try:
-		image_file_pattern = get_filter_config()['image-path'][app_name.value]['filename']
-		logger.info("Image filename pattern is set by %s as: %s", args.toml, image_file_pattern)
-		for c in "*?[]":
-			if c in image_file_pattern:
-				is_wildcard = True
-				break
-		file_list = [Path(f) for f in args.files if fnmatch(f, image_file_pattern)] if is_wildcard else [Path(f) for f in args.files]
-		if len(file_list) == 0:
-			sys.exit("Error: No files found %s: %s" % ('with wildcard' if is_wildcard else 'without wildcard', image_file_pattern))
-	except KeyError:
-		file_list = [Path(f) for f in args.files]
-	logger.info("%d file%s found", len(file_list), 's' if len(file_list) > 1 else '')
+
+	if not get_files():
+		try:
+			image_file_pattern = get_filter_config()['image-path'][app_name.value]['filename']
+			logger.info("Image filename pattern is set by %s as: %s", args.toml, image_file_pattern)
+			is_wildcard = False
+			for c in "*?[]":
+				if c in image_file_pattern:
+					is_wildcard = True
+					break
+			if is_wildcard:
+				_file_list = []
+				search_path = Path(args.dir) / image_file_pattern if args.dir else Path(image_file_pattern)
+				for n, match_f in enumerate(search_path.glob(image_file_pattern)):
+					_file_list.append(match_f)
+					if n > args.glob_max:
+						logger.warning("Exceeded glob_max: %d", args.glob_max)
+						break
+				if len(_file_list) == 0:
+					sys.exit("Error: No files found %s: %s" % ('with wildcard' if is_wildcard else 'without wildcard', image_file_pattern))
+				file_list = sorted(_file_list, key=lambda f: f.stat().st_mtime, reverse=True)
+		except KeyError:
+			sys.exit("No files found in toml file as [image-path.%s]\nfilename='*_jp.co.taimee.png'" % app_name.name)
+		'''else:
+			logger.info("%d file%s found from %s", len(file_list), 's' if len(file_list) > 1 else '', image_file_pattern)
+			from os.path import getmtime
+			nth = args.nth # if args.nth else 1
+			logger.info("Choosing the %d-%s file from the latest in %d files.", nth, "th" if nth > 3 else ("st", "nd", "rd")[nth - 1], len(file_list))
+			file_list.sort(key=getmtime, reverse=True)'''
+	else:
+		file_list = get_files() # [Path(f) for f in args.files]
 		# raise ValueError("Error: Image file name is not specified with --file option or not found in toml file as [image-path.%s]\nfilename='*_jp.co.taimee.png'" % app_name)
 	# filename_path = Path(image_file_pattern)
 #glob_path.glob(str(filename_path)) if f.is_file()]
 		# logger.info("Files: %s", file_list)
 		# sort by modified date descendingf
 	if len(file_list) > 1:
-		from os.path import getmtime
-		nth = args.nth # if args.nth else 1
-		logger.info("Choosing the %d-%s file from the latest in %d files.", nth, "th" if nth > 3 else ("st", "nd", "rd")[nth - 1], len(file_list))
-		file_list.sort(key=getmtime, reverse=True)
-		image_file = file_list[nth - 1]
+		try:
+			image_file = file_list[args.nth - 1]
+		except IndexError:
+			image_file = file_list[0]
+			logger.warning("Index out of range by args.nth: %d, so selected the latest file", args.nth)
 		logger.info("Selected file: %s", image_file.name)
 	else:
 		image_file = file_list[0]
@@ -1461,15 +1511,19 @@ def main():
 		ImageAreaParamName.breaktime:filter_area_param_dict.get('breaktime'),
 		ImageAreaParamName.shift:filter_area_param_dict.get('shift'),
 		ImageAreaParamName.paystub:filter_area_param_dict.get('paystub'),'''
-	taimee_filter = TaimeeFilter(image=image, param_dict=filter_param_dict, show_check=args.show)
+	match app_name:
+		case APP_NAME.TAIMEE:
+			app_filter = TaimeeFilter(image=image, param_dict=filter_param_dict, show_check=args.show)
+		case APP_NAME.MERCARI:
+			raise ValueError("Error: app_name is not supported: %s" % app_name)
 	# print(f"{para.__class__.__name__:para.as_toml() for para in taimee_filter.area_param_list}")
 	if not args.no_ocr:
 		from tesseract_ocr import TesseractOCR, Output
 		ocr = TesseractOCR()
-		for k, area_param in taimee_filter.area_param_dict.items():
+		for k, area_param in app_filter.area_param_dict.items():
 			ocr_name = f"ocr-{k.name}"
 			print(f"[{ocr_name}]")
-			for ocr_area in area_param.crop_image(taimee_filter.image, taimee_filter.y_margin):
+			for ocr_area in area_param.crop_image(app_filter.image, app_filter.y_margin):
 
 				ocr_result = ocr.exec(ocr_area, output_type=Output.DATAFRAME, psm=args.psm)
 				max_line = max(ocr_result['line_num'])
@@ -1485,7 +1539,7 @@ def main():
 	if args.make:
 		from io import StringIO
 		sio = StringIO()
-		for key, param in taimee_filter.area_param_dict.items():
+		for key, param in app_filter.area_param_dict.items():
 			param.to_toml(sio)
 		sio.seek(0)
 		print("[ocr-filter.taimee]")	
