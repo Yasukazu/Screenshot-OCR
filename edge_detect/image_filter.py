@@ -1335,13 +1335,15 @@ class APP_NAME(Enum):
 	MERCARI = '_jp.mercari.work.android'
 
 	def __str__(self):
-		return self.value
+		return self.name.lower()
+
+app_name_to_enum = {n.name.lower(): n for n in APP_NAME}
 
 def main():
 	OCR_FILTER = "ocr-filter"
 	parser = ArgumentParser()
-	parser.add_argument('files', nargs='+', help='Image files to commit OCR or to get parameters. Specify like: *.png')
-	parser.add_argument('--app', choices=[n.name.lower() for n in APP_NAME], type=APP_NAME, help=f'Application name of the screenshot to execute OCR:(specify in TOML filename =: {[f"*{n.value}.png" for n in APP_NAME]})')
+	parser.add_argument('files', nargs='*', help='Image files to commit OCR or to get parameters. Specify like: *.png')
+	parser.add_argument('--app', choices=[n.name.lower() for n in APP_NAME], type=str, help=f'Application name of the screenshot to execute OCR:(specify in TOML filename =: {[f"*{n.value}.png" for n in APP_NAME]})') # 
 	parser.add_argument('--toml', help=f'Configuration toml file name like {OCR_FILTER}')
 	# parser.add_argument('--file', help='Image file name to commit OCR or to get parameters: *.png')
 	parser.add_argument('--dir', help='Image dir of files: ./')
@@ -1353,9 +1355,7 @@ def main():
 	parser.add_argument('--ocr-conf', type=int, default=55, help='Confidence threshold for OCR')
 	parser.add_argument('--psm', type=int, default=6, help='PSM value for Tesseract')
 	args = parser.parse_args()
-	if not args.files:
-		parser.print_help()
-		sys.exit(1)
+	# if not args.files: parser.print_help() sys.exit(1)
 	filter_area_param_dict = {}
 	# image_config_filename = (args.file) #.resolve()Path
 	filter_config_is_loaded = False
@@ -1389,12 +1389,15 @@ def main():
 				logger.info("Loaded file_list of %d files: %s", len(file_list), file_list)
 			return file_list
 
-	if not(app_name := args.app):
-		class NoAppNameException(Exception):
-			"""No application name specified"""
-			pass
+	class NoAppNameException(Exception):
+		"""No application name specified"""
+		pass
+	try:
+		app_name = app_name_to_enum[args.app]
+	except (TypeError, KeyError):
 		try:
 			if (_file:=get_files()[(args.nth - 1) or 0]): # try to extract app name from file name
+				app_name = None
 				for nm in APP_NAME:
 					if (_file.stem.endswith(nm.value)):
 						app_name = nm
@@ -1425,7 +1428,11 @@ def main():
 
 	if not get_files():
 		try:
-			image_file_pattern = get_filter_config()['image-path'][app_name.value]['filename']
+			image_path_dir = Path(get_filter_config()['image-path']['dir']).expanduser()
+		except KeyError:
+			image_path_dir = Path()
+		try:
+			image_file_pattern = get_filter_config()['image-path'][str(app_name)]['filename']
 			logger.info("Image filename pattern is set by %s as: %s", args.toml, image_file_pattern)
 			is_wildcard = False
 			for c in "*?[]":
@@ -1434,8 +1441,8 @@ def main():
 					break
 			if is_wildcard:
 				_file_list = []
-				search_path = Path(args.dir) / image_file_pattern if args.dir else Path(image_file_pattern)
-				for n, match_f in enumerate(search_path.glob(image_file_pattern)):
+				# search_path = (image_path_dir) / image_file_pattern if image_path_dir else Path(image_file_pattern)
+				for n, match_f in enumerate(image_path_dir.glob(image_file_pattern)):
 					_file_list.append(match_f)
 					if n > args.glob_max:
 						logger.warning("Exceeded glob_max: %d", args.glob_max)
