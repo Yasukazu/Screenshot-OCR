@@ -1341,7 +1341,7 @@ def main():
 	OCR_FILTER = "ocr-filter"
 	parser = ArgumentParser()
 	parser.add_argument('files', nargs='+', help='Image files to commit OCR or to get parameters. Specify like: *.png')
-	parser.add_argument('--app', choices=APP_NAME, type=APP_NAME, help=f'Application name of the screenshot to execute OCR: {APP_NAME}')
+	parser.add_argument('--app', choices=[n.name.lower() for n in APP_NAME], type=APP_NAME, help=f'Application name of the screenshot to execute OCR:(specify in TOML filename =: {[f"*{n.value}.png" for n in APP_NAME]})')
 	parser.add_argument('--toml', help=f'Configuration toml file name like {OCR_FILTER}')
 	# parser.add_argument('--file', help='Image file name to commit OCR or to get parameters: *.png')
 	parser.add_argument('--dir', help='Image dir of files: ./')
