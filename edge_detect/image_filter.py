@@ -1399,24 +1399,23 @@ def main():
 		"""No application name specified"""
 		pass
 
-	try:
-		app_name = app_name_to_enum[args.app]
-	except (TypeError, KeyError):
+	if args.app is not None:
 		try:
-			if (_file:=get_args_files()[args.nth - 1]): # try to extract app name from file name
-				app_name = None
-				for nm in APP_NAME:
-					if (_file.stem.endswith(nm.value)):
-						app_name = nm
-						break
-				if not app_name:
-					raise NoAppNameException()	
-				print(f"Application name is set as {app_name.name} from file name: {_file.name}")
-			else:
-				raise NoAppNameException()
-		except IndexError:
-			sys.exit(f"Index out of range : specified by args.nth: {args.nth}")
-		except NoAppNameException:
+			app_name = app_name_to_enum[args.app]
+		except KeyError:
+			sys.exit(f"No such app name:{args.app}")
+	else:
+		try: # try to extract app name from file name
+			_file = get_args_files()[args.nth - 1]
+			app_name = None
+			for nm in APP_NAME:
+				if _file.stem.endswith(nm.value):
+					app_name = nm
+					break
+			if not app_name:
+				raise NoAppNameException()	
+			print(f"Application name is set as {app_name.name} from file name: {_file.name}")
+		except (IndexError, NoAppNameException):
 			sys.exit("Needs application name spec. by '--app' option or file name(ending with {}).".format([nm.value for nm in APP_NAME]))
 	try:
 		image_path_dir = Path(args.dir or get_filter_config()['image-path']['dir'])
@@ -1431,7 +1430,7 @@ def main():
 		image_path_dir = None
 
 	if image_path_dir and not image_path_dir.exists():
-		sys.exit("Image_dir does not exist: %s" % image_path_dir)
+		sys.exit("Image dir. does not exist: %s" % image_path_dir)
 
 	if not get_args_files() and args.toml:
 		try:
@@ -1452,6 +1451,8 @@ def main():
 						break
 				if len(_file_list) == 0:
 					sys.exit("Error: No files found %s: %s" % ('with wildcard' if is_wildcard else 'without wildcard', image_file_pattern))
+				else:
+					logger.info("%d files are listed.", len(_file_list))
 				file_list = sorted(_file_list, key=lambda f: f.stat().st_mtime, reverse=True)
 		except KeyError:
 			sys.exit("No files found in toml file as [image-path.%s]\nfilename='*_jp.co.taimee.png'" % str(app_name))
@@ -1468,18 +1469,15 @@ def main():
 #glob_path.glob(str(filename_path)) if f.is_file()]
 		# logger.info("Files: %s", file_list)
 		# sort by modified date descendingf
-	if len(file_list) > 1:
-		try:
-			image_file = file_list[args.nth - 1]
-		except IndexError:
-			# image_file = file_list[0]
-			sys.exit(f"Index out of range for file_list by {args.nth=}")
-		logger.info("Selected file: %s", image_file.name)
-	else:
-		image_file = file_list[0]
+	try:
+		image_file = file_list[args.nth - 1]
+	except IndexError:
+		# image_file = file_list[0]
+		sys.exit(f"Index out of range for file_list by {args.nth=}")
+	logger.info("Selected file: %s", image_file.name)
 	# else: image_file = filename_path
 	if not image_file.exists():
-		raise ValueError("Error: image_file not found: %s" % image_file)
+		sys.exit("Error: image_file not found: %s" % image_file)
 	# image_fullpath = image_path.resolve()
 	try:
 		filter_area_param_dict = {} if args.make else get_filter_config()[OCR_FILTER][str(app_name)]
