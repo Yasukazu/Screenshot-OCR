@@ -72,13 +72,7 @@ class KeyUnit(Enum):
 	TIME = 2
 	MONEY = 3
 
-'''
-class ImageAreaParamName(Enum):
-	heading = HeadingAreaParam
-	shift = ShiftAreaParam
-	breaktime = BreaktimeAreaParam
-	paystub = PaystubAreaParam
-	salary = SalaryAreaParam'''
+
 class ImageDictKey(Enum):
 	y_offset = (KeyUnit.PIXEL, 0)
 	heading = (KeyUnit.TEXT, 0)  # heading"
@@ -472,19 +466,7 @@ def find_horizontal_borders(
 		arr = image[y, edge_len:-edge_len]
 		if np.all(arr == border_color.value):
 			return True
-		'''changes = arr[1:] != arr[:-1]
-		change_indices = np.where(changes)[0] + 1
-		if not(change_indices.size):
-			return None
-		all_indices = np.concatenate(([0], change_indices, [len(arr)]))
-		run_lengths = np.diff(all_indices)
-		run_values = arr[all_indices[:-1]]
-		for n, (k, g) in enumerate(groupby(arr.tolist())):
-			if n >= 3:
-				return None # raise NotBorder()
-			if k == border_color.value and len(list(g)) >= border_len:
-				return True
-		return False'''
+
 
 	y = -1
 	# border_lines = []
@@ -714,12 +696,7 @@ def find_border(
 			break
 
 	last_white = list(reversed(b_list)).index(border_found)
-	"""last_white = 0
-	for i in reversed(range(len(b_color_list))):
-		if b_color_list[i].value == -(border_color.value):
-			last_white += 1
-		else:
-			break"""
+
 	return y, len(b_list) - last_white
 
 
