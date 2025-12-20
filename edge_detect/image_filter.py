@@ -223,7 +223,7 @@ class HeadingAreaParam(ImageAreaParam):
 		return "LABEL TEXT START"
 
 
-from taimee_filter import TaimeeHeadingAreaParam
+# from taimee_filter import TaimeeHeadingAreaParam
 
 def get_center_run_length(line: Sequence[int]) -> int | None:
 	kg_list = [(k, len(list(g))) for n, (k, g) in enumerate(groupby(line)) if n < 3]
@@ -551,12 +551,14 @@ def _plot(images: Sequence[np.ndarray]):
 		plt.show()
 
 class TaimeeFilter:
+
 	THRESHOLD = 237
 	BORDERS_MIN = 3
 	BORDERS_MAX = 4
 	LABEL_TEXT_START = 'この店'
 
 	def __init__(self, image: np.ndarray | Path | str, param_dict: dict[ImageAreaParamName, Sequence[int]] = {}, show_check=False):
+		from taimee_filter import TaimeeHeadingAreaParam
 		self.image = image if isinstance(image, np.ndarray) else cv2.imread(str(image))
 		if self.image is None:
 			raise ValueError("Failed to load image")
