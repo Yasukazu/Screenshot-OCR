@@ -1,3 +1,4 @@
+from typing import TypedDict
 from io import IOBase
 from enum import IntEnum, auto
 from dataclasses import field
@@ -1337,7 +1338,12 @@ class APP_NAME(Enum):
 	def __str__(self):
 		return self.name.lower()
 
-app_name_to_enum = {n.name.lower(): n for n in APP_NAME}
+class AppNameToEnum(TypedDict):
+	key: str
+	value: APP_NAME
+
+app_name_to_enum: AppNameToEnum 
+app_name_to_enum = {n.name.lower(): n for n in APP_NAME}  # type: ignore
 
 def main():
 	OCR_FILTER = "ocr-filter"
@@ -1377,7 +1383,7 @@ def main():
 		return filter_config
 
 	file_list_loaded = False
-	def get_files(file_list=[]):
+	def get_args_files(file_list=[]):
 		if len(args.files) == 1:
 			return args.files[0]
 		else:
@@ -1392,11 +1398,12 @@ def main():
 	class NoAppNameException(Exception):
 		"""No application name specified"""
 		pass
+
 	try:
 		app_name = app_name_to_enum[args.app]
 	except (TypeError, KeyError):
 		try:
-			if (_file:=get_files()[(args.nth - 1) or 0]): # try to extract app name from file name
+			if (_file:=get_args_files()[args.nth - 1]): # try to extract app name from file name
 				app_name = None
 				for nm in APP_NAME:
 					if (_file.stem.endswith(nm.value)):
@@ -1412,25 +1419,21 @@ def main():
 		except NoAppNameException:
 			sys.exit("Needs application name spec. by '--app' option or file name(ending with {}).".format([nm.value for nm in APP_NAME]))
 	try:
-		image_dir = args.dir or get_filter_config()['image-path']['dir']
-	except KeyError:
-		image_dir = None
-		# sys.exit("Error: Image dir is not specified with --dir option or not found in TOML file as [image-path.dir]"))
-	else:
-		try:
-			image_dir = Path(image_dir).expanduser()
-			logger.info("Image directory is expanded user by args as %s", image_dir)
-		except RuntimeError:
-			raise ValueError(f"image_dir expanduser failed:{image_dir}")
+		image_path_dir = Path(args.dir or get_filter_config()['image-path']['dir'])
+		logger.info("Image directory is set as %s by %s", image_path_dir, 'args.dir' if args.dir else 'config.image_path.dir')
+		if str(image_path_dir)[0] == '~':
+			try:
+				image_path_dir = image_path_dir.expanduser()
+			except RuntimeError:
+				sys.exit("image_dir.expanduser() failed!")
+			logger.info("Image directory is expanded user by args as %s", image_path_dir)
+	except (TypeError, KeyError):
+		image_path_dir = None
 
-	if image_dir and not image_dir.exists():
-		raise ValueError("Error: image_dir does not exist: %s" % image_dir)
+	if image_path_dir and not image_path_dir.exists():
+		sys.exit("Image_dir does not exist: %s" % image_path_dir)
 
-	if not get_files():
-		try:
-			image_path_dir = Path(get_filter_config()['image-path']['dir']).expanduser()
-		except KeyError:
-			image_path_dir = Path()
+	if not get_args_files() and args.toml:
 		try:
 			image_file_pattern = get_filter_config()['image-path'][str(app_name)]['filename']
 			logger.info("Image filename pattern is set by %s as: %s", args.toml, image_file_pattern)
@@ -1451,7 +1454,7 @@ def main():
 					sys.exit("Error: No files found %s: %s" % ('with wildcard' if is_wildcard else 'without wildcard', image_file_pattern))
 				file_list = sorted(_file_list, key=lambda f: f.stat().st_mtime, reverse=True)
 		except KeyError:
-			sys.exit("No files found in toml file as [image-path.%s]\nfilename='*_jp.co.taimee.png'" % app_name.name)
+			sys.exit("No files found in toml file as [image-path.%s]\nfilename='*_jp.co.taimee.png'" % str(app_name))
 		'''else:
 			logger.info("%d file%s found from %s", len(file_list), 's' if len(file_list) > 1 else '', image_file_pattern)
 			from os.path import getmtime
@@ -1459,7 +1462,7 @@ def main():
 			logger.info("Choosing the %d-%s file from the latest in %d files.", nth, "th" if nth > 3 else ("st", "nd", "rd")[nth - 1], len(file_list))
 			file_list.sort(key=getmtime, reverse=True)'''
 	else:
-		file_list = get_files() # [Path(f) for f in args.files]
+		file_list = get_args_files() # [Path(f) for f in args.files]
 		# raise ValueError("Error: Image file name is not specified with --file option or not found in toml file as [image-path.%s]\nfilename='*_jp.co.taimee.png'" % app_name)
 	# filename_path = Path(image_file_pattern)
 #glob_path.glob(str(filename_path)) if f.is_file()]
@@ -1469,8 +1472,8 @@ def main():
 		try:
 			image_file = file_list[args.nth - 1]
 		except IndexError:
-			image_file = file_list[0]
-			logger.warning("Index out of range by args.nth: %d, so selected the latest file", args.nth)
+			# image_file = file_list[0]
+			sys.exit(f"Index out of range for file_list by {args.nth=}")
 		logger.info("Selected file: %s", image_file.name)
 	else:
 		image_file = file_list[0]
@@ -1479,31 +1482,12 @@ def main():
 		raise ValueError("Error: image_file not found: %s" % image_file)
 	# image_fullpath = image_path.resolve()
 	try:
-		filter_area_param_dict = {} if args.make else get_filter_config()[OCR_FILTER][app_name.value]
+		filter_area_param_dict = {} if args.make else get_filter_config()[OCR_FILTER][str(app_name)]
 	except KeyError:
 		filter_area_param_dict = {}
 		if not args.make:
 			logger.warning("KeyError: '%s' not found in get_filter_config()", app_name)
-	'''except KeyError as err:
-		raise ValueError("Error: key not found!\n%s" % err)
-	except FileNotFoundError as err:
-		raise ValueError("Error: file not found!\n%s" % err)
-	except tomllib.TOMLDecodeError as err:
-		raise ValueError("Error: failed to TOML decode!\n%s" % err)'''
-	# else: raise ValueError("Image filter module test to extract parameter from an image file. Needs filespec.")
-	'''try:
-		image_fullpath
-	except NameError:
-		try:
-			image_fullpath = Path(args.dir) / args.file
-			if '*' in args.file or '?' in args.file:
-				glob_path = Path(image_dir)
-				logger.info("Trying to expand filename with wildcard: %s\n In %s" % (image_file, glob_path))
-		except TypeError:
-			try:
-				image_fullpath = Path(args.file)
-			except TypeError:
-				raise ValueError("Error: Image file name is not specified with --file option or not found in toml file as [image-path.%s]\nfilename='*_jp.co.taimee.png'" % app_name)'''
+
 	image = cv2.imread(str(image_file), cv2.IMREAD_GRAYSCALE) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
 	if image is None:
 		raise ValueError("Error: Could not load image: %s" % image_file)
@@ -1513,7 +1497,7 @@ def main():
 			try:
 				filter_param_dict[key] = filter_area_param_dict[key.name]
 			except KeyError:
-				filter_param_dict[key] = None
+				filter_param_dict[key] = {}
 		'''ImageAreaParamName.heading:filter_area_param_dict.get('heading'),
 		ImageAreaParamName.breaktime:filter_area_param_dict.get('breaktime'),
 		ImageAreaParamName.shift:filter_area_param_dict.get('shift'),
@@ -1522,9 +1506,11 @@ def main():
 		case APP_NAME.TAIMEE:
 			app_filter = TaimeeFilter(image=image, param_dict=filter_param_dict, show_check=args.show)
 		case APP_NAME.MERCARI:
-			raise ValueError("Error: app_name is not supported: %s" % app_name)
+			sys.exit("Error: this app_name is not yet implemented: %s" % app_name)
+		case _:
+			sys.exit("Unknown app_name : %s" % app_name)
 	# print(f"{para.__class__.__name__:para.as_toml() for para in taimee_filter.area_param_list}")
-	if not args.no_ocr:
+	if not args.no_ocr and app_filter is not None:
 		from tesseract_ocr import TesseractOCR, Output
 		ocr = TesseractOCR()
 		for k, area_param in app_filter.area_param_dict.items():
