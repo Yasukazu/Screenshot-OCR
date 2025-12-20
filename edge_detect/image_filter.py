@@ -909,7 +909,7 @@ def main():
 	parser.add_argument('--nth', type=int, default=1, help='Rank(default: 1) of files descending sorted(the latest, the first) by modified date as wildcard(*, ?)')
 	parser.add_argument('--glob-max', type=int, default=60, help='Pick up file max as pattern found in TOML')
 	parser.add_argument('--show', action='store_true', help='Show images to check')
-	parser.add_argument('--make', action='store_true', help=f'Force to make config(i.e. do not load config file like "{OCR_FILTER}.toml")')
+	parser.add_argument('--make', help=f'Force to make config(i.e. this arg. makes not to load a config file like "{OCR_FILTER}.toml")')
 	parser.add_argument('--no-ocr', action='store_true', default=False, help='Do not execute OCR')
 	parser.add_argument('--ocr-conf', type=int, default=55, help='Confidence threshold for OCR')
 	parser.add_argument('--psm', type=int, default=6, help='PSM value for Tesseract')
@@ -1061,11 +1061,21 @@ def main():
 		case _:
 			sys.exit("Unknown app_name : %s" % app_name)
 	# print(f"{para.__class__.__name__:para.as_toml() for para in taimee_filter.area_param_list}")
+	from tomlkit import dump, TOMLDocument, table, comment, nl
 	if not args.no_ocr and app_filter is not None:
 		from tesseract_ocr import TesseractOCR, Output
 		ocr = TesseractOCR()
+		doc = TOMLDocument()
+		doc.add(comment("ocr-filter"))
+		doc.add(nl())
+		doc.add(comment(image_file.name))
+		doc.add(nl())
 		for k, area_param in app_filter.area_param_dict.items():
 			ocr_name = f"ocr-{k.name}"
+			area_tbl = table()
+			area_tbl.add(comment(ocr_name))
+			area_tbl.add(nl())
+
 			print(f"[{ocr_name}]")
 			for ocr_area in area_param.crop_image(app_filter.image, app_filter.y_margin):
 
@@ -1081,13 +1091,21 @@ def main():
 				print(ocr_text)
 
 	if args.make:
-		from io import StringIO
-		sio = StringIO()
-		for key, param in app_filter.area_param_dict.items():
-			param.to_toml(sio)
-		sio.seek(0)
-		print("[ocr-filter.taimee]")	
-		print(sio.read())
+		make_path = Path(args.make + '.toml') if not args.make.endswith('.toml') else Path(args.make)
+		if make_path.exists():
+			try:
+				yn = input(f"File {make_path} already exists. Overwrite? (Yes/No)")[0].lower()
+			except (IndexError, EOFError, KeyboardInterrupt):
+				yn = 'n'
+			if yn != 'y':
+				sys.exit("Error: make file already exists: %s" % make_path)
+		with make_path.open('w') as wf: # dump(doc, wf)
+		# from io import StringIO sio = StringIO()
+			for key, param in app_filter.area_param_dict.items():
+				param.to_toml(wf)
+		# sio.seek(0)
+		# print("[ocr-filter.taimee]")	
+		# print(sio.read())
 	# --toml ocr-filter
 	'''[ocr-filter.taimee]
 HeadingAreaParam = [0, 111, 196, -1]
