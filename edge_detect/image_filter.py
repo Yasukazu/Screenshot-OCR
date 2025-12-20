@@ -904,12 +904,12 @@ def main():
 	parser.add_argument('files', nargs='*', help='Image files to commit OCR or to get parameters. Specify like: *.png')
 	parser.add_argument('--app', choices=[n.name.lower() for n in APP_NAME], type=str, help=f'Application name of the screenshot to execute OCR:(specify in TOML filename =: {[f"*{n.value}.png" for n in APP_NAME]})') # 
 	parser.add_argument('--toml', help=f'Configuration toml file name like {OCR_FILTER}')
-	# parser.add_argument('--file', help='Image file name to commit OCR or to get parameters: *.png')
+	parser.add_argument('--save', help='Output path to save OCR text of the image file as TOML format into the image file name extention as ".ocr-<app_name>.toml"')
 	parser.add_argument('--dir', help='Image dir of files: ./')
 	parser.add_argument('--nth', type=int, default=1, help='Rank(default: 1) of files descending sorted(the latest, the first) by modified date as wildcard(*, ?)')
 	parser.add_argument('--glob-max', type=int, default=60, help='Pick up file max as pattern found in TOML')
 	parser.add_argument('--show', action='store_true', help='Show images to check')
-	parser.add_argument('--make', help=f'Force to make config(i.e. this arg. makes not to load a config file like "{OCR_FILTER}.toml")')
+	parser.add_argument('--make', help=f'make config. from image(i.e. this arg. makes not to load a config file like "{OCR_FILTER}.toml")')
 	parser.add_argument('--no-ocr', action='store_true', default=False, help='Do not execute OCR')
 	parser.add_argument('--ocr-conf', type=int, default=55, help='Confidence threshold for OCR')
 	parser.add_argument('--psm', type=int, default=6, help='PSM value for Tesseract')
@@ -967,7 +967,7 @@ def main():
 					break
 			if not app_name:
 				raise NoAppNameException()	
-			print(f"Application name is set as {app_name.name} from file name: {_file.name}")
+			logger.info("Application name is set as '%s' from file name:%s", app_name.name, _file.name)
 		except (IndexError, NoAppNameException):
 			sys.exit("Needs application name spec. by '--app' option or file name(ending with {}).".format([nm.value for nm in APP_NAME]))
 	try:
@@ -1053,31 +1053,31 @@ def main():
 		ImageAreaParamName.breaktime:filter_area_param_dict.get('breaktime'),
 		ImageAreaParamName.shift:filter_area_param_dict.get('shift'),
 		ImageAreaParamName.paystub:filter_area_param_dict.get('paystub'),'''
-	match app_name:
-		case APP_NAME.TAIMEE:
-			app_filter = TaimeeFilter(image=image, param_dict=filter_param_dict, show_check=args.show)
-		case APP_NAME.MERCARI:
-			sys.exit("Error: this app_name is not yet implemented: %s" % app_name)
-		case _:
-			sys.exit("Unknown app_name : %s" % app_name)
-	# print(f"{para.__class__.__name__:para.as_toml() for para in taimee_filter.area_param_list}")
-	from tomlkit import dump, TOMLDocument, table, comment, nl
-	if not args.no_ocr and app_filter is not None:
-		from tesseract_ocr import TesseractOCR, Output
-		ocr = TesseractOCR()
-		doc = TOMLDocument()
-		doc.add(comment("ocr-filter"))
-		doc.add(nl())
-		doc.add(comment(image_file.name))
-		doc.add(nl())
-		for k, area_param in app_filter.area_param_dict.items():
-			ocr_name = f"ocr-{k.name}"
-			area_tbl = table()
-			area_tbl.add(comment(ocr_name))
-			area_tbl.add(nl())
 
-			print(f"[{ocr_name}]")
-			for ocr_area in area_param.crop_image(app_filter.image, app_filter.y_margin):
+	# print(f"{para.__class__.__name__:para.as_toml() for para in taimee_filter.area_param_list}")
+	if not args.no_ocr:
+		match app_name:
+			case APP_NAME.TAIMEE:
+				app_filter = TaimeeFilter(image=image, param_dict=filter_param_dict, show_check=args.show)
+			case APP_NAME.MERCARI:
+				sys.exit("Error: this app_name is not yet implemented: %s" % app_name)
+			case _:
+				sys.exit("Unknown app_name : %s" % app_name)
+		from tesseract_ocr import TesseractOCR, Output
+		from tomli_w import dumps
+		# from tomlkit import TOMLDocument, table, comment, nl, dump
+		ocr = TesseractOCR()
+		doc_dict = {}
+		# doc = TOMLDocument() doc.add(comment("ocr-result")) doc.add(nl()) doc.add(comment(image_file.name)) doc.add(nl())
+		for k, area_param in app_filter.area_param_dict.items():
+			area_name = f"ocr-{k.name}"
+			# area_tbl = table() area_tbl.add(comment(area_name)) area_tbl.add(nl())
+			area_dict = {}
+			pg_list = []
+
+			for pg, ocr_area in enumerate(area_param.crop_image(app_filter.image, app_filter.y_margin)):
+				pg_str = f"p{pg+1}"
+				print(f"[{area_name}.{pg_str}]")
 
 				ocr_result = ocr.exec(ocr_area, output_type=Output.DATAFRAME, psm=args.psm)
 				max_line = max(ocr_result['line_num'])
@@ -1087,23 +1087,50 @@ def main():
 				for r in range(1, max_line + 1):
 					line = textline(r) 
 					df_list.append(line) # '\n'.join(line))
-				ocr_text = '\n'.join([''.join(df['text']) for df in df_list])
+				ocr_text = ['\t'.join(df['text']) for df in df_list]
 				print(ocr_text)
+				pg_list.append(ocr_text)
+				# area_tbl.add(comment(pg_str)) area_tbl.add(nl()) area_tbl.add(comment(ocr_text)) area_tbl.add(nl())
+			if len(pg_list) > 1:
+				for p, pg in enumerate(pg_list):
+					pg_str = f"p{p+1}"
+					area_dict[pg_str] = '\n'.join(pg) 
+				doc_dict[area_name] = area_dict
+			else:
+				doc_dict[area_name] = '\n'.join(pg_list[0])
+			# doc.add(area_tbl)
+		if args.save:
+			save_path = Path(args.save) / (image_file.stem + '.ocr-' + app_name.name.lower() + '.toml')
+			if save_path.exists():
+				yn = input(f"\nThe file path to save the image file area configuration:'{save_path}'\n already exists. Overwrite?(Enter 'Yes' or 'Affirmative' if you want to overwrite)").lower()
+				if yn != 'yes' and yn != 'affirmative':
+					sys.exit("Exit since the user not accept overwrite of: %s" % save_path)
+			toml_text = dumps(doc_dict, multiline_strings=True)
+			with save_path.open('w') as wf:
+				wf.write(toml_text)
+			logger.info("Saved toml file into: %s\n%s", save_path, toml_text)
 
+#
 	if args.make:
 		make_path = Path(args.make + '.toml') if not args.make.endswith('.toml') else Path(args.make)
 		if make_path.exists():
 			try:
-				yn = input(f"File {make_path} already exists. Overwrite? (Yes/No)")[0].lower()
+				yn = input(f"\nThe file path to save the image file area configuration:'{make_path}'\n already exists. Overwrite?(Enter 'Yes' or 'Affirmative' if you want to overwrite)").lower()
 			except (IndexError, EOFError, KeyboardInterrupt):
 				yn = 'n'
-			if yn != 'y':
-				sys.exit("Error: make file already exists: %s" % make_path)
+			if yn != 'yes' and yn != 'affirmative':
+				sys.exit("Exit since the user not accept overwrite of: %s" % make_path)
+		from io import StringIO
+		sio = StringIO()
 		with make_path.open('w') as wf: # dump(doc, wf)
-		# from io import StringIO sio = StringIO()
+			label = f"[ocr-filter.{str(app_name)}]"
+			print(label, file=wf)
+			print(f"[ocr-filter.{label}]", file=wf)
 			for key, param in app_filter.area_param_dict.items():
 				param.to_toml(wf)
-		# sio.seek(0)
+				sio.write(param.as_toml() + '\n')
+		sio.seek(0)
+		logger.info("Image area parameters are saved into %s\nas: %s", make_path, sio.read())
 		# print("[ocr-filter.taimee]")	
 		# print(sio.read())
 	# --toml ocr-filter
