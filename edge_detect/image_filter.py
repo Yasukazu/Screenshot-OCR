@@ -142,7 +142,7 @@ class ImageAreaParam(TOMLDataclass):
 	def as_toml(self, **kwargs):
 		name = kwargs.get('name', '').strip()
 		name_str = f".{name}" if name else ""
-		class_name = self.get_class_name()
+		class_name = self.__class__.__name__ # get_class_name()
 		class_name_without_area_param = class_name[:-len("AreaParam")]
 		class_name_node = to_snake(class_name_without_area_param)
 		underscore = class_name_node.rfind("_")
