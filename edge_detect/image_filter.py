@@ -2,7 +2,6 @@ from typing import TypedDict
 from io import IOBase
 from enum import IntEnum, auto
 from dataclasses import field
-from collections import deque
 from pathlib import Path
 from typing import Iterator, Sequence, NamedTuple, Optional, Sequence
 from dataclasses import dataclass
@@ -24,7 +23,6 @@ import numpy as np
 from numpy import ndarray
 import matplotlib.pyplot as plt
 from inspect import isclass
-from itertools import groupby
 from fancy_dataclass import TOMLDataclass
 
 from near_bunch import NearBunch, NearBunchException, NoBunchException
@@ -263,9 +261,10 @@ class ShiftAreaParam(ImageAreaParam):
 			if not (runlen:= get_center_run_length(image[:, x].tolist())):
 				return
 			for x0 in range(x, 0, -1):
-				runlen = None
+				# runlen = None
 				line = image[:, x0].tolist()
-				if (runlen:= get_center_run_length(line)) < 0:
+				runlen = get_center_run_length(line)
+				if runlen is not None and runlen < 0:
 					return x0
 		# left = trim_left()
 		def both_side_diff() -> int:
@@ -549,248 +548,6 @@ def _plot(images: Sequence[np.ndarray]):
 		for n, image in enumerate(images):
 			ax[n].imshow(image)
 		plt.show()
-
-class TaimeeFilter:
-
-	THRESHOLD = 237
-	BORDERS_MIN = 3
-	BORDERS_MAX = 4
-	LABEL_TEXT_START = 'この店'
-
-	def __init__(self, image: np.ndarray | Path | str, param_dict: dict[ImageAreaParamName, Sequence[int]] = {}, show_check=False):
-		from taimee_filter import TaimeeHeadingAreaParam
-		self.image = image if isinstance(image, np.ndarray) else cv2.imread(str(image))
-		if self.image is None:
-			raise ValueError("Failed to load image")
-		self.params = param_dict
-		bin_image = cv2.threshold(self.image, self.THRESHOLD, 255, cv2.THRESH_BINARY)[1]
-
-		# find borders as bunches
-		border_offset_list: deque[tuple[int, int]] = deque()
-		# border_offset_list: deque[BorderOffset] = deque()
-
-		# _border_offset_list: list[BorderOffset] = []
-		'''with-margin / without-margin
-			margin
-		 0 HL
-			header
-		 1 HL
-			shift
-		 2 HL
-			breaktime
-		 3 HL
-		'''
-		# last_offset = 0
-		n = -1
-		for n, (b, o) in enumerate(get_horizontal_border_bunches(bin_image, min_bunch=3, offset_list=border_offset_list)):
-			# if n == 0: y_margin = b.elems[-1] + 1
-					# last_b_end = b.elems[-1]
-				# elif n == 1: horizontal_border_offset_list.append(BunchOffset(b, b.elems[0] - 1))
-			if n == 3:
-				break
-				# last_offset += b.elems[-1] + 1
-
-
-		margin_area = border_offset_list.popleft()
-		y_margin = border_offset_list[0][0]
-		bin_image = bin_image[y_margin:, :]
-		border_offset_array = np.array(border_offset_list)
-		del(border_offset_list)
-		border_offset_array -= y_margin # border_offsets[0][0]
-		border_offset_ranges = [range(t, p) for t, p in border_offset_array.tolist()]
-		'''if __debug__:
-			canvas = bin_image.copy()
-			canvas[:, 0:4] = 255
-			for n, rg in enumerate(border_offset_ranges):
-				canvas[rg.start:rg.stop, n] = 0
-			_plot([canvas])'''
-		self.y_margin = y_margin
-
-		# self.y_origin = y_origin = border_offsets[0][1]
-		heading_area_figure_parts = {}
-		try:
-			heading_area_param = TaimeeHeadingAreaParam(*param_dict[ImageAreaParamName.heading])
-		except (KeyError, TypeError):
-			heading_area_param = TaimeeHeadingAreaParam.from_image(bin_image[:border_offset_ranges[0].stop, :], figure_parts=heading_area_figure_parts)
-
-		if show_check:
-			show_image = self.image[self.y_margin + heading_area_param.y_offset:self.y_margin + border_offset_ranges[0].stop + heading_area_param.height, heading_area_param.x_offset:]
-			do_show_check("heading_area", heading_area_param, show_image)
-		self.area_param_dict: dict[ImageAreaParamName, ImageAreaParam] = {ImageAreaParamName.heading: heading_area_param}
-		# get shift area
-		try:
-			area_param = ShiftAreaParam(*param_dict[ImageAreaParamName.shift])
-		except (KeyError, TypeError):
-			area_range = border_offset_ranges[1] # list[0].elems[-1] + 1
-			# y_origin = border_offset_list[1].elems[0]
-			# scan_image = bin_image[area_range.start:area_range.stop, :]
-			area_param = ShiftAreaParam.from_image(bin_image, offset_range=area_range, image_check=show_check)
-		if show_check:
-			area_image = bin_image[area_param.y_offset:area_param.y_offset + area_param.height, :]
-			do_show_check("shift_area", area_param, area_image)
-		self.area_param_dict[ImageAreaParamName.shift] = area_param
-		# get breaktime area
-		try:
-			area_param = BreaktimeAreaParam(*param_dict[ImageAreaParamName.breaktime])
-		except (KeyError, TypeError):
-			area_range = border_offset_ranges[2]
-			# y_origin = border_offset_list[2].elems[0]
-			area_param = BreaktimeAreaParam(y_offset=area_range.start, height=area_range.stop - area_range.start) # y_origin - area_top)
-		if show_check:
-			area_image = bin_image[area_param.y_offset:area_param.y_offset + area_param.height, :]
-			do_show_check("breaktime area", area_param, area_image)
-		self.area_param_dict[ImageAreaParamName.breaktime] = area_param
-		# get paystub area
-		try:
-			area_param = PaystubAreaParam(*param_dict[ImageAreaParamName.paystub])
-		except (KeyError, TypeError):
-			# area_range = border_offset_ranges[3] # elems[-1] + 1
-			area_param = PaystubAreaParam(y_offset=border_offset_ranges[-1].stop)
-		if show_check:
-			area_image = bin_image[area_param.y_offset:, :]
-			do_show_check("paystub area", area_param, area_image)
-		self.area_param_dict[ImageAreaParamName.paystub] = area_param
-		if show_check:
-			cv2.destroyAllWindows()
-		
-	def extract_heading(self, params: dict[ImageDictKey, tuple[int, int]] | None = None, seek_button_shape: bool = False, button_text: Optional[list[str]] = None) -> ImageAreaParam|tuple[ImageAreaParam, str]:
-		'''Return: (ypos, height, x_start)
-		Use with self.y_offset like image[self.y_offset: self.y_offset + height, x_start:]'''
-		if len(self.distant_array) == 0:
-			raise ValueError("No nearby borders found")
-		if self.y_origin >= self.distant_array[0]:
-			raise ValueError("Y offset is not less than non-nearby array first element")
-		heading_area = bin_image[self.y_origin:self.distant_array[0] + self.y_origin, :].copy()
-		for y in self.horizontal_lines:
-			if y >= heading_area.shape[0]:
-				break
-			heading_area[y, :] = 255
-		xpos = self.get_heading_avatar_end_xpos(heading_area, remove_borders=False)
-		# scan button like shape from bottom
-		if seek_button_shape or (button_text is not None):
-			heading_h, heading_w = heading_area.shape[:2]
-			button_w_min = heading_w // 3
-			def get_line(line: Sequence[int]):
-				for (k, g) in groupby(line):
-					if k == 0 and (w:=len(list(g))) >= button_w_min:
-						return w
-			def get_hline(y: int):
-				for n, (k, g) in enumerate(groupby(heading_area[y, :].tolist())):
-					if n == 3 and k == 0 and (w:=len(list(g))) >= button_w_min:
-						return w
-			button_bottom_line = None
-			for y in range(heading_h - 1, 0, -1):
-				if (w:=get_line(heading_area[y, :].tolist())):
-					button_bottom_line = w
-					break
-			if not button_bottom_line:
-				raise ValueError("No button found in heading bottom area!")
-			heading_area[0, :] = 255
-			y2 = -1
-			bg_found = False
-			for y2 in range(y, 0, -1):
-				if np.all(heading_area[y2, xpos:] == 255):
-					bg_found = True
-					break
-			if not bg_found:
-				raise ValueError("No bg above button shape!")
-			button_area = heading_area[y2:y, xpos:]
-			cv2.imshow("Button area", button_area)
-			cv2.waitKey(0)
-			# find contours of the button
-			contours, _ = cv2.findContours(button_area, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-			contour = contours[0]
-			x, y, w, h = cv2.boundingRect(contour)
-			button_area_copy = button_area.copy()
-			cv2.rectangle(button_area_copy, (x, y), (x + w, y + h), 0, 2)
-			cv2.imshow("Button area and its bounding rect", button_area_copy)
-			cv2.waitKey(0)
-			print(f"Bottom Shape's bounding rectangle size is:: height: {h}, width: {w} ")
-			h_area_copy = heading_area.copy()
-			cv2.rectangle(h_area_copy, (xpos + x, y2), (xpos + x2, y), (0, 0, 0), 2)
-			cv2.imshow("Heading area bottom shape", h_area_copy)	
-			cv2.waitKey(0)
-			# button_text: str | None = None
-			if button_text is not None:
-				from tesseract_ocr import TesseractOCR, Output
-				ocr = TesseractOCR()
-				ocr_result = ocr.exec(heading_area[y2:y, xpos:], output_type=Output.DATAFRAME, psm=7)
-				button_text += list(ocr_result[ocr_result['conf'] > 50]['text'])
-				# print(f"OCR Result text: {ocr_text}")
-
-			assert np.any(heading_area[y2 + 1, :] != 255)
-			button_top_line = get_line(heading_area[y2 + 1,:].tolist()) # length
-			if abs(button_top_line - button_bottom_line) > 10:
-				raise ValueError(f"Button shape is not top-bottom symmetrical! top: {button_top_line}, bottom: {button_bottom_line}")	
-			'''cv2.imshow("Heading area bottom shape", heading_area[y2+1:y+1, xpos:])	
-			cv2.waitKey(0)'''
-			# try to find button width
-			button_band = heading_area[y2+1:y+1, xpos:]
-			shape_w = button_band.shape[1]
-			black_found = False
-			for x in range(shape_w):
-				if np.any(button_band[:, x] != 255):
-					black_found = True
-					break
-			if not black_found:
-				raise ValueError("No valid shape found (3)")
-			bg_found = False
-			for x2 in range(x, shape_w):
-				if np.all(button_band[:, x2] == 255):
-					bg_found = True
-					break
-			if not bg_found:
-				raise ValueError("No valid shape found (4)")
-			print(f"Button Shape's rectangle size is:: height: {y - y2}, width: {x2 - x} ")
-			print(f"and it's position is:: from heading area top: {y2}, from left: {xpos + x}")
-			assert (y + 2 ) > (y2 - 1)
-			assert (x2 + 1) > (x - 1)
-			button_rect = button_band[:, x:x2]
-			# cv2.imshow("Heading shape area ", shape_band)	
-			cv2.imshow("Heading area bottom shape rect", button_rect)	
-			cv2.waitKey(0)
-
-
-		new_params = ImageAreaParam(0, y2, xpos)#, -1)
-		if params is not None:
-			params[ImageDictKey.heading] = new_params
-		self.params = params
-		return new_params
-
-		
-
-		
-	@classmethod
-	def get_heading_avatar_end_xpos(cls, image: np.ndarray, min_width: int = 8, 		borders: list[int] | None =None, remove_borders: bool = False)->int:
-		height, width = image.shape[:2]
-
-		# Remove horizontal borders from the image to simplify processing
-		if remove_borders:
-			image = image.copy()
-			if borders is None:
-				for y in (find_horizontal_borders(image)):
-					image[y, :] = 255
-			else:
-				for y in borders:
-					image[y, :] = 255
-
-		px = -1
-		for px in range(width):
-			v_line = image[:, px]
-			if np.any(v_line == 0):
-				break
-		if px == width:
-			raise ValueError("Not enough valid width(%d) for the heading!" % width)
-		# 2 pass the shape
-		x = -1
-		for x in range(px + 1, width):
-			v_line = image[:, x]
-			if np.all(v_line == 255):
-				break
-		if x < min_width:
-			raise ValueError("Not enough valid width(%d) for the heading!" % x)
-		return x
-
 @dataclass
 class BinaryImage:
 	given_image: ndarray | Path | str
@@ -1164,6 +921,7 @@ app_name_to_enum: AppNameToEnum
 app_name_to_enum = {n.name.lower(): n for n in APP_NAME}  # type: ignore
 
 def main():
+	from taimee_filter import TaimeeFilter
 	OCR_FILTER = "ocr-filter"
 	parser = ArgumentParser()
 	parser.add_argument('files', nargs='*', help='Image files to commit OCR or to get parameters. Specify like: *.png')
