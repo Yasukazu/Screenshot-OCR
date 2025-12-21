@@ -1069,16 +1069,15 @@ def main():
 		ocr = TesseractOCR()
 		doc_dict = {}
 		# doc = TOMLDocument() doc.add(comment("ocr-result")) doc.add(nl()) doc.add(comment(image_file.name)) doc.add(nl())
+		print(f"# {image_file.name=}")
 		for k, area_param in app_filter.area_param_dict.items():
 			area_name = f"ocr-{k.name}"
 			# area_tbl = table() area_tbl.add(comment(area_name)) area_tbl.add(nl())
 			area_dict = {}
 			pg_list = []
-
+			print(f"[{area_name}]")
 			for pg, ocr_area in enumerate(area_param.crop_image(app_filter.image, app_filter.y_margin)):
 				pg_str = f"p{pg+1}"
-				print(f"[{area_name}.{pg_str}]")
-
 				ocr_result = ocr.exec(ocr_area, output_type=Output.DATAFRAME, psm=args.psm)
 				max_line = max(ocr_result['line_num'])
 				def textline(n, conf=args.ocr_conf):
@@ -1087,8 +1086,8 @@ def main():
 				for r in range(1, max_line + 1):
 					line = textline(r) 
 					df_list.append(line) # '\n'.join(line))
-				ocr_text = ['\t'.join(df['text']) for df in df_list]
-				print(ocr_text)
+				ocr_text = [' '.join(df['text']) for df in df_list]
+				print(f"{pg_str}={ocr_text}")
 				pg_list.append(ocr_text)
 				# area_tbl.add(comment(pg_str)) area_tbl.add(nl()) area_tbl.add(comment(ocr_text)) area_tbl.add(nl())
 			if len(pg_list) > 1:
