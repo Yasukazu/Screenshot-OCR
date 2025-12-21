@@ -172,27 +172,33 @@ python edge_detect/image_filter.py --help
 ```
 
 ```text
-usage: image_filter.py [-h] [--app APP]
-                       [--toml TOML] [--file FILE]
-                       [--dir DIR] [--nth NTH]
-                       [--show] [--make]
-                       [--no-ocr]
+usage: image_filter.py [-h] [--app {taimee,mercari}] [--toml TOML] [--save SAVE]
+                       [--dir DIR] [--nth NTH] [--glob-max GLOB_MAX] [--show]
+                       [--make MAKE] [--no-ocr] [--ocr-conf OCR_CONF] [--psm PSM]
+                       [files ...]
+
+positional arguments:
+  files                 Image files to commit OCR or to get parameters. Specify
+                        like: *.png
 
 options:
-  -h, --help   show this help message and exit
-  --app APP    Application name: taimee, ...
-  --toml TOML  Configuration toml file name like
-               ocr-filter
-  --file FILE  Image file name to commit OCR or to
-               get parameters: *.png
-  --dir DIR    Image dir of files: ./
-  --nth NTH    Rank(default: 1) of files
-               descending sorted(the latest, the
-               first) by modified date as
-               wildcard(*, ?)
-  --show       Show images to check
-  --make       Force to make config(i.e. do not
-               load config file like "ocr-
-               filter.toml")
-  --no-ocr     Do not execute OCR
+  -h, --help            show this help message and exit
+  --app {taimee,mercari}
+                        Application name of the screenshot to execute
+                        OCR:(specify in TOML filename =: ['*_jp.co.taimee.png',
+                        '*_jp.mercari.work.android.png'])
+  --toml TOML           Configuration toml file name like ocr-filter
+  --save SAVE           Output path to save OCR text of the image file as TOML
+                        format into the image file name extention as
+                        ".ocr-<app_name>.toml"
+  --dir DIR             Image dir of files: ./
+  --nth NTH             Rank(default: 1) of files descending sorted(the latest,
+                        the first) by modified date as wildcard(*, ?)
+  --glob-max GLOB_MAX   Pick up file max as pattern found in TOML
+  --show                Show images to check
+  --make MAKE           make config. from image(i.e. this arg. makes not to load
+                        a config file like "ocr-filter.toml")
+  --no-ocr              Do not execute OCR
+  --ocr-conf OCR_CONF   Confidence threshold for OCR
+  --psm PSM             PSM value for Tesseract
 ```
