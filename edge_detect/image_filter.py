@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from enum import Enum
 import sys
 
+from tomlkit import TOMLDocument
+
 cwd = Path(__file__).resolve().parent
 sys.path.append(str(cwd.parent))
 
@@ -884,6 +886,7 @@ import tomllib
 from fnmatch import fnmatch
 
 class APP_NAME(Enum):
+	''' name of app: value is stem end '''
 	TAIMEE = '_jp.co.taimee'
 	MERCARI = '_jp.mercari.work.android'
 
@@ -897,6 +900,16 @@ class AppNameToEnum(TypedDict):
 app_name_to_enum: AppNameToEnum 
 app_name_to_enum = {n.name.lower(): n for n in APP_NAME}  # type: ignore
 
+class MainError(ValueError):
+	''' base error of main '''
+	def __init__(self, msg: str):
+		self.msg = msg
+
+class ConfigError(MainError):
+	''' Bad config. '''
+	def __init__(self, msg: str):
+		self.msg = msg
+
 def main():
 	from taimee_filter import TaimeeFilter
 	OCR_FILTER = "ocr-filter"
@@ -909,31 +922,35 @@ def main():
 	parser.add_argument('--nth', type=int, default=1, help='Rank(default: 1) of files descending sorted(the latest, the first) by modified date as wildcard(*, ?)')
 	parser.add_argument('--glob-max', type=int, default=60, help='Pick up file max as pattern found in TOML')
 	parser.add_argument('--show', action='store_true', help='Show images to check')
-	parser.add_argument('--make', help=f'make config. from image(i.e. this arg. makes not to load a config file like "{OCR_FILTER}.toml")')
+	parser.add_argument('--make', action='store_true', help=f'make config. from image(i.e. this arg. makes not to load a config file like "{OCR_FILTER}.toml")')
 	parser.add_argument('--no-ocr', action='store_true', default=False, help='Do not execute OCR')
 	parser.add_argument('--ocr-conf', type=int, default=55, help='Confidence threshold for OCR')
 	parser.add_argument('--psm', type=int, default=6, help='PSM value for Tesseract')
+	parser.add_argument('--ini', default='image-filter.ini', help='Configuration ini file default:"image-filter.ini"')
 	args = parser.parse_args()
 	# if not args.files: parser.print_help() sys.exit(1)
 	filter_area_param_dict = {}
 	# image_config_filename = (args.file) #.resolve()Path
-	filter_config_is_loaded = False
-	def get_filter_config(filter_config = {}):
-		nonlocal filter_config_is_loaded
-		if args.toml and not filter_config_is_loaded:
+	filter_config_doc: TOMLDocument | None = None
+	def get_filter_config()->TOMLDocument:
+		nonlocal filter_config_doc
+		if args.toml and not filter_config_doc:
 			try: # if env_file.exists():
 				if not args.toml.endswith('.toml'):
 					args.toml += '.toml'
 				filter_toml_path = Path(args.toml) # .resolve()
-				with filter_toml_path.open('rb') as f:
-					filter_config |= tomllib.load(f)
-				logger.info("Loaded filter config in [%s]", filter_toml_path, filter_config)
+				from tomlkit import load # TOMLDocument, table, comment, nl, dump, 
+				with filter_toml_path.open('r') as f:
+					filter_config_doc = load(f)
+				logger.info("Loaded filter config in [%s] as: %s", filter_toml_path, filter_config_doc)
 			except FileNotFoundError:
-				logger.warning("FileNotFoundError in TOML")
+				logger.error("FileNotFoundError in TOML")
+				raise ConfigError("FileNotFoundError in TOML")
 			except tomllib.TOMLDecodeError:
-				logger.warning("Not a valid TOML file")
-			filter_config_is_loaded = True
-		return filter_config
+				logger.error("Not a valid TOML file")
+				raise ConfigError("Not a valid TOML file")
+			# filter_config_is_loaded = True
+		return filter_config_doc or (filter_config_doc := TOMLDocument())
 
 	file_list_loaded = False
 	def get_args_files(file_list=[]):
@@ -1065,10 +1082,9 @@ def main():
 				sys.exit("Unknown app_name : %s" % app_name)
 		from tesseract_ocr import TesseractOCR, Output
 		from tomli_w import dumps
-		# from tomlkit import TOMLDocument, table, comment, nl, dump
 		ocr = TesseractOCR()
 		doc_dict = {}
-		# doc = TOMLDocument() doc.add(comment("ocr-result")) doc.add(nl()) doc.add(comment(image_file.name)) doc.add(nl())
+
 		print(f"# {image_file.name=}")
 		for k, area_param in app_filter.area_param_dict.items():
 			area_name = f"ocr-{k.name}"
@@ -1111,7 +1127,7 @@ def main():
 
 #
 	if args.make:
-		make_path = Path(args.make + '.toml') if not args.make.endswith('.toml') else Path(args.make)
+		make_path = Path(args.toml) # Path(args.make + '.toml') if not args.make.endswith('.toml') else Path(args.make)
 		if make_path.exists():
 			try:
 				yn = input(f"\nThe file path to save the image file area configuration:'{make_path}'\n already exists. Overwrite?(Enter 'Yes' or 'Affirmative' if you want to overwrite)").lower()
@@ -1122,6 +1138,7 @@ def main():
 		from io import StringIO
 		sio = StringIO()
 		with make_path.open('w') as wf: # dump(doc, wf)
+			org_config = get_filter_config()
 			label = f"[ocr-filter.{str(app_name)}]"
 			print(label, file=wf)
 			print(f"[ocr-filter.{label}]", file=wf)
