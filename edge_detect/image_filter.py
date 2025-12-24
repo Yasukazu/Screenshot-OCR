@@ -910,6 +910,11 @@ class ConfigError(MainError):
 	def __init__(self, msg: str):
 		self.msg = msg
 
+class MakeError(MainError):
+	''' Error during make process. '''
+	def __init__(self, msg: str):
+		self.msg = msg
+
 def main():
 	from taimee_filter import TaimeeFilter
 	OCR_FILTER = "ocr-filter"
@@ -987,17 +992,25 @@ def main():
 			logger.info("Application name is set as '%s' from file name:%s", app_name.name, _file.name)
 		except (IndexError, NoAppNameException):
 			sys.exit("Needs application name spec. by '--app' option or file name(ending with {}).".format([nm.value for nm in APP_NAME]))
+	image_path_dir: Path | None = None
 	try:
 		image_path_dir = Path(args.dir or get_filter_config()['image-path']['dir'])
-		logger.info("Image directory is set as %s by %s", image_path_dir, 'args.dir' if args.dir else 'config.image_path.dir')
+	except TypeError:
+		logger.info("Image dir is None since not args.dir")
+	except KeyError:
+		logger.info("Image dir is None since no key in get_filter_config")
+	except ConfigError:
+		logger.info("Image dir is None due to config error")
+	else:
+		logger.info("Image directory is set as %s by %s", image_path_dir, 'args.dirget_filter_config()' if args.dir else 'config.image_path.dir')
 		if str(image_path_dir)[0] == '~':
 			try:
 				image_path_dir = image_path_dir.expanduser()
 			except RuntimeError:
 				sys.exit("image_dir.expanduser() failed!")
 			logger.info("Image directory is expanded user by args as %s", image_path_dir)
-	except (TypeError, KeyError):
-		image_path_dir = None
+
+	
 
 	if image_path_dir and not image_path_dir.exists():
 		sys.exit("Image dir. does not exist: %s" % image_path_dir)
@@ -1125,26 +1138,52 @@ def main():
 				wf.write(toml_text)
 			logger.info("Saved toml file into: %s\n%s", save_path, toml_text)
 
-#
+
 	if args.make:
 		make_path = Path(args.toml) # Path(args.make + '.toml') if not args.make.endswith('.toml') else Path(args.make)
+		if make_path.exists() and (make_path_size:=make_path.stat().st_size) > 0:
+			try:
+				yn = input(f"\nThe file path to save the image file area configuration:'{make_path}'\n already exists size as {make_path_size} bytes. Overwrite?(Enter 'Yes' or 'Affirmative' if you want to overwrite): ").lower()
+			except (IndexError, EOFError, KeyboardInterrupt):
+				yn = ''
+			if yn != 'yes' and yn != 'affirmative':
+				sys.exit("Exit since the user did not accept overwrite of: %s" % make_path)
+		from tomlkit.toml_file import TOMLFile
+		from tomlkit import table
 		if make_path.exists():
 			try:
-				yn = input(f"\nThe file path to save the image file area configuration:'{make_path}'\n already exists. Overwrite?(Enter 'Yes' or 'Affirmative' if you want to overwrite)").lower()
-			except (IndexError, EOFError, KeyboardInterrupt):
-				yn = 'n'
-			if yn != 'yes' and yn != 'affirmative':
-				sys.exit("Exit since the user not accept overwrite of: %s" % make_path)
+				config_file = TOMLFile(make_path) # get_filter_config()
+			except Exception as e:
+				logger.error("Failed to load existing TOML file %s: %s", make_path, e)
+				raise MakeError(f"Failed to load existing TOML file {make_path}: {e}") from e
+			else:
+				org_config = config_file.read()
+		else:
+			org_config = TOMLFile()
 		from io import StringIO
 		sio = StringIO()
 		with make_path.open('w') as wf: # dump(doc, wf)
-			org_config = get_filter_config()
 			label = f"[ocr-filter.{str(app_name)}]"
 			print(label, file=wf)
 			print(f"[ocr-filter.{label}]", file=wf)
+			org_area_dict = org_config[OCR_FILTER][app_name.name.lower()]
 			for key, param in app_filter.area_param_dict.items():
+				k = key.name.lower()
+				vals = param.as_slice_param()
+				val = vals if k == 'shift' else vals[0]
+				if org_area_dict[k] != val:
+					yn = input(f"Original image area value({org_area_dict[k]}) is different from new one ({val}): overwrite('y/n'):")
+					if yn.lower() not in ('y', 'yes'):
+						continue
+				org_area_dict[k] = val
 				param.to_toml(wf)
+				dic = param.to_dict()
 				sio.write(param.as_toml() + '\n')
+		try:
+			config_file.write()
+			logger.info("config file updated: %s", make_path)
+		except Exception as e:
+			raise ConfigError("Failed to update config file") from e
 		sio.seek(0)
 		logger.info("Image area parameters are saved into %s\nas: %s", make_path, sio.read())
 		# print("[ocr-filter.taimee]")	
