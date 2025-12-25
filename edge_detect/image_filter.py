@@ -937,9 +937,11 @@ def main():
 	filter_area_param_dict = {}
 	# image_config_filename = (args.file) #.resolve()Path
 	filter_config_doc: TOMLDocument | None = None
-	def get_filter_config()->TOMLDocument:
+	def get_filter_config() -> TOMLDocument | None:
 		nonlocal filter_config_doc
-		if args.toml and not filter_config_doc:
+		if filter_config_doc:
+			return filter_config_doc
+		if args.toml:
 			try: # if env_file.exists():
 				if not args.toml.endswith('.toml'):
 					args.toml += '.toml'
@@ -947,15 +949,17 @@ def main():
 				from tomlkit import load # TOMLDocument, table, comment, nl, dump, 
 				with filter_toml_path.open('r') as f:
 					filter_config_doc = load(f)
-				logger.info("Loaded filter config in [%s] as: %s", filter_toml_path, filter_config_doc)
 			except FileNotFoundError:
-				logger.error("FileNotFoundError in TOML")
+				logger.error("%s File Not Found TOML", filter_toml_path)
 				raise ConfigError("FileNotFoundError in TOML")
 			except tomllib.TOMLDecodeError:
-				logger.error("Not a valid TOML file")
+				logger.error("Not a valid TOML file: %s", filter_toml_path)
 				raise ConfigError("Not a valid TOML file")
+			else:
+				logger.info("Loaded filter config in [%s] as: %s", filter_toml_path, filter_config_doc)
+				return filter_config_doc 
 			# filter_config_is_loaded = True
-		return filter_config_doc or (filter_config_doc := TOMLDocument())
+		# (filter_config_doc := TOMLDocument())
 
 	file_list_loaded = False
 	def get_args_files(file_list=[]):
@@ -996,11 +1000,11 @@ def main():
 	try:
 		image_path_dir = Path(args.dir or get_filter_config()['image-path']['dir'])
 	except TypeError:
-		logger.info("Image dir is None since not args.dir")
+		logger.info("Image dir keeps None since not args.dir or not get_filter_config")
 	except KeyError:
-		logger.info("Image dir is None since no key in get_filter_config")
+		logger.info("Image dir keeps None since no key for 'image-path.dir' in get_filter_config")
 	except ConfigError:
-		logger.info("Image dir is None due to config error")
+		logger.info("Image dir keeps None due to config error")
 	else:
 		logger.info("Image directory is set as %s by %s", image_path_dir, 'args.dirget_filter_config()' if args.dir else 'config.image_path.dir')
 		if str(image_path_dir)[0] == '~':
@@ -1150,6 +1154,7 @@ def main():
 				sys.exit("Exit since the user did not accept overwrite of: %s" % make_path)
 		from tomlkit.toml_file import TOMLFile
 		from tomlkit import table
+		config_file: TOMLFile | None = None
 		if make_path.exists():
 			try:
 				config_file = TOMLFile(make_path) # get_filter_config()
@@ -1159,33 +1164,56 @@ def main():
 			else:
 				org_config = config_file.read()
 		else:
-			org_config = TOMLFile()
-		from io import StringIO
-		sio = StringIO()
-		with make_path.open('w') as wf: # dump(doc, wf)
-			label = f"[ocr-filter.{str(app_name)}]"
-			print(label, file=wf)
-			print(f"[ocr-filter.{label}]", file=wf)
-			org_area_dict = org_config[OCR_FILTER][app_name.name.lower()]
-			for key, param in app_filter.area_param_dict.items():
-				k = key.name.lower()
-				vals = param.as_slice_param()
-				val = vals if k == 'shift' else vals[0]
+			org_config = TOMLDocument()
+		# from io import StringIO
+		# sio = StringIO()
+		# with make_path.open('w') as wf: # dump(doc, wf)
+		# label = f"[ocr-filter.{str(app_name)}]"
+		# print(label, file=wf)
+		# print(f"[ocr-filter.{label}]", file=wf)
+		try:
+			ocr_filter_table = org_config[OCR_FILTER]
+		except KeyError:
+			ocr_filter_table = org_config.add(OCR_FILTER, table())[OCR_FILTER]
+		try:
+			org_area_dict = ocr_filter_table[app_name.name.lower()]
+		except KeyError:
+			org_area_dict = {}
+		for key, param in app_filter.area_param_dict.items():
+			k = key.name.lower()
+			vals = param.as_slice_param()
+			val = vals if k == 'shift' else vals[0]
+			try:
 				if org_area_dict[k] != val:
-					yn = input(f"Original image area value({org_area_dict[k]}) is different from new one ({val}): overwrite('y/n'):")
+					yn = input(f"Original image area value({org_area_dict[k]}) is different from new one ({val}): overwrite('yes/no'):")
 					if yn.lower() not in ('y', 'yes'):
 						continue
-				org_area_dict[k] = val
-				param.to_toml(wf)
-				dic = param.to_dict()
-				sio.write(param.as_toml() + '\n')
+			except KeyError:
+				pass
+			org_area_dict[k] = val # update
+			# param.to_toml(wf)
+			# dic = param.to_dict()
+			# sio.write(param.as_toml() + '\n')
+		ocr_filter_table[app_name.name.lower()] = org_area_dict
 		try:
-			config_file.write()
-			logger.info("config file updated: %s", make_path)
+			if config_file:
+				config_file.write(org_config)
+			else:
+				# from io import StringIO
+				# sio = StringIO()
+				toml_file = TOMLFile(make_path)
+				toml_file.write(org_config)
+				'''with make_path.open('w') as wf:
+					org_config.write(sio)
+					sio.seek(0)
+					buff = sio.read()
+					print(sio.read(), file=wf)'''
 		except Exception as e:
 			raise ConfigError("Failed to update config file") from e
-		sio.seek(0)
-		logger.info("Image area parameters are saved into %s\nas: %s", make_path, sio.read())
+		else:
+			logger.info("config file updated: %s", make_path)
+		# sio.seek(0)
+		# logger.info("Image area parameters are saved into %s\nas: %s", make_path, sio.read())
 		# print("[ocr-filter.taimee]")	
 		# print(sio.read())
 	# --toml ocr-filter
