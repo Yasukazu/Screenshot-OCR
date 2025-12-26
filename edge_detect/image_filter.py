@@ -884,11 +884,12 @@ from argparse import ArgumentParser
 # from dotenv import dotenv_values
 import tomllib
 from fnmatch import fnmatch
+from enum import StrEnum, auto
 
-class APP_NAME(Enum):
+class APP_NAME(StrEnum):
 	''' name of app: value is stem end '''
-	TAIMEE = '_jp.co.taimee'
-	MERCARI = '_jp.mercari.work.android'
+	TAIMEE = auto() # '_jp.co.taimee'
+	MERCARI = auto() # '_jp.mercari.work.android'
 
 	def __str__(self):
 		return self.name.lower()
@@ -915,12 +916,47 @@ class MakeError(MainError):
 	def __init__(self, msg: str):
 		self.msg = msg
 
+from os.path import abspath, dirname
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Settings(BaseSettings):
+	env_prefix:str = "image_filter_"
+	env_file:str = "image_filter.env"
+	env_file_encoding:str = "utf-8"
+	use_enum_values:bool = True
+	model_config = SettingsConfigDict(env_prefix=env_prefix, env_file=env_file, env_file_encoding=env_file_encoding, use_enum_values=use_enum_values)
+
+from configparser import ConfigParser
+from os.path import join as os_path_join
+from typing import Any
+
+CONFIG_FILE_NAME = "image-filter.ini"
 def main():
+	base_dir = abspath(dirname(__file__))
+	config_fullpath = os_path_join(base_dir, CONFIG_FILE_NAME)
+	config_parser = ConfigParser()
+	# base_config: dict[str, Any] | None = None
+	try:
+		config_parser.read(config_fullpath)
+	except FileNotFoundError:
+		logger.error("config file not found: %s", config_fullpath)
+		raise ConfigError("config file not found: %s" % config_fullpath)
+	except Exception as e:
+		logger.error("config file load error: %s", config_fullpath)
+		raise ConfigError("config file load error: %s" % config_fullpath)
+	else:
+		try:
+			image_ext = config_parser["DEFAULT"][ "image_ext"]
+		except KeyError:
+			image_ext = '.png'
+		app_stem_end: dict[str, str] = {}
+		for section in config_parser.sections():
+			app_stem_end[section] = config_parser.get(section, "stem_end")
 	from taimee_filter import TaimeeFilter
 	OCR_FILTER = "ocr-filter"
 	parser = ArgumentParser()
 	parser.add_argument('files', nargs='*', help='Image files to commit OCR or to get parameters. Specify like: *.png')
-	parser.add_argument('--app', choices=[n.name.lower() for n in APP_NAME], type=str, help=f'Application name of the screenshot to execute OCR:(specify in TOML filename =: {[f"*{n.value}.png" for n in APP_NAME]})') # 
+	parser.add_argument('--app', choices=[n.name.lower() for n in APP_NAME], type=str, help=f'Application name of the screenshot to execute OCR:(specify in TOML filename =: {[f"*{n}{image_ext}" for n in app_stem_end]})') # 
 	parser.add_argument('--toml', help=f'Configuration toml file name like {OCR_FILTER}')
 	parser.add_argument('--save', help='Output path to save OCR text of the image file as TOML format into the image file name extention as ".ocr-<app_name>.toml"')
 	parser.add_argument('--dir', help='Image dir of files: ./')
@@ -980,7 +1016,8 @@ def main():
 
 	if args.app is not None:
 		try:
-			app_name = app_name_to_enum[args.app]
+			app_name = APP_NAME[args.app.upper()] # app_name_to_enum[args.app]
+			logger.info("app_name is set as '%s'", app_name)
 		except KeyError:
 			sys.exit(f"No such app name:{args.app}")
 	else:
@@ -1145,73 +1182,77 @@ def main():
 
 	if args.make:
 		make_path = Path(args.toml) # Path(args.make + '.toml') if not args.make.endswith('.toml') else Path(args.make)
-		if make_path.exists() and (make_path_size:=make_path.stat().st_size) > 0:
-			try:
-				yn = input(f"\nThe file path to save the image file area configuration:'{make_path}'\n already exists size as {make_path_size} bytes. Overwrite?(Enter 'Yes' or 'Affirmative' if you want to overwrite): ").lower()
-			except (IndexError, EOFError, KeyboardInterrupt):
-				yn = ''
-			if yn != 'yes' and yn != 'affirmative':
-				sys.exit("Exit since the user did not accept overwrite of: %s" % make_path)
+
 		from tomlkit.toml_file import TOMLFile
 		from tomlkit import table
 		config_file: TOMLFile | None = None
 		if make_path.exists():
 			try:
 				config_file = TOMLFile(make_path) # get_filter_config()
+				org_config = config_file.read()
 			except Exception as e:
 				logger.error("Failed to load existing TOML file %s: %s", make_path, e)
 				raise MakeError(f"Failed to load existing TOML file {make_path}: {e}") from e
 			else:
-				org_config = config_file.read()
+				logger.info("config is loaded from: %s", make_path)
 		else:
 			org_config = TOMLDocument()
+			logger.info("config is created")
 		# from io import StringIO
 		# sio = StringIO()
 		# with make_path.open('w') as wf: # dump(doc, wf)
 		# label = f"[ocr-filter.{str(app_name)}]"
 		# print(label, file=wf)
 		# print(f"[ocr-filter.{label}]", file=wf)
-		try:
-			ocr_filter_table = org_config[OCR_FILTER]
-		except KeyError:
-			ocr_filter_table = org_config.add(OCR_FILTER, table())[OCR_FILTER]
-		try:
-			org_area_dict = ocr_filter_table[app_name.name.lower()]
-		except KeyError:
-			org_area_dict = {}
+		from tomlkit import container as TKContainer
+		ocr_filter_table: TKContainer = org_config.get(OCR_FILTER) or org_config.add(OCR_FILTER, table())[OCR_FILTER]
+		org_area_dict: dict = ocr_filter_table.get(app_name.name.lower()) or {}
 		for key, param in app_filter.area_param_dict.items():
+			different = False
 			k = key.name.lower()
 			vals = param.as_slice_param()
-			val = vals if k == 'shift' else vals[0]
 			try:
-				if org_area_dict[k] != val:
-					yn = input(f"Original image area value({org_area_dict[k]}) is different from new one ({val}): overwrite('yes/no'):")
+				if k == 'shift':
+					for n, val in enumerate(vals):
+						different = (tuple(org_area_dict[k][n]) != val)
+						if different:
+							break
+				else:
+					different = (tuple(org_area_dict[k]) != vals[0])
+				if different:
+					yn = input(f"Original image area value({org_area_dict[k]}) is different from new one ({vals}): overwrite('yes/no'):")
 					if yn.lower() not in ('y', 'yes'):
+						logger.info("Overwrite skipped for %s", k)
 						continue
 			except KeyError:
 				pass
-			org_area_dict[k] = val # update
-			# param.to_toml(wf)
-			# dic = param.to_dict()
-			# sio.write(param.as_toml() + '\n')
-		ocr_filter_table[app_name.name.lower()] = org_area_dict
-		try:
-			if config_file:
-				config_file.write(org_config)
-			else:
-				# from io import StringIO
-				# sio = StringIO()
-				toml_file = TOMLFile(make_path)
-				toml_file.write(org_config)
-				'''with make_path.open('w') as wf:
-					org_config.write(sio)
-					sio.seek(0)
-					buff = sio.read()
-					print(sio.read(), file=wf)'''
-		except Exception as e:
-			raise ConfigError("Failed to update config file") from e
-		else:
-			logger.info("config file updated: %s", make_path)
+			if different:
+				if make_path.exists() and (make_path_size:=make_path.stat().st_size) > 0:
+					try:
+						yn = input(f"\nThe file path to save the image file area configuration:'{make_path}'\n already exists with a size as {make_path_size} bytes. Overwrite?(Enter 'Yes' or 'Affirmative' if you want to overwrite): ").lower()
+					except (EOFError, KeyboardInterrupt): # Ctrl+C or Ctrl+D/ctrl+Z
+						yn = ''
+					if yn != 'yes' and yn != 'affirmative':
+						sys.exit("Exit since the user did not accept overwrite of: %s" % make_path)
+				org_area_dict[k] = vals if k == 'shift' else vals[0] # update
+				ocr_filter_table[app_name.name.lower()] = org_area_dict
+				try:
+					if config_file:
+						config_file.write(org_config)
+						logger.info("config file is updated: %s", make_path)
+					else:
+						# from io import StringIO
+						# sio = StringIO()
+						toml_file = TOMLFile(make_path)
+						toml_file.write(org_config)
+						logger.info("config file is created: %s", make_path)
+						'''with make_path.open('w') as wf:
+							org_config.write(sio)
+							sio.seek(0)
+							buff = sio.read()
+							print(sio.read(), file=wf)'''
+				except Exception as e:
+					raise ConfigError("Failed to update or create the config file") from e
 		# sio.seek(0)
 		# logger.info("Image area parameters are saved into %s\nas: %s", make_path, sio.read())
 		# print("[ocr-filter.taimee]")	
@@ -1224,4 +1265,18 @@ BreaktimeAreaParam = [488, 224, 0, 720]
 PaystubAreaParam = [714, -1, 0, -1]'''
 
 if __name__ == "__main__":
-	main()
+	try:
+		main()
+		sys.exit(0)
+	except ConfigError as e:
+		logger.error("ConfigError: %s", e)
+		sys.exit(1)
+	except MakeError as e:
+		logger.error("MakeError: %s", e)
+		sys.exit(2)
+	except SystemExit as e:
+		logger.error("SystemExit: %s", e)
+		raise
+	except Exception as e:
+		logger.error("Error: %s", e)
+		raise
