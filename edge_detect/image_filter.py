@@ -917,41 +917,69 @@ class MakeError(MainError):
 		self.msg = msg
 
 from os.path import abspath, dirname
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict, CliApp
 
 class Settings(BaseSettings):
 	env_prefix:str = "image_filter_"
-	env_file:str = "image_filter.env"
+	env_file:str = "image-filter.env"
 	env_file_encoding:str = "utf-8"
 	use_enum_values:bool = True
+	image_ext: str = ".png"
+	image_ext_set: set[str] = {".jpg", ".png"}
+	app_name_to_stem_end:dict[str, str] = {}#'taimee': '_jp.co.taimee', 'mercari': '_jp.mercari.work.android'}
 	model_config = SettingsConfigDict(env_prefix=env_prefix, env_file=env_file, env_file_encoding=env_file_encoding, use_enum_values=use_enum_values)
+
+	def cli_cmd(self) -> None:
+		return self.image_ext
 
 from configparser import ConfigParser
 from os.path import join as os_path_join
 from typing import Any
+from dotenv import load_dotenv
 
-CONFIG_FILE_NAME = "image-filter.ini"
-def main():
-	base_dir = abspath(dirname(__file__))
-	config_fullpath = os_path_join(base_dir, CONFIG_FILE_NAME)
-	config_parser = ConfigParser()
-	# base_config: dict[str, Any] | None = None
-	try:
-		config_parser.read(config_fullpath)
-	except FileNotFoundError:
-		logger.error("config file not found: %s", config_fullpath)
-		raise ConfigError("config file not found: %s" % config_fullpath)
-	except Exception as e:
-		logger.error("config file load error: %s", config_fullpath)
-		raise ConfigError("config file load error: %s" % config_fullpath)
-	else:
+def main(
+	base_dir = abspath(dirname(__file__)), config_file_name = "image-filter.ini"
+):
+	config_fullpath = os_path_join(base_dir, config_file_name)
+	app_stem_end = None
+	if config_file_name.endswith('.toml'):
 		try:
-			image_ext = config_parser["DEFAULT"][ "image_ext"]
-		except KeyError:
-			image_ext = '.png'
-		app_stem_end: dict[str, str] = {}
-		for section in config_parser.sections():
-			app_stem_end[section] = config_parser.get(section, "stem_end")
+			with open(config_fullpath, 'rb') as rf:
+				basic_config = tomllib.load(rf)
+		except Exception as e:
+			logger.error("basic config load error: %s", config_fullpath)
+			raise ConfigError("basic config load error: %s" % config_fullpath) from e
+		else:
+			image_ext = basic_config.get("image_ext", '.png')
+			image_dir_base = basic_config.get("image_dir_base", '')
+			try:
+				app_stem_end: dict[str, str] = {k: v['stem_end'] for k, v in basic_config["file_name"].items()}
+			except KeyError:
+				raise ConfigError("Missing 'stem_end' key in file_name configuration")
+
+	elif config_file_name.endswith('.ini'):
+		config_parser = ConfigParser()
+		# base_config: dict[str, Any] | None = None
+		try:
+			config_parser.read(config_fullpath)
+		except FileNotFoundError:
+			logger.error("config file not found: %s", config_fullpath)
+			raise ConfigError("config file not found: %s" % config_fullpath)
+		except Exception as e:
+			logger.error("config file load error: %s", config_fullpath)
+			raise ConfigError("config file load error: %s" % config_fullpath)
+		else:
+			try:
+				image_ext = config_parser["common"][ "image_ext"]
+			except KeyError:
+				image_ext = '.png'
+			try:
+				app_stem_end: dict[str, str] = dict(config_parser['stem_end'])
+			except KeyError:
+				app_stem_end = None
+	if app_stem_end is None:
+		raise ConfigError("app_stem_end is not set by config")
+		# for section in config_parser.sections(): app_stem_end[section] = config_parser.get(section, "stem_end")
 	from taimee_filter import TaimeeFilter
 	OCR_FILTER = "ocr-filter"
 	parser = ArgumentParser()
