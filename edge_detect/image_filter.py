@@ -954,11 +954,11 @@ def main(
 				IniConfigParser(config_sections, split_ml_text_to_list=True)]
 				),
 		)
-	parser.add_argument("--image_ext", default='.jpg')
-	parser.add_argument("--image_dir_base", default='./')
+	parser.add_argument("--image_ext", default='.jpg', env_var='IMAGE_FILTER_IMAGE_EXT')
+	parser.add_argument("--image_dir_base", default='./', env_var='IMAGE_FILTER_IMAGE_DIR_BASE')
 	parser.add_argument('files', nargs='*', help='Image files to commit OCR or to get parameters. Specify like: *.png')
-	parser.add_argument("--taimee")
-	parser.add_argument("--mercari")
+	parser.add_argument("--taimee", env_var='IMAGE_FILTER_TAIMEE')
+	parser.add_argument("--mercari", env_var='IMAGE_FILTER_MERCARI')
 	args = parser.parse_args()
 	config_fullpath = os_path_join(base_dir, f"{config_file_node}.{list(config_file_ext_enum)[0].lower()}")
 	app_stem_end = None
