@@ -943,10 +943,10 @@ class ConfigFileExt(StrEnum):
 	INI = auto()
 
 def main(
-	base_dir = abspath(dirname(__file__)), config_file_node = "image-filter", config_file_ext_enum = ConfigFileExt
+	config_dir = abspath(dirname(__file__)), config_file_node = "image-filter", config_file_ext_enum = ConfigFileExt
 ):
 	config_sections = ['stem_end', 'common']
-	default_config_files=[str(Path(base_dir) / f"{config_file_node}.{ext.lower()}") for ext in config_file_ext_enum]
+	default_config_files=[str(Path(config_dir) / f"{config_file_node}.{ext.lower()}") for ext in config_file_ext_enum]
 	parser = ArgParser(
 			default_config_files=default_config_files,
 			config_file_parser_class=CompositeConfigParser(
@@ -957,12 +957,13 @@ def main(
 	parser.add_argument("--image_ext", default='.jpg', env_var='IMAGE_FILTER_IMAGE_EXT')
 	parser.add_argument("--image_dir_base", default='./', env_var='IMAGE_FILTER_IMAGE_DIR_BASE')
 	parser.add_argument('files', nargs='*', help='Image files to commit OCR or to get parameters. Specify like: *.png')
-	parser.add_argument("--taimee", env_var='IMAGE_FILTER_TAIMEE')
-	parser.add_argument("--mercari", env_var='IMAGE_FILTER_MERCARI')
+	parser.add_argument("--app_stem_end", env_var='IMAGE_FILTER_APP_STEM_END', default='taimee:_jp.co.taimee,mercari:_jp.mercari.work.android')
+	#parser.add_argument("--taimee", env_var='IMAGE_FILTER_TAIMEE')
+	#parser.add_argument("--mercari", env_var='IMAGE_FILTER_MERCARI')
 	args = parser.parse_args()
-	config_fullpath = os_path_join(base_dir, f"{config_file_node}.{list(config_file_ext_enum)[0].lower()}")
-	app_stem_end = None
-	if (config_fullpath := Path(base_dir) / f"{config_file_node}.toml").exists():
+	config_fullpath = os_path_join(config_dir, f"{config_file_node}.{list(config_file_ext_enum)[0].lower()}")
+	app_stem_end = {n[:n.index(':')]:n[n.index(':')+1:] for n in args.app_stem_end.split(',')}
+	if (config_fullpath := Path(config_dir) / f"{config_file_node}.toml").exists():
 		try:
 			with open(config_fullpath, 'rb') as rf:
 				basic_config = tomllib.load(rf)
@@ -977,7 +978,7 @@ def main(
 			except KeyError:
 				raise ConfigError("Missing 'stem_end' key in file_name configuration")
 
-	elif (config_fullpath := Path(base_dir) / f"{config_file_node}.ini").exists():
+	elif (config_fullpath := Path(config_dir) / f"{config_file_node}.ini").exists():
 		config_parser = ConfigParser()
 		# base_config: dict[str, Any] | None = None
 		try:
