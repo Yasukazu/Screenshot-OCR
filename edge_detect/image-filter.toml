@@ -1,7 +1,11 @@
+[common]
 image_ext = ".png"
 image_dir_base = "~/github/screen/DATA/"
-[file_name.taimee]
-stem_end = "_jp.co.taimee"
-[file_name.mercari]
-stem_end = "_jp.mercari.work.android"
+[stem_end]
+taimee = "_jp.co.taimee"
+mercari = "_jp.mercari.work.android"
+#[file_name.taimee]
+#stem_end = "_jp.co.taimee"
+#[file_name.mercari]
+#stem_end = "_jp.mercari.work.android"
 

@@ -933,16 +933,36 @@ class Settings(BaseSettings):
 		return self.image_ext
 
 from configparser import ConfigParser
+from configargparse import ArgParser, CompositeConfigParser, TomlConfigParser, IniConfigParser
 from os.path import join as os_path_join
 from typing import Any
 from dotenv import load_dotenv
 
+class ConfigFileExt(StrEnum):	
+	TOML = auto()
+	INI = auto()
+
 def main(
-	base_dir = abspath(dirname(__file__)), config_file_name = "image-filter.ini"
+	base_dir = abspath(dirname(__file__)), config_file_node = "image-filter", config_file_ext_enum = ConfigFileExt
 ):
-	config_fullpath = os_path_join(base_dir, config_file_name)
+	config_sections = ['stem_end', 'common']
+	default_config_files=[str(Path(base_dir) / f"{config_file_node}.{ext.lower()}") for ext in config_file_ext_enum]
+	parser = ArgParser(
+			default_config_files=default_config_files,
+			config_file_parser_class=CompositeConfigParser(
+				[TomlConfigParser(config_sections),
+				IniConfigParser(config_sections, split_ml_text_to_list=True)]
+				),
+		)
+	parser.add_argument("--image_ext", default='.jpg')
+	parser.add_argument("--image_dir_base", default='./')
+	parser.add_argument('files', nargs='*', help='Image files to commit OCR or to get parameters. Specify like: *.png')
+	parser.add_argument("--taimee")
+	parser.add_argument("--mercari")
+	args = parser.parse_args()
+	config_fullpath = os_path_join(base_dir, f"{config_file_node}.{list(config_file_ext_enum)[0].lower()}")
 	app_stem_end = None
-	if config_file_name.endswith('.toml'):
+	if (config_fullpath := Path(base_dir) / f"{config_file_node}.toml").exists():
 		try:
 			with open(config_fullpath, 'rb') as rf:
 				basic_config = tomllib.load(rf)
@@ -957,7 +977,7 @@ def main(
 			except KeyError:
 				raise ConfigError("Missing 'stem_end' key in file_name configuration")
 
-	elif config_file_name.endswith('.ini'):
+	elif (config_fullpath := Path(base_dir) / f"{config_file_node}.ini").exists():
 		config_parser = ConfigParser()
 		# base_config: dict[str, Any] | None = None
 		try:
@@ -982,7 +1002,7 @@ def main(
 		# for section in config_parser.sections(): app_stem_end[section] = config_parser.get(section, "stem_end")
 	from taimee_filter import TaimeeFilter
 	OCR_FILTER = "ocr-filter"
-	parser = ArgumentParser()
+	# parser = ArgumentParser()
 	parser.add_argument('files', nargs='*', help='Image files to commit OCR or to get parameters. Specify like: *.png')
 	parser.add_argument('--app', choices=[n.name.lower() for n in APP_NAME], type=str, help=f'Application name of the screenshot to execute OCR:(specify in TOML filename =: {[f"*{n}{image_ext}" for n in app_stem_end]})') # 
 	parser.add_argument('--toml', help=f'Configuration toml file name like {OCR_FILTER}')
@@ -1199,7 +1219,7 @@ def main(
 		if args.save:
 			save_path = Path(args.save) / (image_file.stem + '.ocr-' + app_name.name.lower() + '.toml')
 			if save_path.exists():
-				yn = input(f"\nThe file path to save the image file area configuration:'{save_path}'\n already exists. Overwrite?(Enter 'Yes' or 'Affirmative' if you want to overwrite)").lower()
+				yn = input(f"\nThe file path to save the image file area configuration:{save_path} already exists. Overwrite?(Enter 'Yes' or 'Affirmative' if you want to overwparser.parse_args()rite)").lower()
 				if yn != 'yes' and yn != 'affirmative':
 					sys.exit("Exit since the user not accept overwrite of: %s" % save_path)
 			toml_text = dumps(doc_dict, multiline_strings=True)
