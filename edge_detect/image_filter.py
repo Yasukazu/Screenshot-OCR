@@ -119,6 +119,14 @@ class ImageAreaParam(TOMLDataclass):
 	def min_width(cls):
 		return 9
 
+	@classmethod
+	def from_param(cls, param: Sequence[int]) -> "ImageAreaParam":
+		match len(param):
+			case num if num in range(1, 4):
+				return cls(*(list(param) + [-1, 0, -1][:num - 4]))
+			case _:
+				return cls(*param)
+
 	def __post_init__(self):
 		if self.height is not None:
 			if 0 <= self.height < self.min_height():
@@ -133,7 +141,7 @@ class ImageAreaParam(TOMLDataclass):
 		return cls(height=height, width=width)
 
 	@property
-	def param(self)-> Int4:
+	def param(self)-> Sequence[int]:
 		return (self.y_offset, self.height or -1, self.x_offset, self.width or -1)
 
 
@@ -239,6 +247,12 @@ class ShiftAreaParam(ImageAreaParam):
 	end_xpos: as width
 	while start_xpos is 0 and end_width is -1
 	'''
+	xpos2: int = -1
+
+	@property
+	def param(self)-> Sequence[int]:
+		return list(super().param) + [self.xpos2]
+
 	@classmethod
 	def get_class_name(cls):
 		return cls.__class__.__name__
@@ -933,7 +947,7 @@ class Settings(BaseSettings):
 		return self.image_ext
 
 from configparser import ConfigParser
-from configargparse import ArgParser, CompositeConfigParser, TomlConfigParser, IniConfigParser
+from configargparse import ArgParser, CompositeConfigParser, TomlConfigParser, IniConfigParser, ConfigparserConfigFileParser
 from os.path import join as os_path_join
 from typing import Any
 from dotenv import load_dotenv
@@ -942,73 +956,35 @@ class ConfigFileExt(StrEnum):
 	TOML = auto()
 	INI = auto()
 
+import yaml
+
 def main(
 	config_dir = abspath(dirname(__file__)), config_file_node = "image-filter", config_file_ext_enum = ConfigFileExt
 ):
-	config_sections = ['stem_end', 'common']
-	default_config_files=[str(Path(config_dir) / f"{config_file_node}.{ext.lower()}") for ext in config_file_ext_enum]
+	from taimee_filter import TaimeeFilter
+	OCR_FILTER = "ocr-filter"
+	config_sections = ['app_stem_end', 'common', 'image_area_param']
+	default_config_files=[str(Path(config_dir) / f"{config_file_node}.{ext.lower()}") for ext in config_file_ext_enum] + [str(Path(config_dir) / "image-area-param.cfg")]
 	parser = ArgParser(
 			default_config_files=default_config_files,
 			config_file_parser_class=CompositeConfigParser(
 				[TomlConfigParser(config_sections),
-				IniConfigParser(config_sections, split_ml_text_to_list=True)]
-				),
+				IniConfigParser(config_sections, split_ml_text_to_list=True),
+				ConfigparserConfigFileParser
+				])
 		)
 	parser.add_argument("--image_ext", default='.jpg', env_var='IMAGE_FILTER_IMAGE_EXT')
-	parser.add_argument("--image_dir_base", default='./', env_var='IMAGE_FILTER_IMAGE_DIR_BASE')
+	parser.add_argument("--image_dir", default='./', env_var='IMAGE_FILTER_IMAGE_DIR')
 	parser.add_argument('files', nargs='*', help='Image files to commit OCR or to get parameters. Specify like: *.png')
-	parser.add_argument("--app_stem_end", env_var='IMAGE_FILTER_APP_STEM_END', default='taimee:_jp.co.taimee,mercari:_jp.mercari.work.android')
+	parser.add_argument("--app_stem_end", env_var='IMAGE_FILTER_APP_STEM_END', default='taimee:_jp.co.taimee,mercari:_jp.mercari.work.android', help='Screenshot image file name pattern of the screenshot to execute OCR:(specified in format as "<app_name>:<stem_end>,..." )')
 	#parser.add_argument("--taimee", env_var='IMAGE_FILTER_TAIMEE')
 	#parser.add_argument("--mercari", env_var='IMAGE_FILTER_MERCARI')
-	args = parser.parse_args()
-	config_fullpath = os_path_join(config_dir, f"{config_file_node}.{list(config_file_ext_enum)[0].lower()}")
-	app_stem_end = {n[:n.index(':')]:n[n.index(':')+1:] for n in args.app_stem_end.split(',')}
-	if (config_fullpath := Path(config_dir) / f"{config_file_node}.toml").exists():
-		try:
-			with open(config_fullpath, 'rb') as rf:
-				basic_config = tomllib.load(rf)
-		except Exception as e:
-			logger.error("basic config load error: %s", config_fullpath)
-			raise ConfigError("basic config load error: %s" % config_fullpath) from e
-		else:
-			image_ext = basic_config.get("image_ext", '.png')
-			image_dir_base = basic_config.get("image_dir_base", '')
-			try:
-				app_stem_end: dict[str, str] = {k: v['stem_end'] for k, v in basic_config["file_name"].items()}
-			except KeyError:
-				raise ConfigError("Missing 'stem_end' key in file_name configuration")
-
-	elif (config_fullpath := Path(config_dir) / f"{config_file_node}.ini").exists():
-		config_parser = ConfigParser()
-		# base_config: dict[str, Any] | None = None
-		try:
-			config_parser.read(config_fullpath)
-		except FileNotFoundError:
-			logger.error("config file not found: %s", config_fullpath)
-			raise ConfigError("config file not found: %s" % config_fullpath)
-		except Exception as e:
-			logger.error("config file load error: %s", config_fullpath)
-			raise ConfigError("config file load error: %s" % config_fullpath)
-		else:
-			try:
-				image_ext = config_parser["common"][ "image_ext"]
-			except KeyError:
-				image_ext = '.png'
-			try:
-				app_stem_end: dict[str, str] = dict(config_parser['stem_end'])
-			except KeyError:
-				app_stem_end = None
-	if app_stem_end is None:
-		raise ConfigError("app_stem_end is not set by config")
-		# for section in config_parser.sections(): app_stem_end[section] = config_parser.get(section, "stem_end")
-	from taimee_filter import TaimeeFilter
-	OCR_FILTER = "ocr-filter"
 	# parser = ArgumentParser()
 	parser.add_argument('files', nargs='*', help='Image files to commit OCR or to get parameters. Specify like: *.png')
-	parser.add_argument('--app', choices=[n.name.lower() for n in APP_NAME], type=str, help=f'Application name of the screenshot to execute OCR:(specify in TOML filename =: {[f"*{n}{image_ext}" for n in app_stem_end]})') # 
-	parser.add_argument('--toml', help=f'Configuration toml file name like {OCR_FILTER}')
+	parser.add_argument('--app', choices=[n.name.lower() for n in APP_NAME], type=str, help='Application name of the screenshot to execute OCR') # 
+	# parser.add_argument('--toml', help=f'Configuration toml file name like {OCR_FILTER}')
 	parser.add_argument('--save', help='Output path to save OCR text of the image file as TOML format into the image file name extention as ".ocr-<app_name>.toml"')
-	parser.add_argument('--dir', help='Image dir of files: ./')
+	# parser.add_argument('--dir', help='Image dir of files: ./')
 	parser.add_argument('--nth', type=int, default=1, help='Rank(default: 1) of files descending sorted(the latest, the first) by modified date as wildcard(*, ?)')
 	parser.add_argument('--glob-max', type=int, default=60, help='Pick up file max as pattern found in TOML')
 	parser.add_argument('--show', action='store_true', help='Show images to check')
@@ -1016,13 +992,26 @@ def main(
 	parser.add_argument('--no-ocr', action='store_true', default=False, help='Do not execute OCR')
 	parser.add_argument('--ocr-conf', type=int, default=55, help='Confidence threshold for OCR')
 	parser.add_argument('--psm', type=int, default=6, help='PSM value for Tesseract')
-	parser.add_argument('--ini', default='image-filter.ini', help='Configuration ini file default:"image-filter.ini"')
+	parser.add_argument("--image_area_param", type=yaml.safe_load, help='Screenshot image area name to parameter in config file as "image_area_param:{<app_name>:{<area_name>:[0,106,196,-1],..}}"')
 	args = parser.parse_args()
-	# if not args.files: parser.print_help() sys.exit(1)
+	app_stem_end:dict[str,str] = {n[:n.index(':')]:n[n.index(':')+1:] for n in args.app_stem_end.split(',')}
+
 	filter_area_param_dict = {}
 	# image_config_filename = (args.file) #.resolve()Path
 	filter_config_doc: TOMLDocument | None = None
-	def get_filter_config() -> TOMLDocument | None:
+	def get_image_area_param_config(app_name: APP_NAME) -> dict[ImageAreaParamName, Sequence[int]] | None:
+		try:
+			return args.image_area_param[app_name]
+		except TypeError:
+			image_area_param_dict = {}
+			for app in args.image_area_param.split(';'):
+				for app_name, image_area_param in app.split(':'):
+					if ImageAreaParamName[app_name] == app_name:
+						area_name, area_param = image_area_param.split(',', 1)
+						area_param_dict[area_name] = [int(p) for p in area_param.split(',')]
+						image_area_param_dict[ImageAreaParamName(app_name)] = {v for k, v in image_area_params}
+						return {ImageAreaParamName(k): v for k, v in image_area_params}
+	'''def get_filter_config(app_name: APP_NAME) -> TOMLDocument | None:
 		nonlocal filter_config_doc
 		if filter_config_doc:
 			return filter_config_doc
@@ -1044,20 +1033,30 @@ def main(
 				logger.info("Loaded filter config in [%s] as: %s", filter_toml_path, filter_config_doc)
 				return filter_config_doc 
 			# filter_config_is_loaded = True
-		# (filter_config_doc := TOMLDocument())
-
+		# (filter_config_doc := TOMLDocument())'''
 	file_list_loaded = False
 	def get_args_files(file_list=[]):
-		if len(args.files) == 1:
-			return args.files[0]
+		nonlocal file_list_loaded
+		if file_list_loaded:
+			return file_list
+		# if len(args.files) == 1: return args.files[0]
 		else:
-			nonlocal file_list_loaded
 			if not file_list_loaded:
-				_file_list = [(Path(f), Path(f).stat().st_mtime) for f in args.files]
+				_file_list = []
+				for f in args.files:
+					if is_wild_card(f):
+						path = (Path(args.image_dir) / Path(f)) if args.image_dir else Path(f)
+						_file_list += [(Path(f), Path(f).stat().st_mtime) for f in path.glob(f)]
 				file_list += [m[0] for m in sorted(_file_list, key=lambda f: f[1], reverse=True)]
 				file_list_loaded = True
 				logger.info("Loaded file_list of %d files: %s", len(file_list), file_list)
 			return file_list
+
+	def is_wild_card(file_name):
+		for c in "*?[]":
+			if c in file_name:
+				return True
+		return False
 
 	class NoAppNameException(Exception):
 		"""No application name specified"""
@@ -1084,10 +1083,12 @@ def main(
 			sys.exit("Needs application name spec. by '--app' option or file name(ending with {}).".format([nm.value for nm in APP_NAME]))
 	image_path_dir: Path | None = None
 	try:
-		image_path_dir = Path(args.dir or get_filter_config()['image-path']['dir'])
+		image_path_dir = Path(args.image_dir).expanduser() # or get_filter_config()['image-path']['dir'])
 	except TypeError:
 		logger.info("Image dir keeps None since not args.dir or not get_filter_config")
-	except KeyError:
+	except RuntimeError:
+		logger.info("Image dir user home expansion(starting with '~') failed.")
+	'''except KeyError:
 		logger.info("Image dir keeps None since no key for 'image-path.dir' in get_filter_config")
 	except ConfigError:
 		logger.info("Image dir keeps None due to config error")
@@ -1098,45 +1099,13 @@ def main(
 				image_path_dir = image_path_dir.expanduser()
 			except RuntimeError:
 				sys.exit("image_dir.expanduser() failed!")
-			logger.info("Image directory is expanded user by args as %s", image_path_dir)
-
-	
+			logger.info("Image directory is expanded user by args as %s", image_path_dir)'''
 
 	if image_path_dir and not image_path_dir.exists():
 		sys.exit("Image dir. does not exist: %s" % image_path_dir)
 
-	if not get_args_files() and args.toml:
-		try:
-			image_file_pattern = get_filter_config()['image-path'][str(app_name)]['filename']
-			logger.info("Image filename pattern is set by %s as: %s", args.toml, image_file_pattern)
-			is_wildcard = False
-			for c in "*?[]":
-				if c in image_file_pattern:
-					is_wildcard = True
-					break
-			if is_wildcard:
-				_file_list = []
-				# search_path = (image_path_dir) / image_file_pattern if image_path_dir else Path(image_file_pattern)
-				for n, match_f in enumerate(image_path_dir.glob(image_file_pattern)):
-					_file_list.append(match_f)
-					if n > args.glob_max:
-						logger.warning("Exceeded glob_max: %d", args.glob_max)
-						break
-				if len(_file_list) == 0:
-					sys.exit("Error: No files found %s: %s" % ('with wildcard' if is_wildcard else 'without wildcard', image_file_pattern))
-				else:
-					logger.info("%d files are listed.", len(_file_list))
-				file_list = sorted(_file_list, key=lambda f: f.stat().st_mtime, reverse=True)
-		except KeyError:
-			sys.exit("No files found in toml file as [image-path.%s]\nfilename='*_jp.co.taimee.png'" % str(app_name))
-		'''else:
-			logger.info("%d file%s found from %s", len(file_list), 's' if len(file_list) > 1 else '', image_file_pattern)
-			from os.path import getmtime
-			nth = args.nth # if args.nth else 1
-			logger.info("Choosing the %d-%s file from the latest in %d files.", nth, "th" if nth > 3 else ("st", "nd", "rd")[nth - 1], len(file_list))
-			file_list.sort(key=getmtime, reverse=True)'''
-	else:
-		file_list = get_args_files() # [Path(f) for f in args.files]
+	# if not get_args_files(): # and args.toml:
+	file_list = get_args_files() # [Path(f) for f in args.files]
 		# raise ValueError("Error: Image file name is not specified with --file option or not found in toml file as [image-path.%s]\nfilename='*_jp.co.taimee.png'" % app_name)
 	# filename_path = Path(image_file_pattern)
 #glob_path.glob(str(filename_path)) if f.is_file()]
@@ -1153,8 +1122,8 @@ def main(
 		sys.exit("Error: image_file not found: %s" % image_file)
 	# image_fullpath = image_path.resolve()
 	try:
-		filter_area_param_dict = {} if args.make else get_filter_config()[OCR_FILTER][str(app_name)]
-	except KeyError:
+		filter_area_param_dict = {} if args.make else args.image_area_param[app_name] # get_image_area_param_config(app_name)
+	except (TypeError, KeyError):
 		filter_area_param_dict = {}
 		if not args.make:
 			logger.warning("KeyError: '%s' not found in get_filter_config()", app_name)
