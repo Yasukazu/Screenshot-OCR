@@ -121,6 +121,7 @@ class ImageAreaParam(TOMLDataclass):
 
 	@classmethod
 	def from_param(cls, param: Sequence[int]) -> "ImageAreaParam":
+		''' new from a sequence of int '''
 		match len(param):
 			case num if num in range(1, 4):
 				return cls(*(list(param) + [-1, 0, -1][:num - 4]))
@@ -141,8 +142,8 @@ class ImageAreaParam(TOMLDataclass):
 		return cls(height=height, width=width)
 
 	@property
-	def param(self)-> Sequence[int]:
-		return (self.y_offset, self.height or -1, self.x_offset, self.width or -1)
+	def param(self)-> list[int]:
+		return [self.y_offset, self.height or -1, self.x_offset, self.width or -1]
 
 
 	@classmethod
@@ -242,16 +243,12 @@ def get_center_run_length(line: Sequence[int]) -> int | None:
 
 @dataclass
 class ShiftAreaParam(ImageAreaParam):
-	'''Needs to initialize using named parameters::
-	start_width: as xpos
-	end_xpos: as width
-	while start_xpos is 0 and end_width is -1
-	'''
-	xpos2: int = -1
+	''' adding to super, x_offset2 for shift end '''
+	x_offset2: int = 0
 
 	@property
-	def param(self)-> Sequence[int]:
-		return list(super().param) + [self.xpos2]
+	def param(self)-> list[int]:
+		return [*super().param, self.x_offset2]
 
 	@classmethod
 	def get_class_name(cls):
@@ -296,26 +293,7 @@ class ShiftAreaParam(ImageAreaParam):
 			raise ValueError("Center shape not found!")
 		image[:, x_center - b] = 0
 		return x_center - b, x_center + b
-		'''all_white = False
 
-		for x in range(image.shape[1] // 2 - 1, 0, -1):
-			if np.all(image[:, x] != 0):
-				all_white = True
-				break
-		if not all_white:
-			raise ValueError("No all white found in left half of scan area!")
-		x0 = x
-		all_white = False
-		for x in range(image.shape[1] // 2, image.shape[1]):
-			if np.all(image[:, x] != 0):
-				all_white = True
-				break
-		if not all_white:
-			raise ValueError("No all white found in right half of scan area!")
-		if image_check:
-			cv2.imshow("Shift area center", image[:, x0:x])
-			cv2.waitKey(0)
-		return x0, x'''
 
 	@classmethod
 	def from_image(cls, image: np.ndarray, offset_range: range, image_check:bool=False) -> "ShiftAreaParam":
@@ -332,7 +310,7 @@ class ShiftAreaParam(ImageAreaParam):
 		return self.width
 
 	def as_slice_param(self) -> Sequence[Int4]:
-		return ((self.y_offset, self.y_offset + self.height, 0, self.x_offset),(self.y_offset, self.y_offset + self.height, self.width, -1))
+		return ((self.y_offset, self.y_offset + self.height, self.x_offset, self.x_offset + self.width), (self.y_offset, self.y_offset + self.height, self.x_offset2, -1))
 
 
 @dataclass
@@ -964,15 +942,14 @@ def main(
 	from taimee_filter import TaimeeFilter
 	OCR_FILTER = "ocr-filter"
 	config_sections = ['app_stem_end', 'common', 'image_area_param']
-	default_config_files=[str(Path(config_dir) / f"{config_file_node}.{ext.lower()}") for ext in config_file_ext_enum] + [str(Path(config_dir) / "image-area-param.cfg")]
+	default_config_files=[str(Path(config_dir) / f"{config_file_node}.{ext.lower()}") for ext in config_file_ext_enum] + [str(Path(config_dir) / "image-area-param.ini")]
 	parser = ArgParser(
 			default_config_files=default_config_files,
 			config_file_parser_class=CompositeConfigParser(
 				[TomlConfigParser(config_sections),
-				IniConfigParser(config_sections, split_ml_text_to_list=True),
-				ConfigparserConfigFileParser
-				])
-		)
+				IniConfigParser(config_sections, split_ml_text_to_list=True) ]
+				)
+			)
 	parser.add_argument("--image_ext", default='.jpg', env_var='IMAGE_FILTER_IMAGE_EXT')
 	parser.add_argument("--image_dir", default='./', env_var='IMAGE_FILTER_IMAGE_DIR')
 	parser.add_argument('files', nargs='*', help='Image files to commit OCR or to get parameters. Specify like: *.png')
@@ -992,13 +969,27 @@ def main(
 	parser.add_argument('--no-ocr', action='store_true', default=False, help='Do not execute OCR')
 	parser.add_argument('--ocr-conf', type=int, default=55, help='Confidence threshold for OCR')
 	parser.add_argument('--psm', type=int, default=6, help='PSM value for Tesseract')
-	parser.add_argument("--image_area_param", type=yaml.safe_load, help='Screenshot image area name to parameter in config file as "image_area_param:{<app_name>:{<area_name>:[0,106,196,-1],..}}"')
+	parser.add_argument("--image_area_param", nargs='*', help='Screenshot image area name to parameter in config file as "image_area_param=<area_name>:0,106,196,-1"') # type=yaml.safe_load, 
 	args = parser.parse_args()
 	app_stem_end:dict[str,str] = {n[:n.index(':')]:n[n.index(':')+1:] for n in args.app_stem_end.split(',')}
 
 	filter_area_param_dict = {}
 	# image_config_filename = (args.file) #.resolve()Path
 	filter_config_doc: TOMLDocument | None = None
+	param_dict_loaded = False
+	def get_image_area_param_dict(param_dict={}):
+		nonlocal param_dict_loaded
+		if not param_dict_loaded:
+			param_name_set = set([n.name for n in ImageAreaParamName])
+			for elem in args.image_area_param:
+				try:
+					k, v = elem.split(':')
+					if k in param_name_set:
+						param_dict[k] = v
+				except (ValueError, TypeError):
+					pass
+			param_dict_loaded = True
+		return param_dict			
 	def get_image_area_param_config(app_name: APP_NAME) -> dict[ImageAreaParamName, Sequence[int]] | None:
 		try:
 			return args.image_area_param[app_name]
@@ -1011,29 +1002,7 @@ def main(
 						area_param_dict[area_name] = [int(p) for p in area_param.split(',')]
 						image_area_param_dict[ImageAreaParamName(app_name)] = {v for k, v in image_area_params}
 						return {ImageAreaParamName(k): v for k, v in image_area_params}
-	'''def get_filter_config(app_name: APP_NAME) -> TOMLDocument | None:
-		nonlocal filter_config_doc
-		if filter_config_doc:
-			return filter_config_doc
-		if args.toml:
-			try: # if env_file.exists():
-				if not args.toml.endswith('.toml'):
-					args.toml += '.toml'
-				filter_toml_path = Path(args.toml) # .resolve()
-				from tomlkit import load # TOMLDocument, table, comment, nl, dump, 
-				with filter_toml_path.open('r') as f:
-					filter_config_doc = load(f)
-			except FileNotFoundError:
-				logger.error("%s File Not Found TOML", filter_toml_path)
-				raise ConfigError("FileNotFoundError in TOML")
-			except tomllib.TOMLDecodeError:
-				logger.error("Not a valid TOML file: %s", filter_toml_path)
-				raise ConfigError("Not a valid TOML file")
-			else:
-				logger.info("Loaded filter config in [%s] as: %s", filter_toml_path, filter_config_doc)
-				return filter_config_doc 
-			# filter_config_is_loaded = True
-		# (filter_config_doc := TOMLDocument())'''
+
 	file_list_loaded = False
 	def get_args_files(file_list=[]):
 		nonlocal file_list_loaded
