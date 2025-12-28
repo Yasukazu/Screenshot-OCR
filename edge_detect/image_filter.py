@@ -952,12 +952,12 @@ def main(
 			)
 	parser.add_argument("--image_ext", default='.jpg', env_var='IMAGE_FILTER_IMAGE_EXT')
 	parser.add_argument("--image_dir", default='./', env_var='IMAGE_FILTER_IMAGE_DIR')
-	parser.add_argument('--files', nargs='*', help='Image files to commit OCR or to get parameters. Specify like: *.png')
+	# parser.add_argument('--files', nargs='*', help='Image files to commit OCR or to get parameters. Specify like: *.png')
 	parser.add_argument("--app_stem_end", env_var='IMAGE_FILTER_APP_STEM_END', default='taimee:_jp.co.taimee,mercari:_jp.mercari.work.android', help='Screenshot image file name pattern of the screenshot to execute OCR:(specified in format as "<app_name>:<stem_end>,..." )')
 	#parser.add_argument("--taimee", env_var='IMAGE_FILTER_TAIMEE')
 	#parser.add_argument("--mercari", env_var='IMAGE_FILTER_MERCARI')
 	# parser = ArgumentParser()
-	parser.add_argument('files', nargs='*', help='Image files to commit OCR or to get parameters. Specify like: *.png')
+	parser.add_argument('files', nargs='*', default=['*{app_stem_end}{image_ext}'], help='Image files to commit OCR or to get parameters. Default is: [*.png]')
 	parser.add_argument('--app', choices=[n.name.lower() for n in APP_NAME], type=str, help='Application name of the screenshot to execute OCR') # 
 	# parser.add_argument('--toml', help=f'Configuration toml file name like {OCR_FILTER}')
 	parser.add_argument('--save', help='Output path to save OCR text of the image file as TOML format into the image file name extention as ".ocr-<app_name>.toml"')
@@ -1009,10 +1009,12 @@ def main(
 	def get_args_files(file_list=[]):
 		nonlocal file_list_loaded
 		if not file_list_loaded:
+			_file_list = []
 			for f in args.files:
 				if is_wild_card(f):
-					path = (Path(args.image_dir) / Path(f)) if args.image_dir else Path(f)
-					_file_list += [(Path(f), Path(f).stat().st_mtime) for f in path.glob(f)]
+					patt = f.format(app_stem_end=app_stem_end[args.app], image_ext=args.image_ext)
+					dir_path = Path(args.image_dir) if args.image_dir else Path(f).parent
+					_file_list += [(Path(f), Path(f).stat().st_mtime) for f in dir_path.glob(patt)]
 			file_list += [m[0] for m in sorted(_file_list, key=lambda f: f[1], reverse=True)]
 			file_list_loaded = True
 			logger.info("Loaded file_list of %d files: %s", len(file_list), file_list)
@@ -1258,8 +1260,9 @@ if __name__ == "__main__":
 		logger.error("MakeError: %s", e)
 		sys.exit(2)
 	except SystemExit as e:
-		logger.error("SystemExit: %s", e)
-		raise
+		if e.code != 0:
+			logger.error("SystemExit: %s", e)
+			raise
 	except Exception as e:
 		logger.error("Error: %s", e)
 		raise
