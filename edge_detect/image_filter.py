@@ -952,7 +952,7 @@ def main(
 			)
 	parser.add_argument("--image_ext", default='.jpg', env_var='IMAGE_FILTER_IMAGE_EXT')
 	parser.add_argument("--image_dir", default='./', env_var='IMAGE_FILTER_IMAGE_DIR')
-	parser.add_argument('files', nargs='*', help='Image files to commit OCR or to get parameters. Specify like: *.png')
+	parser.add_argument('--files', nargs='*', help='Image files to commit OCR or to get parameters. Specify like: *.png')
 	parser.add_argument("--app_stem_end", env_var='IMAGE_FILTER_APP_STEM_END', default='taimee:_jp.co.taimee,mercari:_jp.mercari.work.android', help='Screenshot image file name pattern of the screenshot to execute OCR:(specified in format as "<app_name>:<stem_end>,..." )')
 	#parser.add_argument("--taimee", env_var='IMAGE_FILTER_TAIMEE')
 	#parser.add_argument("--mercari", env_var='IMAGE_FILTER_MERCARI')
@@ -976,8 +976,9 @@ def main(
 	filter_area_param_dict = {}
 	# image_config_filename = (args.file) #.resolve()Path
 	filter_config_doc: TOMLDocument | None = None
+
 	param_dict_loaded = False
-	def get_image_area_param_dict(param_dict={}):
+	def get_image_area_param_dict(param_dict: dict[ImageAreaParamName, Sequence[int]] = {}) -> dict[ImageAreaParamName, Sequence[int]]:
 		nonlocal param_dict_loaded
 		if not param_dict_loaded:
 			param_name_set = set([n.name for n in ImageAreaParamName])
@@ -985,11 +986,12 @@ def main(
 				try:
 					k, v = elem.split(':')
 					if k in param_name_set:
-						param_dict[k] = v
+						param_dict[ImageAreaParamName[k]] = [int(p) for p in v.split(',')]
 				except (ValueError, TypeError):
 					pass
 			param_dict_loaded = True
 		return param_dict			
+
 	def get_image_area_param_config(app_name: APP_NAME) -> dict[ImageAreaParamName, Sequence[int]] | None:
 		try:
 			return args.image_area_param[app_name]
@@ -1006,20 +1008,15 @@ def main(
 	file_list_loaded = False
 	def get_args_files(file_list=[]):
 		nonlocal file_list_loaded
-		if file_list_loaded:
-			return file_list
-		# if len(args.files) == 1: return args.files[0]
-		else:
-			if not file_list_loaded:
-				_file_list = []
-				for f in args.files:
-					if is_wild_card(f):
-						path = (Path(args.image_dir) / Path(f)) if args.image_dir else Path(f)
-						_file_list += [(Path(f), Path(f).stat().st_mtime) for f in path.glob(f)]
-				file_list += [m[0] for m in sorted(_file_list, key=lambda f: f[1], reverse=True)]
-				file_list_loaded = True
-				logger.info("Loaded file_list of %d files: %s", len(file_list), file_list)
-			return file_list
+		if not file_list_loaded:
+			for f in args.files:
+				if is_wild_card(f):
+					path = (Path(args.image_dir) / Path(f)) if args.image_dir else Path(f)
+					_file_list += [(Path(f), Path(f).stat().st_mtime) for f in path.glob(f)]
+			file_list += [m[0] for m in sorted(_file_list, key=lambda f: f[1], reverse=True)]
+			file_list_loaded = True
+			logger.info("Loaded file_list of %d files: %s", len(file_list), file_list)
+		return file_list
 
 	def is_wild_card(file_name):
 		for c in "*?[]":
@@ -1091,7 +1088,7 @@ def main(
 		sys.exit("Error: image_file not found: %s" % image_file)
 	# image_fullpath = image_path.resolve()
 	try:
-		filter_area_param_dict = {} if args.make else args.image_area_param[app_name] # get_image_area_param_config(app_name)
+		filter_area_param_dict: dict[ImageAreaParamName, Sequence[int]] = {} if args.make else get_image_area_param_dict() # args.image_area_param[app_name] # get_image_area_param_config(app_name)
 	except (TypeError, KeyError):
 		filter_area_param_dict = {}
 		if not args.make:
@@ -1100,14 +1097,14 @@ def main(
 	image = cv2.imread(str(image_file), cv2.IMREAD_GRAYSCALE) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
 	if image is None:
 		raise ValueError("Error: Could not load image: %s" % image_file)
-	filter_param_dict: dict[ImageAreaParamName, dict[str, str|float|None]] = {}
+	'''filter_param_dict: dict[ImageAreaParamName, dict[str, str|float|None]] = {}
 	if not args.make:
 		for key in ImageAreaParamName:
 			try:
 				filter_param_dict[key] = filter_area_param_dict[key.name]
 			except KeyError:
 				filter_param_dict[key] = {}
-		'''ImageAreaParamName.heading:filter_area_param_dict.get('heading'),
+		ImageAreaParamName.heading:filter_area_param_dict.get('heading'),
 		ImageAreaParamName.breaktime:filter_area_param_dict.get('breaktime'),
 		ImageAreaParamName.shift:filter_area_param_dict.get('shift'),
 		ImageAreaParamName.paystub:filter_area_param_dict.get('paystub'),'''
@@ -1116,11 +1113,10 @@ def main(
 	if not args.no_ocr:
 		match app_name:
 			case APP_NAME.TAIMEE:
-				app_filter = TaimeeFilter(image=image, param_dict=filter_param_dict, show_check=args.show)
+				app_filter = TaimeeFilter(image=image, param_dict=filter_area_param_dict, show_check=args.show)
 			case APP_NAME.MERCARI:
 				sys.exit("Error: this app_name is not yet implemented: %s" % app_name)
-			case _:
-				sys.exit("Unknown app_name : %s" % app_name)
+
 		from tesseract_ocr import TesseractOCR, Output
 		from tomli_w import dumps
 		ocr = TesseractOCR()
