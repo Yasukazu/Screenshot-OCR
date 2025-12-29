@@ -16,7 +16,7 @@ sys.path.append(str(cwd.parent))
 import matplotlib.pyplot as plt
 from cv2 import UMat
 import cv2
-from tesseract_ocr import TesseractOCR
+
 from camel_converter import to_snake
 
 # from cvc2.typing import MatLike
@@ -27,14 +27,25 @@ import matplotlib.pyplot as plt
 from inspect import isclass
 from fancy_dataclass import TOMLDataclass
 
-from near_bunch import NearBunch, NearBunchException, NoBunchException
 
 cwd = Path(__file__).resolve().parent
 sys.path.append(str(cwd.parent))
 from set_logger import set_logger
 
 logger = set_logger(__name__)
+from enum import StrEnum, auto
 
+class APP_NAME(StrEnum):
+	''' name of app: value is stem end '''
+	TAIMEE = auto() # '_jp.co.taimee'
+	MERCARI = auto() # '_jp.mercari.work.android'
+
+	def __str__(self):
+		return self.name.lower()
+
+class AppNameToEnum(TypedDict):
+	key: str
+	value: APP_NAME
 class ImageFilterException(Exception):
 	pass
 
@@ -823,6 +834,9 @@ def merge_nearby_elems(elems: Sequence[int], thresh=9) -> Iterator[int]:
 	if sent:
 		yield elem0
 
+sys.path.insert(0, str(Path(__file__).parent))
+from near_bunch import NearBunch, NearBunchException, NoBunchException
+
 class BorderOffset(NamedTuple):
 	bunch: NearBunch
 	offset: int
@@ -876,19 +890,7 @@ from argparse import ArgumentParser
 # from dotenv import dotenv_values
 import tomllib
 from fnmatch import fnmatch
-from enum import StrEnum, auto
 
-class APP_NAME(StrEnum):
-	''' name of app: value is stem end '''
-	TAIMEE = auto() # '_jp.co.taimee'
-	MERCARI = auto() # '_jp.mercari.work.android'
-
-	def __str__(self):
-		return self.name.lower()
-
-class AppNameToEnum(TypedDict):
-	key: str
-	value: APP_NAME
 
 app_name_to_enum: AppNameToEnum 
 app_name_to_enum = {n.name.lower(): n for n in APP_NAME}  # type: ignore
@@ -934,6 +936,10 @@ class ConfigFileExt(StrEnum):
 	TOML = auto()
 	INI = auto()
 
+class NoAppNameError(ConfigError):
+	"""No application name specified"""
+	pass
+
 import yaml
 
 def main(
@@ -950,14 +956,14 @@ def main(
 				IniConfigParser(config_sections, split_ml_text_to_list=True) ]
 				)
 			)
-	parser.add_argument("--image_ext", default='.jpg', env_var='IMAGE_FILTER_IMAGE_EXT')
+	parser.add_argument("--image_ext", action='append', default='.png', env_var='IMAGE_FILTER_IMAGE_EXT')
 	parser.add_argument("--image_dir", default='./', env_var='IMAGE_FILTER_IMAGE_DIR')
 	# parser.add_argument('--files', nargs='*', help='Image files to commit OCR or to get parameters. Specify like: *.png')
-	parser.add_argument("--app_stem_end", env_var='IMAGE_FILTER_APP_STEM_END', default='taimee:_jp.co.taimee,mercari:_jp.mercari.work.android', help='Screenshot image file name pattern of the screenshot to execute OCR:(specified in format as "<app_name>:<stem_end>,..." )')
+	parser.add_argument("--app_stem_end", env_var='IMAGE_FILTER_APP_STEM_END', default='taimee:_jp.co.taimee;mercari:_jp.mercari.work.android', help='Screenshot image file name pattern of the screenshot to execute OCR:(specified in format as "<app_name1>:<stem_end1>,<stem_end2>;..." )')
 	#parser.add_argument("--taimee", env_var='IMAGE_FILTER_TAIMEE')
 	#parser.add_argument("--mercari", env_var='IMAGE_FILTER_MERCARI')
 	# parser = ArgumentParser()
-	parser.add_argument('files', nargs='*', default=['*{app_stem_end}{image_ext}'], help='Image files to commit OCR or to get parameters. Default is: [*.png]')
+	# parser.add_argument('--filename_pattern', action='append', default=['*{app_stem_end}{image_ext}'], help='Image files to commit OCR or to get parameters. Can be specified multiple times. Default is: *{app_stem_end}{image_ext}')
 	parser.add_argument('--app', choices=[n.name.lower() for n in APP_NAME], type=str, help='Application name of the screenshot to execute OCR') # 
 	# parser.add_argument('--toml', help=f'Configuration toml file name like {OCR_FILTER}')
 	parser.add_argument('--save', help='Output path to save OCR text of the image file as TOML format into the image file name extention as ".ocr-<app_name>.toml"')
@@ -971,7 +977,17 @@ def main(
 	parser.add_argument('--psm', type=int, default=6, help='PSM value for Tesseract')
 	parser.add_argument("--image_area_param", nargs='*', help='Screenshot image area name to parameter in config file as "image_area_param=<area_name>:0,106,196,-1"') # type=yaml.safe_load, 
 	args = parser.parse_args()
-	app_stem_end:dict[str,str] = {n[:n.index(':')]:n[n.index(':')+1:] for n in args.app_stem_end.split(',')}
+	is_app_to_stem_end_set = False
+	def app_to_stem_end_set(app:APP_NAME, app_to_stem_end_dict:dict[APP_NAME, set[str]]={}) -> set[str]:
+		nonlocal is_app_to_stem_end_set
+		if is_app_to_stem_end_set:
+			return app_to_stem_end_dict[app]
+		for it in args.app_stem_end.split(';'):
+			name, val = it.split(':')
+			vals = val.split(',')
+			app_to_stem_end_dict[APP_NAME[name]] = set(vals)
+		is_app_to_stem_end_set = True
+		return app_to_stem_end_dict[app]
 
 	filter_area_param_dict = {}
 	# image_config_filename = (args.file) #.resolve()Path
@@ -1005,18 +1021,21 @@ def main(
 						image_area_param_dict[ImageAreaParamName(app_name)] = {v for k, v in image_area_params}
 						return {ImageAreaParamName(k): v for k, v in image_area_params}
 
-	file_list_loaded = False
-	def get_args_files(file_list=[]):
-		nonlocal file_list_loaded
-		if not file_list_loaded:
+	is_file_list_loaded = False
+	from os import scan_dir
+	def get_args_files(file_list:list[str]=[]):
+		nonlocal is_file_list_loaded
+		if not is_file_list_loaded:
 			_file_list = []
-			for f in args.files:
-				if is_wild_card(f):
-					patt = f.format(app_stem_end=app_stem_end[args.app], image_ext=args.image_ext)
-					dir_path = Path(args.image_dir) if args.image_dir else Path(f).parent
-					_file_list += [(Path(f), Path(f).stat().st_mtime) for f in dir_path.glob(patt)]
-			file_list += [m[0] for m in sorted(_file_list, key=lambda f: f[1], reverse=True)]
-			file_list_loaded = True
+			with scan_dir(args.image_dir) as ee:
+				for e in ee:
+					if e.is_file() and (path_obj:=Path(e.path)).suffix in args.image_ext:
+						for stem_end in app_to_stem_end_set(app_name()):
+							if path_obj.stem.endswith(stem_end):
+								_file_list.append((Path(e.path), e.stat().st_mtime))
+
+			file_list += [m[0].name for m in sorted(_file_list, key=lambda f: f[1], reverse=True)]
+			is_file_list_loaded = True
 			logger.info("Loaded file_list of %d files: %s", len(file_list), file_list)
 		return file_list
 
@@ -1026,61 +1045,57 @@ def main(
 				return True
 		return False
 
-	class NoAppNameException(Exception):
-		"""No application name specified"""
-		pass
-
-	if args.app is not None:
+	is_app_name_set = False
+	def app_name()-> APP_NAME: # n=0, app_name_list=[]
 		try:
-			app_name = APP_NAME[args.app.upper()] # app_name_to_enum[args.app]
-			logger.info("app_name is set as '%s'", app_name)
+			return APP_NAME[args.app]
 		except KeyError:
-			sys.exit(f"No such app name:{args.app}")
-	else:
-		try: # try to extract app name from file name
-			_file = get_args_files()[args.nth - 1]
-			app_name = None
-			for nm in APP_NAME:
-				if _file.stem.endswith(nm.value):
-					app_name = nm
-					break
-			if not app_name:
-				raise NoAppNameException()	
-			logger.info("Application name is set as '%s' from file name:%s", app_name.name, _file.name)
-		except (IndexError, NoAppNameException):
-			sys.exit("Needs application name spec. by '--app' option or file name(ending with {}).".format([nm.value for nm in APP_NAME]))
-	image_path_dir: Path | None = None
-	try:
-		image_path_dir = Path(args.image_dir).expanduser() # or get_filter_config()['image-path']['dir'])
-	except TypeError:
-		logger.info("Image dir keeps None since not args.dir or not get_filter_config")
-	except RuntimeError:
-		logger.info("Image dir user home expansion(starting with '~') failed.")
-	'''except KeyError:
-		logger.info("Image dir keeps None since no key for 'image-path.dir' in get_filter_config")
-	except ConfigError:
-		logger.info("Image dir keeps None due to config error")
-	else:
-		logger.info("Image directory is set as %s by %s", image_path_dir, 'args.dirget_filter_config()' if args.dir else 'config.image_path.dir')
-		if str(image_path_dir)[0] == '~':
+			pass
+		if not args.app: # is not None:
+			raise NoAppNameError("No application name specified")
+		elif is_app_name_set:
+			return app_name_list[n]
+		else:
 			try:
-				image_path_dir = image_path_dir.expanduser()
-			except RuntimeError:
-				sys.exit("image_dir.expanduser() failed!")
-			logger.info("Image directory is expanded user by args as %s", image_path_dir)'''
+				_app_name = APP_NAME[args.app.upper()] # app_name_to_enum[args.app]
+				logger.info("app_name is set as '%s'", _app_name)
+			except KeyError:
+				raise ConfigError(f"No such app name:{args.app}")
+			else:
+				try: # try to extract app name from file name
+					_file = get_args_files()[args.nth - 1]
+					_app_name = None
+					for nm in args.file_stem_end: # APP_NAME:
+						if Path(_file).stem.endswith(nm.value):
+							_app_name = nm
+							if _app_name not in app_name_list:
+								app_name_list.append(_app_name)
+					if not app_name_list:
+						raise NoAppNameError("No app name is found in file names! Available names: {}".format([nm.value for nm in APP_NAME]))	
+					logger.info("Application name(s) is/are set as [%s] from file name:%s", [an.name.lower() for an in app_name_list], _file.name)
+				except (IndexError, NoAppNameError):
+					sys.exit("Needs application name spec. by '--app' option or file name(ending with {}).".format([nm.value for nm in APP_NAME]))
+		image_path_dir: Path | None = None
+		try:
+			image_path_dir = Path(args.image_dir).expanduser() # or get_filter_config()['image-path']['dir'])
+		except TypeError:
+			logger.info("Image dir keeps None since not args.dir or not get_filter_config")
+		except RuntimeError:
+			logger.info("Image dir user home expansion(starting with '~') failed.")
+
 
 	if image_path_dir and not image_path_dir.exists():
 		sys.exit("Image dir. does not exist: %s" % image_path_dir)
 
 	# if not get_args_files(): # and args.toml:
-	file_list = get_args_files() # [Path(f) for f in args.files]
+	# file_list = get_args_files() # [Path(f) for f in args.files]
 		# raise ValueError("Error: Image file name is not specified with --file option or not found in toml file as [image-path.%s]\nfilename='*_jp.co.taimee.png'" % app_name)
 	# filename_path = Path(image_file_pattern)
 #glob_path.glob(str(filename_path)) if f.is_file()]
 		# logger.info("Files: %s", file_list)
 		# sort by modified date descendingf
 	try:
-		image_file = file_list[args.nth - 1]
+		image_file = get_args_files()[args.nth - 1]
 	except IndexError:
 		# image_file = file_list[0]
 		sys.exit(f"Index out of range for file_list by {args.nth=}")
@@ -1119,6 +1134,7 @@ def main(
 			case APP_NAME.MERCARI:
 				sys.exit("Error: this app_name is not yet implemented: %s" % app_name)
 
+		
 		from tesseract_ocr import TesseractOCR, Output
 		from tomli_w import dumps
 		ocr = TesseractOCR()
