@@ -956,7 +956,7 @@ def main(
 				IniConfigParser(config_sections, split_ml_text_to_list=True) ]
 				)
 			)
-	parser.add_argument("--image_ext", action='append', default='.png', env_var='IMAGE_FILTER_IMAGE_EXT')
+	parser.add_argument("--image_ext", nargs='+', default=['.png'], env_var='IMAGE_FILTER_IMAGE_EXT')
 	parser.add_argument("--image_dir", default='./', env_var='IMAGE_FILTER_IMAGE_DIR')
 	# parser.add_argument('--files', nargs='*', help='Image files to commit OCR or to get parameters. Specify like: *.png')
 	parser.add_argument("--app_stem_end", env_var='IMAGE_FILTER_APP_STEM_END', default='taimee:_jp.co.taimee;mercari:_jp.mercari.work.android', help='Screenshot image file name pattern of the screenshot to execute OCR:(specified in format as "<app_name1>:<stem_end1>,<stem_end2>;..." )')
@@ -964,7 +964,7 @@ def main(
 	#parser.add_argument("--mercari", env_var='IMAGE_FILTER_MERCARI')
 	# parser = ArgumentParser()
 	# parser.add_argument('--filename_pattern', action='append', default=['*{app_stem_end}{image_ext}'], help='Image files to commit OCR or to get parameters. Can be specified multiple times. Default is: *{app_stem_end}{image_ext}')
-	parser.add_argument('--app', choices=[n.name.lower() for n in APP_NAME], type=str, help='Application name of the screenshot to execute OCR') # 
+	parser.add_argument('--app', choices=[n.name.lower() for n in APP_NAME], type=str, help=f'Application name of the screenshot to execute OCR: choices={", ".join(n.name.lower() for n in APP_NAME)}') # 
 	# parser.add_argument('--toml', help=f'Configuration toml file name like {OCR_FILTER}')
 	parser.add_argument('--save', help='Output path to save OCR text of the image file as TOML format into the image file name extention as ".ocr-<app_name>.toml"')
 	# parser.add_argument('--dir', help='Image dir of files: ./')
@@ -977,6 +977,15 @@ def main(
 	parser.add_argument('--psm', type=int, default=6, help='PSM value for Tesseract')
 	parser.add_argument("--image_area_param", nargs='*', help='Screenshot image area name to parameter in config file as "image_area_param=<area_name>:0,106,196,-1"') # type=yaml.safe_load, 
 	args = parser.parse_args()
+	if not args.app:
+		from prompt_toolkit.shortcuts import choice
+		args.app = APP_NAME(choice(message="Choose an application:", options=[(n.name.lower(), n.value) for n in APP_NAME]))
+		logger.info("args.app is chosen by user : %s", args.app)
+	else:
+		try:
+			args.app = APP_NAME(args.app)
+		except ValueError:
+			raise ConfigError(f"Invalid application name: {args.app}. Valid choices are: {', '.join(n.name.lower() for n in APP_NAME)}")
 	is_app_to_stem_end_set = False
 	def app_to_stem_end_set(app:APP_NAME, app_to_stem_end_dict:dict[APP_NAME, set[str]]={}) -> set[str]:
 		nonlocal is_app_to_stem_end_set
@@ -1030,7 +1039,7 @@ def main(
 			with scan_dir(args.image_dir) as ee:
 				for e in ee:
 					if e.is_file() and (path_obj:=Path(e.path)).suffix in args.image_ext:
-						for stem_end in app_to_stem_end_set(app_name()):
+						for stem_end in app_to_stem_end_set(APP_NAME[args.app]):
 							if path_obj.stem.endswith(stem_end):
 								_file_list.append((Path(e.path), e.stat().st_mtime))
 
@@ -1109,7 +1118,7 @@ def main(
 	except (TypeError, KeyError):
 		filter_area_param_dict = {}
 		if not args.make:
-			logger.warning("KeyError: '%s' not found in get_filter_config()", app_name)
+			logger.warning("KeyError: '%s' not found in get_filter_config()", APP_NAME[args.app])
 
 	image = cv2.imread(str(image_file), cv2.IMREAD_GRAYSCALE) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
 	if image is None:
@@ -1128,11 +1137,11 @@ def main(
 
 	# print(f"{para.__class__.__name__:para.as_toml() for para in taimee_filter.area_param_list}")
 	if not args.no_ocr:
-		match app_name:
+		match APP_NAME[args.app]:
 			case APP_NAME.TAIMEE:
 				app_filter = TaimeeFilter(image=image, param_dict=filter_area_param_dict, show_check=args.show)
 			case APP_NAME.MERCARI:
-				sys.exit("Error: this app_name is not yet implemented: %s" % app_name)
+				sys.exit("Error: this app_name is not yet implemented: %s" % args.app)
 
 		
 		from tesseract_ocr import TesseractOCR, Output
@@ -1170,7 +1179,7 @@ def main(
 				doc_dict[area_name] = '\n'.join(pg_list[0])
 			# doc.add(area_tbl)
 		if args.save:
-			save_path = Path(args.save) / (image_file.stem + '.ocr-' + app_name.name.lower() + '.toml')
+			save_path = Path(args.save) / (image_file.stem + '.ocr-' + APP_NAME[args.app].name.lower() + '.toml')
 			if save_path.exists():
 				yn = input(f"\nThe file path to save the image file area configuration:{save_path} already exists. Overwrite?(Enter 'Yes' or 'Affirmative' if you want to overwparser.parse_args()rite)").lower()
 				if yn != 'yes' and yn != 'affirmative':
@@ -1207,7 +1216,7 @@ def main(
 		# print(f"[ocr-filter.{label}]", file=wf)
 		from tomlkit import container as TKContainer
 		ocr_filter_table: TKContainer = org_config.get(OCR_FILTER) or org_config.add(OCR_FILTER, table())[OCR_FILTER]
-		org_area_dict: dict = ocr_filter_table.get(app_name.name.lower()) or {}
+		org_area_dict: dict = ocr_filter_table.get(APP_NAME[args.app].name.lower()) or {}
 		for key, param in app_filter.area_param_dict.items():
 			different = False
 			k = key.name.lower()
@@ -1236,7 +1245,7 @@ def main(
 					if yn != 'yes' and yn != 'affirmative':
 						sys.exit("Exit since the user did not accept overwrite of: %s" % make_path)
 				org_area_dict[k] = vals if k == 'shift' else vals[0] # update
-				ocr_filter_table[app_name.name.lower()] = org_area_dict
+				ocr_filter_table[APP_NAME[args.app].name.lower()] = org_area_dict
 				try:
 					if config_file:
 						config_file.write(org_config)
