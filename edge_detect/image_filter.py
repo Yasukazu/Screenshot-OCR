@@ -979,7 +979,7 @@ def main(
 	args = parser.parse_args()
 	if not args.app:
 		from prompt_toolkit.shortcuts import choice
-		args.app = APP_NAME(choice(message="Choose an application:", options=[(n.name.lower(), n.value) for n in APP_NAME]))
+		args.app = APP_NAME(choice(message="Choose an application:", options=[(n.name.lower(), {'taimee': 'Taimee Job', 'mercari': 'Mercari Work'}[n.value]) for n in APP_NAME]))
 		logger.info("args.app is chosen by user : %s", args.app)
 	else:
 		try:
@@ -1013,7 +1013,7 @@ def main(
 					if k in param_name_set:
 						param_dict[ImageAreaParamName[k]] = [int(p) for p in v.split(',')]
 				except (ValueError, TypeError):
-					pass
+					logger.warning("Invalid image area parameter: %s", elem)
 			param_dict_loaded = True
 		return param_dict			
 
@@ -1039,7 +1039,7 @@ def main(
 			with scan_dir(args.image_dir) as ee:
 				for e in ee:
 					if e.is_file() and (path_obj:=Path(e.path)).suffix in args.image_ext:
-						for stem_end in app_to_stem_end_set(APP_NAME[args.app]):
+						for stem_end in app_to_stem_end_set(args.app):
 							if path_obj.stem.endswith(stem_end):
 								_file_list.append((Path(e.path), e.stat().st_mtime))
 
@@ -1057,7 +1057,7 @@ def main(
 	is_app_name_set = False
 	def app_name()-> APP_NAME: # n=0, app_name_list=[]
 		try:
-			return APP_NAME[args.app]
+			return args.app
 		except KeyError:
 			pass
 		if not args.app: # is not None:
@@ -1118,7 +1118,7 @@ def main(
 	except (TypeError, KeyError):
 		filter_area_param_dict = {}
 		if not args.make:
-			logger.warning("KeyError: '%s' not found in get_filter_config()", APP_NAME[args.app])
+			logger.warning("KeyError: '%s' not found in get_filter_config()", args.app)
 
 	image = cv2.imread(str(image_file), cv2.IMREAD_GRAYSCALE) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
 	if image is None:
@@ -1137,7 +1137,7 @@ def main(
 
 	# print(f"{para.__class__.__name__:para.as_toml() for para in taimee_filter.area_param_list}")
 	if not args.no_ocr:
-		match APP_NAME[args.app]:
+		match args.app:
 			case APP_NAME.TAIMEE:
 				app_filter = TaimeeFilter(image=image, param_dict=filter_area_param_dict, show_check=args.show)
 			case APP_NAME.MERCARI:
@@ -1179,7 +1179,7 @@ def main(
 				doc_dict[area_name] = '\n'.join(pg_list[0])
 			# doc.add(area_tbl)
 		if args.save:
-			save_path = Path(args.save) / (image_file.stem + '.ocr-' + APP_NAME[args.app].name.lower() + '.toml')
+			save_path = Path(args.save) / f"{image_file.stem}.ocr-{args.app}'.toml'"
 			if save_path.exists():
 				yn = input(f"\nThe file path to save the image file area configuration:{save_path} already exists. Overwrite?(Enter 'Yes' or 'Affirmative' if you want to overwparser.parse_args()rite)").lower()
 				if yn != 'yes' and yn != 'affirmative':
@@ -1215,8 +1215,8 @@ def main(
 		# print(label, file=wf)
 		# print(f"[ocr-filter.{label}]", file=wf)
 		from tomlkit import container as TKContainer
-		ocr_filter_table: TKContainer = org_config.get(OCR_FILTER) or org_config.add(OCR_FILTER, table())[OCR_FILTER]
-		org_area_dict: dict = ocr_filter_table.get(APP_NAME[args.app].name.lower()) or {}
+		ocr_filter_table = org_config.get(OCR_FILTER) or org_config.add(OCR_FILTER, table())[OCR_FILTER]
+		org_area_dict: dict = ocr_filter_table.get(args.app) or {}
 		for key, param in app_filter.area_param_dict.items():
 			different = False
 			k = key.name.lower()

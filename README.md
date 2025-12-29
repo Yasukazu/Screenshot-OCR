@@ -172,33 +172,49 @@ python edge_detect/image_filter.py --help
 ```
 
 ```text
-usage: image_filter.py [-h] [--app {taimee,mercari}] [--toml TOML] [--save SAVE]
-                       [--dir DIR] [--nth NTH] [--glob-max GLOB_MAX] [--show]
-                       [--make MAKE] [--no-ocr] [--ocr-conf OCR_CONF] [--psm PSM]
-                       [files ...]
-
-positional arguments:
-  files                 Image files to commit OCR or to get parameters. Specify
-                        like: *.png
+usage: image_filter.py [-h] [--image_ext IMAGE_EXT [IMAGE_EXT ...]] [--image_dir IMAGE_DIR]
+                       [--app_stem_end APP_STEM_END] [--app {taimee,mercari}] [--save SAVE]
+                       [--nth NTH] [--glob-max GLOB_MAX] [--show] [--make] [--no-ocr]
+                       [--ocr-conf OCR_CONF] [--psm PSM]
+                       [--image_area_param [IMAGE_AREA_PARAM ...]]
 
 options:
   -h, --help            show this help message and exit
+  --image_ext IMAGE_EXT [IMAGE_EXT ...]
+                        [env var: IMAGE_FILTER_IMAGE_EXT]
+  --image_dir IMAGE_DIR
+                        [env var: IMAGE_FILTER_IMAGE_DIR]
+  --app_stem_end APP_STEM_END
+                        Screenshot image file name pattern of the screenshot to execute
+                        OCR:(specified in format as "<app_name1>:<stem_end1>,<stem_end2>;..." )
+                        [env var: IMAGE_FILTER_APP_STEM_END]
   --app {taimee,mercari}
-                        Application name of the screenshot to execute
-                        OCR:(specify in TOML filename =: ['*_jp.co.taimee.png',
-                        '*_jp.mercari.work.android.png'])
-  --toml TOML           Configuration toml file name like ocr-filter
-  --save SAVE           Output path to save OCR text of the image file as TOML
-                        format into the image file name extention as
-                        ".ocr-<app_name>.toml"
-  --dir DIR             Image dir of files: ./
-  --nth NTH             Rank(default: 1) of files descending sorted(the latest,
-                        the first) by modified date as wildcard(*, ?)
+                        Application name of the screenshot to execute OCR: choices=taimee, mercari
+  --save SAVE           Output path to save OCR text of the image file as TOML format into the
+                        image file name extention as ".ocr-<app_name>.toml"
+  --nth NTH             Rank(default: 1) of files descending sorted(the latest, the first) by
+                        modified date as wildcard(*, ?)
   --glob-max GLOB_MAX   Pick up file max as pattern found in TOML
   --show                Show images to check
-  --make MAKE           make config. from image(i.e. this arg. makes not to load
-                        a config file like "ocr-filter.toml")
+  --make                make config. from image(i.e. this arg. makes not to load a config file
+                        like "ocr-filter.toml")
   --no-ocr              Do not execute OCR
   --ocr-conf OCR_CONF   Confidence threshold for OCR
   --psm PSM             PSM value for Tesseract
+  --image_area_param [IMAGE_AREA_PARAM ...]
+                        Screenshot image area name to parameter in config file as
+                        "image_area_param=<area_name>:0,106,196,-1"
+
+Args that start with '--' can also be set in a config file
+(/home/yasukazu/github/screen/edge_detect/image-filter.toml or
+/home/yasukazu/github/screen/edge_detect/image-filter.ini or
+/home/yasukazu/github/screen/edge_detect/image-area-param.ini). Uses multiple config parser
+settings (in order):  [1] TOML: Config file syntax is Tom's Obvious, Minimal Language. See
+https://github.com/toml-lang/toml/blob/v0.5.0/README.md for details.  [2] INI: Uses configparser
+module to parse an INI file which allows multi-line values. See
+https://docs.python.org/3/library/configparser.html for details. This parser includes support for
+quoting strings literal as well as python list syntax evaluation. Alternatively lists can be
+constructed with a plain multiline string, each non-empty line will be converted to a list item.
+In general, command-line values override environment variables which override config file values
+which override defaults.
 ```
