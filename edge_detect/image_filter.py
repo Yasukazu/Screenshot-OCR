@@ -935,6 +935,7 @@ from dotenv import load_dotenv
 class ConfigFileExt(StrEnum):	
 	TOML = auto()
 	INI = auto()
+	CFG = auto()
 
 class NoAppNameError(ConfigError):
 	"""No application name specified"""
@@ -958,7 +959,7 @@ def main(
 			)
 	parser.add_argument("--image_ext", nargs='+', default=['.png'], env_var='IMAGE_FILTER_IMAGE_EXT')
 	parser.add_argument("--image_dir", default='./', env_var='IMAGE_FILTER_IMAGE_DIR')
-	parser.add_argument('--file', nargs='*', help='Image file fullpath to commit OCR or to get parameters.')
+	parser.add_argument('files', nargs='*', help='Image file fullpaths to commit OCR or to get parameters.')
 	parser.add_argument("--app_stem_end", env_var='IMAGE_FILTER_APP_STEM_END', default='taimee:_jp.co.taimee;mercari:_jp.mercari.work.android', help='Screenshot image file name pattern of the screenshot to execute OCR:(specified in format as "<app_name1>:<stem_end1>,<stem_end2>;..." )')
 	#parser.add_argument("--taimee", env_var='IMAGE_FILTER_TAIMEE')
 	#parser.add_argument("--mercari", env_var='IMAGE_FILTER_MERCARI')
@@ -990,24 +991,27 @@ def main(
 				logger.error("Invalid app_stem_end: %s", it)
 				raise ConfigError(f"Invalid app_stem_end: {it}")
 			vals = val.split(',')
-			app_to_stem_end_dict[APP_NAME[name]] = set(vals)
+			app_to_stem_end_dict[APP_NAME(name)] = set(vals)
 			for val in vals:
-				stem_end_to_app_dict[val] = APP_NAME[name]
+				stem_end_to_app_dict[val] = APP_NAME(name)
 		is_app_to_stem_end_set = True
 		return app_to_stem_end_dict, stem_end_to_app_dict
 
 	def app_to_stem_end_set(app:APP_NAME) -> set[str]:
 		return get_app_to_stem_end_dict()[0][app]
-	def stem_end_to_app(stem_end:str) -> APP_NAME:
-		return get_app_to_stem_end_dict()[1][stem_end]
+	def stem_to_app(stem:str) -> APP_NAME:
+		for k,v in get_app_to_stem_end_dict()[1].items():
+			if stem.endswith(k):
+				return v
+		raise ConfigError(f"Invalid stem: {stem}")
 
 	if not args.app:
-		if not args.file:
+		if not args.files:
 			from prompt_toolkit.shortcuts import choice
 			args.app = APP_NAME(choice(message="Choose an application:", options=[(n.name.lower(), {'taimee': 'Taimee Job', 'mercari': 'Mercari Work'}[n.value]) for n in APP_NAME]))
 			logger.info("args.app is chosen by user : %s", args.app)
 		else:
-			args.app = stem_end_to_app(Path(args.file).stem)
+			args.app = stem_to_app(Path(args.files[0]).stem)
 	else:
 		try:
 			args.app = APP_NAME(args.app)
