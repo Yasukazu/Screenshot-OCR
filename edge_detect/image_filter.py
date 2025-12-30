@@ -961,6 +961,7 @@ def main(
 	parser.add_argument("--image_dir", default='./', env_var='IMAGE_FILTER_IMAGE_DIR')
 	parser.add_argument('files', nargs='*', help='Image file fullpaths to commit OCR or to get parameters.')
 	parser.add_argument("--app_stem_end", env_var='IMAGE_FILTER_APP_STEM_END', default='taimee:_jp.co.taimee;mercari:_jp.mercari.work.android', help='Screenshot image file name pattern of the screenshot to execute OCR:(specified in format as "<app_name1>:<stem_end1>,<stem_end2>;..." )')
+	parser.add_argument("--app_suffix", action='store_true', default=True, help='Screenshot image file name has suffix(sub extention) of the same as app name i.e. "<stem>.<suffix>.<ext>" (default: True)')
 	#parser.add_argument("--taimee", env_var='IMAGE_FILTER_TAIMEE')
 	#parser.add_argument("--mercari", env_var='IMAGE_FILTER_MERCARI')
 	# parser = ArgumentParser()
@@ -984,16 +985,24 @@ def main(
 		nonlocal is_app_to_stem_end_set
 		if is_app_to_stem_end_set:
 			return app_to_stem_end_dict, stem_end_to_app_dict
-		for it in args.app_stem_end.split(';'):
-			try:
-				name, val = it.split(':')
-			except ValueError:
-				logger.error("Invalid app_stem_end: %s", it)
-				raise ConfigError(f"Invalid app_stem_end: {it}")
-			vals = val.split(',')
-			app_to_stem_end_dict[APP_NAME(name)] = set(vals)
-			for val in vals:
-				stem_end_to_app_dict[val] = APP_NAME(name)
+		try:
+			for it in args.app_stem_end.split(';'):
+				try:
+					name, val = it.split(':')
+				except ValueError:
+					logger.error("Invalid app_stem_end: %s", it)
+					raise ConfigError(f"Invalid app_stem_end: {it}")
+				vals = val.split(',')
+				app_to_stem_end_dict[APP_NAME(name)] = set(vals)
+				for val in vals:
+					stem_end_to_app_dict[val] = APP_NAME(name)
+		except AttributeError:
+			if args.app_suffix:
+				for app in APP_NAME:
+					app_to_stem_end_dict[app] = {app.value}
+					stem_end_to_app_dict[app.value] = app
+			else:
+				raise ConfigError("app_stem_end is not specified and app_suffix is not set")
 		is_app_to_stem_end_set = True
 		return app_to_stem_end_dict, stem_end_to_app_dict
 
@@ -1001,7 +1010,7 @@ def main(
 		return get_app_to_stem_end_dict()[0][app]
 	def stem_to_app(stem:str) -> APP_NAME:
 		for k,v in get_app_to_stem_end_dict()[1].items():
-			if stem.endswith(k):
+			if stem.endswith(k) or k in stem.split('.'):
 				return v
 		raise ConfigError(f"Invalid stem: {stem}")
 
