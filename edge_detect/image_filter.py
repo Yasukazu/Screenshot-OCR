@@ -958,7 +958,7 @@ def main(
 			)
 	parser.add_argument("--image_ext", nargs='+', default=['.png'], env_var='IMAGE_FILTER_IMAGE_EXT')
 	parser.add_argument("--image_dir", default='./', env_var='IMAGE_FILTER_IMAGE_DIR')
-	# parser.add_argument('--files', nargs='*', help='Image files to commit OCR or to get parameters. Specify like: *.png')
+	parser.add_argument('--file', nargs='*', help='Image file fullpath to commit OCR or to get parameters.')
 	parser.add_argument("--app_stem_end", env_var='IMAGE_FILTER_APP_STEM_END', default='taimee:_jp.co.taimee;mercari:_jp.mercari.work.android', help='Screenshot image file name pattern of the screenshot to execute OCR:(specified in format as "<app_name1>:<stem_end1>,<stem_end2>;..." )')
 	#parser.add_argument("--taimee", env_var='IMAGE_FILTER_TAIMEE')
 	#parser.add_argument("--mercari", env_var='IMAGE_FILTER_MERCARI')
@@ -977,26 +977,42 @@ def main(
 	parser.add_argument('--psm', type=int, default=6, help='PSM value for Tesseract')
 	parser.add_argument("--image_area_param", nargs='*', help='Screenshot image area name to parameter in config file as "image_area_param=<area_name>:0,106,196,-1"') # type=yaml.safe_load, 
 	args = parser.parse_args()
+
+	is_app_to_stem_end_set = False
+	def get_app_to_stem_end_dict(app_to_stem_end_dict:dict[APP_NAME, set[str]]={}, stem_end_to_app_dict:dict[str, APP_NAME]={}) -> tuple[dict[APP_NAME, set[str]],dict[str, APP_NAME] ]:
+		nonlocal is_app_to_stem_end_set
+		if is_app_to_stem_end_set:
+			return app_to_stem_end_dict, stem_end_to_app_dict
+		for it in args.app_stem_end.split(';'):
+			try:
+				name, val = it.split(':')
+			except ValueError:
+				logger.error("Invalid app_stem_end: %s", it)
+				raise ConfigError(f"Invalid app_stem_end: {it}")
+			vals = val.split(',')
+			app_to_stem_end_dict[APP_NAME[name]] = set(vals)
+			for val in vals:
+				stem_end_to_app_dict[val] = APP_NAME[name]
+		is_app_to_stem_end_set = True
+		return app_to_stem_end_dict, stem_end_to_app_dict
+
+	def app_to_stem_end_set(app:APP_NAME) -> set[str]:
+		return get_app_to_stem_end_dict()[0][app]
+	def stem_end_to_app(stem_end:str) -> APP_NAME:
+		return get_app_to_stem_end_dict()[1][stem_end]
+
 	if not args.app:
-		from prompt_toolkit.shortcuts import choice
-		args.app = APP_NAME(choice(message="Choose an application:", options=[(n.name.lower(), {'taimee': 'Taimee Job', 'mercari': 'Mercari Work'}[n.value]) for n in APP_NAME]))
-		logger.info("args.app is chosen by user : %s", args.app)
+		if not args.file:
+			from prompt_toolkit.shortcuts import choice
+			args.app = APP_NAME(choice(message="Choose an application:", options=[(n.name.lower(), {'taimee': 'Taimee Job', 'mercari': 'Mercari Work'}[n.value]) for n in APP_NAME]))
+			logger.info("args.app is chosen by user : %s", args.app)
+		else:
+			args.app = stem_end_to_app(Path(args.file).stem)
 	else:
 		try:
 			args.app = APP_NAME(args.app)
 		except ValueError:
 			raise ConfigError(f"Invalid application name: {args.app}. Valid choices are: {', '.join(n.name.lower() for n in APP_NAME)}")
-	is_app_to_stem_end_set = False
-	def app_to_stem_end_set(app:APP_NAME, app_to_stem_end_dict:dict[APP_NAME, set[str]]={}) -> set[str]:
-		nonlocal is_app_to_stem_end_set
-		if is_app_to_stem_end_set:
-			return app_to_stem_end_dict[app]
-		for it in args.app_stem_end.split(';'):
-			name, val = it.split(':')
-			vals = val.split(',')
-			app_to_stem_end_dict[APP_NAME[name]] = set(vals)
-		is_app_to_stem_end_set = True
-		return app_to_stem_end_dict[app]
 
 	filter_area_param_dict = {}
 	# image_config_filename = (args.file) #.resolve()Path
