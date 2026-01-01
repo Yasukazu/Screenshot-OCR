@@ -17,10 +17,10 @@ class ImageDirChecker:
 	def get_suffix_subset(self):
 		return self.suffix_subset
 
-	def matches(self, data_dir: Path, check_date_pattern=True) -> Iterator[tuple[Path, list[tuple[str, str] | str]]]:
+	def matches(self, data_dir: Path, check_date_pattern=True, date_split_pattern=r"[_ ]") -> Iterator[tuple[Path, list[tuple[str, str] | str]]]:
 		if check_date_pattern:
 			def check_date(stem: str):
-				for elem in stem.split('_'):
+				for elem in re.split(date_split_pattern, stem):
 					if self.date_pattern.match(elem):
 						return elem
 		else:
