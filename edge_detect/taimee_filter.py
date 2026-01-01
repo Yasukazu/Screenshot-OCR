@@ -196,6 +196,7 @@ class TaimeeHeadingAreaParam(HeadingAreaParam):
 
 from typing import Deque
 class OCRFilter:
+	THRESHOLD = 235
 
 	@classmethod
 	def get_borders(cls, image: np.ndarray | Path | str, thresh=237, min_bunch=1, max_bunch=10):
@@ -226,13 +227,14 @@ class TaimeeFilter(OCRFilter):
 	BORDERS_MAX = 4
 	LABEL_TEXT_START = 'この店'
 
-	def __init__(self, image: np.ndarray | Path | str, param_dict: dict[ImageAreaParamName, Sequence[int]] = {}, show_check=False):
+	def __init__(self, image: np.ndarray | Path | str, param_dict: dict[ImageAreaParamName, Sequence[int]] = {}, show_check=False, thresh=OCRFilter.THRESHOLD):
 		from image_filter import get_horizontal_border_bunches, ImageAreaParamName
 		self.image = image if isinstance(image, np.ndarray) else cv2.imread(str(image))
 		if self.image is None:
 			raise ValueError("Failed to load image")
 		self.params = param_dict
-		bin_image = cv2.threshold(self.image, self.THRESHOLD, 255, cv2.THRESH_BINARY)[1]
+		self.threshold = thresh
+		bin_image = cv2.threshold(self.image, self.threshold, 255, cv2.THRESH_BINARY)[1]
 
 		# find borders as bunches
 		border_offset_list: deque[tuple[int, int]] = deque()
