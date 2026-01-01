@@ -3,6 +3,7 @@ from pathlib import Path
 from collections import deque
 from typing import Sequence, Optional
 from dataclasses import dataclass
+from cv2.gapi import threshold
 import numpy as np
 import cv2
 from image_filter import HeadingAreaParam, FigurePart, XYRange, FromBottomLabelRange, Int4, XYOffset, ImageAreaParamName, ImageDictKey,PaystubAreaParam, BreaktimeAreaParam, ShiftAreaParam, ImageAreaParam
@@ -193,9 +194,34 @@ class TaimeeHeadingAreaParam(HeadingAreaParam):
 			figure_parts[FigurePart.LABEL] = from_bottom_label_range
 		return XYOffset(x=figure_parts[FigurePart.AVATAR].x.stop, y=figure_parts[FigurePart.LABEL].from_bottom)
 
+from typing import Deque
+class OCRFilter:
 
-class TaimeeFilter:
-	THRESHOLD = 237
+	@classmethod
+	def get_borders(cls, image: np.ndarray | Path | str, thresh=237, min_bunch=1, max_bunch=10):
+		from image_filter import get_horizontal_border_bunches, ImageAreaParamName, _plot
+		image = image if isinstance(image, np.ndarray) else cv2.imread(str(image))
+		# if not image: raise ValueError("Failed to load image")
+		bin_image = cv2.threshold(image, thresh, 255, cv2.THRESH_BINARY)[1]
+		border_offset_list: Deque[tuple[int, int]] = deque()
+		# find borders as bunches
+		list(get_horizontal_border_bunches(bin_image, min_bunch=min_bunch, max_bunch=max_bunch,
+		 offset_list=border_offset_list))
+
+		margin_range = border_offset_list.popleft()
+		y_margin = margin_range[1]
+		# bin_image = bin_image[y_margin:, :]
+		border_offset_array = np.array(border_offset_list)
+		border_offset_array -= y_margin 
+		border_offset_ranges = [range(t, p) for t, p in border_offset_array.tolist()]
+		check_image = bin_image[y_margin:].copy()
+		check_image[:, :len(border_offset_ranges) + 1] = 255
+		for n, border_range in enumerate(border_offset_ranges):
+			check_image[border_range.start:border_range.stop, n] = 0
+		# _plot([bin_image, check_image])
+		return y_margin, border_offset_ranges, bin_image
+
+class TaimeeFilter(OCRFilter):
 	BORDERS_MIN = 3
 	BORDERS_MAX = 4
 	LABEL_TEXT_START = 'この店'
@@ -225,7 +251,7 @@ class TaimeeFilter:
 		'''
 		# last_offset = 0
 		n = -1
-		for n, (b, o) in enumerate(get_horizontal_border_bunches(bin_image, min_bunch=3, offset_list=border_offset_list)):
+		for n, (b, o) in enumerate(get_horizontal_border_bunches(bin_image, min_bunch=4, offset_list=border_offset_list)):
 			# if n == 0: y_margin = b.elems[-1] + 1
 					# last_b_end = b.elems[-1]
 				# elif n == 1: horizontal_border_offset_list.append(BunchOffset(b, b.elems[0] - 1))
@@ -434,3 +460,12 @@ class TaimeeFilter:
 			raise ValueError("Not enough valid width(%d) for the heading!" % x)
 		return x
 
+if __name__ == '__main__':
+	from sys import argv
+	image_path = argv[1]
+	image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+	y_margin, borders, bin_image = OCRFilter.get_borders(image)
+	border_end_list = [b.stop for b in borders]
+	first_border_end = border_end_list[0]
+	border_ratio_list = [b.stop / first_border_end for b in borders[1:]]
+	print(','.join([f"{b:.1f}" for b in border_ratio_list]))

@@ -958,7 +958,8 @@ def main(
 				)
 			)
 	parser.add_argument("--image_ext", nargs='+', default=['.png'], env_var='IMAGE_FILTER_IMAGE_EXT')
-	parser.add_argument("--image_dir", default='./', env_var='IMAGE_FILTER_IMAGE_DIR')
+	parser.add_argument("--image_dir", default='~/Pictures', env_var='IMAGE_FILTER_IMAGE_DIR')
+	parser.add_argument("--shot_month", nargs='*', env_var='IMAGE_FILTER_SHOT_MONTH', help='Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD]) included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like "[1,2,..]" )')
 	parser.add_argument('files', nargs='*', help='Image file fullpaths to commit OCR or to get parameters.')
 	parser.add_argument("--app_stem_end", env_var='IMAGE_FILTER_APP_STEM_END', default='taimee:_jp.co.taimee;mercari:_jp.mercari.work.android', help='Screenshot image file name pattern of the screenshot to execute OCR:(specified in format as "<app_name1>:<stem_end1>,<stem_end2>;..." )')
 	parser.add_argument("--app_border_ratio", env_var='IMAGE_FILTER_APP_BORDER_RATIO', default='taimee:2.2,3.2', help='Screenshot image file horizontal border ratio list of the app to execute OCR:(specified in format as "<app_name1>:<ratio1>,<ratio2>;..." )')
@@ -1017,9 +1018,16 @@ def main(
 
 	if not args.app:
 		if not args.files:
-			from prompt_toolkit.shortcuts import choice
-			args.app = APP_NAME(choice(message="Choose an application:", options=[(n.name.lower(), {'taimee': 'Taimee Job', 'mercari': 'Mercari Work'}[n.value]) for n in APP_NAME]))
-			logger.info("args.app is chosen by user : %s", args.app)
+			if args.shot_month:
+				from path_chooser import ImageFileFeeder
+				file_feeder = ImageFileFeeder(suffix_list=[])
+				dir_file_date_list = list(file_feeder.feed(args.image_dir, month_list=[int(m) for m in args.shot_month]))
+				args.files = set([(Path(dr) / f) for dr, fd in dir_file_date_list for f, _ in fd])
+				logger.info("%s files are chosen by feeder with date: %s", len(args.files), [d.isoformat() for d in set([d for _, fd in dir_file_date_list for f, d in fd])])
+			else:
+				from prompt_toolkit.shortcuts import choice
+				args.app = APP_NAME(choice(message="Choose an application:", options=[(n.name.lower(), {'taimee': 'Taimee Job', 'mercari': 'Mercari Work'}[n.value]) for n in APP_NAME]))
+				logger.info("args.app is chosen by user : %s", args.app)
 		else:
 			args.app = stem_to_app(Path(args.files[0]).stem)
 	else:
@@ -1171,8 +1179,7 @@ def main(
 			case APP_NAME.TAIMEE:
 				app_filter = TaimeeFilter(image=image, param_dict=filter_area_param_dict, show_check=args.show)
 			case APP_NAME.MERCARI:
-				sys.exit("Er
-from enum import Enuror: this app_name is not yet implemented: %s" % args.app)
+				sys.exit("Error: this app_name is not yet implemented: %s" % args.app)
 
 		
 		from tesseract_ocr import TesseractOCR, Output
@@ -1273,8 +1280,7 @@ from enum import Enuror: this app_name is not yet implemented: %s" % args.app)
 						yn = input(f"\nThe file path to save the image file area configuration:'{make_path}'\n already exists with a size as {make_path_size} bytes. Overwrite?(Enter 'Yes' or 'Affirmative' if you want to overwrite): ").lower()
 					except (EOFError, KeyboardInterrupt): # Ctrl+C or Ctrl+D/ctrl+Z
 						yn = ''
-					if yn != '
-from enum import Enuyes' and yn != 'affirmative':
+					if yn != 'yes' and yn != 'affirmative':
 						sys.exit("Exit since the user did not accept overwrite of: %s" % make_path)
 				org_area_dict[k] = vals if k == 'shift' else vals[0] # update
 				ocr_filter_table[APP_NAME[args.app].name.lower()] = org_area_dict
