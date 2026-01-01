@@ -1,15 +1,23 @@
 from typing import Iterator
-from prompt_toolkit.completion import PathCompleter
-from prompt_toolkit import prompt
-from prompt_toolkit.completion import NestedCompleter
-import os
+from datetime import date as Date
 from pathlib import Path
 import re
+
 from prompt_toolkit.shortcuts import choice
 
 class ImageFileFeeder:
 	image_file_ext_list=['.jpg', '.jpeg', '.png', '.bmp']
-	date_pattern = re.compile(r'\d{4}-\d\d-\d\d') 
+	date_pattern = re.compile(r'(\d{4})-(\d\d)-(\d\d)') 
+	date_pattern2 = re.compile(r'(\d{4})(\d\d)(\d\d)') 
+	date_patterns = [date_pattern, date_pattern2]
+	date_split_pattern=r"[_ ]"
+	month_list=[m+1 for m in range(12)]
+
+	@classmethod
+	def pick_date(cls, stem: str, date_split_pattern=r"[_ ]"):
+		for elem in re.split(date_split_pattern, stem):
+			if (match:=cls.date_pattern.match(elem) or cls.date_pattern2.match(elem)):
+				return Date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
 
 	def __init__(self, suffix_list = ['.taimee']):
 		self.suffix_subset = set([('.' + elem) if not elem.startswith('.') else elem for elem in suffix_list])
@@ -17,12 +25,10 @@ class ImageFileFeeder:
 	def get_suffix_subset(self):
 		return self.suffix_subset
 
-	def feed(self, data_dir: Path, check_date_pattern=True, date_split_pattern=r"[_ ]") -> Iterator[tuple[Path, list[tuple[str, str] | str]]]:
+	def feed(self, data_dir: Path | str, check_date_pattern=True, month_list=[m+1 for m in range(12)]) -> Iterator[tuple[Path, list[tuple[str, Date] | str]]]:
 		if check_date_pattern:
 			def check_date(stem: str):
-				for elem in re.split(date_split_pattern, stem):
-					if self.date_pattern.match(elem):
-						return elem
+				return self.pick_date(stem)
 		else:
 			check_date = None
 		data_dir = Path(data_dir).expanduser()
@@ -31,8 +37,10 @@ class ImageFileFeeder:
 			for file in files:
 				if set((root / file).suffixes[:-1]) >= self.get_suffix_subset():
 					try:
-						if (date:= check_date(file.rsplit('.', 1)[0])):
+						if (date:= check_date(file.rsplit('.', 1)[0])).month in month_list:
 							date_list.append((file, date))
+					except AttributeError:
+						continue
 					except TypeError:
 							date_list.append((file, ))
 					if date_list:
@@ -49,7 +57,7 @@ def date_dir_feeder(data_dir:str | Path = '~/Documents/screen/') -> Iterator[tup
 			yield pt.name, sub_dirs
 
 def date_dir_walker(data_dir:str | Path = '~/Documents/screen/', dir_checker=ImageFileFeeder()) -> Iterator[tuple[str, list[Path]]]:
-	data_dir = Path(data_dir).expanduser()
+	data_dir = Path(datImageFileFeedera_dir).expanduser()
 	for root, dirs, files in data_dir.walk():
 		for dir in dirs:
 			matching_files = [f.name for f in files if dir_checker.feed(dir)]

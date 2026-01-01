@@ -3,6 +3,7 @@ from io import IOBase
 from enum import IntEnum, auto
 from dataclasses import field
 from pathlib import Path
+from datetime import date
 from typing import Iterator, Sequence, NamedTuple, Optional, Sequence
 from dataclasses import dataclass
 from enum import Enum
@@ -1022,7 +1023,11 @@ def main(
 				from path_chooser import ImageFileFeeder
 				file_feeder = ImageFileFeeder(suffix_list=[])
 				dir_file_date_list = list(file_feeder.feed(args.image_dir, month_list=[int(m) for m in args.shot_month]))
-				args.files = set([(Path(dr) / f) for dr, fd in dir_file_date_list for f, _ in fd])
+				args.files = sorted(set([(Path(dr) / f) for dr, fd in dir_file_date_list for f, _ in fd]), 
+								  key=lambda f: ImageFileFeeder.pick_date(f.stem) or date.min, 
+								  reverse=True)
+				args.app = APP_NAME(list(set(args.files[0].suffixes) & set(['.'+n.value for n in APP_NAME]))[0][1:])
+				logger.info("args.app is chosen by feeder: %s", args.app)
 				logger.info("%s files are chosen by feeder with date: %s", len(args.files), [d.isoformat() for d in set([d for _, fd in dir_file_date_list for f, d in fd])])
 			else:
 				from prompt_toolkit.shortcuts import choice
@@ -1069,19 +1074,23 @@ def main(
 						return {ImageAreaParamName(k): v for k, v in image_area_params}
 
 	is_file_list_loaded = False
-	from os import scan_dir
-	def get_args_files(file_list:list[str]=[]):
+	# from os import scan_dir
+	def get_args_files(file_list:list[Path]=[]):
 		nonlocal is_file_list_loaded
 		if not is_file_list_loaded:
+			if args.files:
+				file_list += args.files
+				is_file_list_loaded = True
+				return file_list
 			_file_list = []
-			with scan_dir(args.image_dir) as ee:
-				for e in ee:
-					if e.is_file() and (path_obj:=Path(e.path)).suffix in args.image_ext:
-						for stem_end in app_to_stem_end_set(args.app):
-							if path_obj.stem.endswith(stem_end):
-								_file_list.append((Path(e.path), e.stat().st_mtime))
+			# with scan_dir(args.image_dir) as ee:
+			for e in Path(args.image_dir).iterdir():
+				if e.is_file and e.suffix in args.image_ext:
+					for stem_end in app_to_stem_end_set(args.app):
+						if e.stem.endswith(stem_end):
+							_file_list.append((e, e.stat().st_mtime))
 
-			file_list += [m[0].name for m in sorted(_file_list, key=lambda f: f[1], reverse=True)]
+			file_list += [m[0] for m in sorted(_file_list, key=lambda f: f[1], reverse=True)]
 			is_file_list_loaded = True
 			logger.info("Loaded file_list of %d files: %s", len(file_list), file_list)
 		return file_list
@@ -1092,6 +1101,7 @@ def main(
 				return True
 		return False
 
+	image_path_dir: Path | None = None
 	is_app_name_set = False
 	def app_name()-> APP_NAME: # n=0, app_name_list=[]
 		try:
@@ -1122,7 +1132,6 @@ def main(
 					logger.info("Application name(s) is/are set as [%s] from file name:%s", [an.name.lower() for an in app_name_list], _file.name)
 				except (IndexError, NoAppNameError):
 					sys.exit("Needs application name spec. by '--app' option or file name(ending with {}).".format([nm.value for nm in APP_NAME]))
-		image_path_dir: Path | None = None
 		try:
 			image_path_dir = Path(args.image_dir).expanduser() # or get_filter_config()['image-path']['dir'])
 		except TypeError:
