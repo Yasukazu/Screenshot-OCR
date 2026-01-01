@@ -961,6 +961,7 @@ def main(
 	parser.add_argument("--image_dir", default='./', env_var='IMAGE_FILTER_IMAGE_DIR')
 	parser.add_argument('files', nargs='*', help='Image file fullpaths to commit OCR or to get parameters.')
 	parser.add_argument("--app_stem_end", env_var='IMAGE_FILTER_APP_STEM_END', default='taimee:_jp.co.taimee;mercari:_jp.mercari.work.android', help='Screenshot image file name pattern of the screenshot to execute OCR:(specified in format as "<app_name1>:<stem_end1>,<stem_end2>;..." )')
+	parser.add_argument("--app_border_ratio", env_var='IMAGE_FILTER_APP_BORDER_RATIO', default='taimee:2.2,3.2', help='Screenshot image file horizontal border ratio list of the app to execute OCR:(specified in format as "<app_name1>:<ratio1>,<ratio2>;..." )')
 	parser.add_argument("--app_suffix", action='store_true', default=True, help='Screenshot image file name has suffix(sub extention) of the same as app name i.e. "<stem>.<suffix>.<ext>" (default: True)')
 	#parser.add_argument("--taimee", env_var='IMAGE_FILTER_TAIMEE')
 	#parser.add_argument("--mercari", env_var='IMAGE_FILTER_MERCARI')
@@ -1170,7 +1171,8 @@ def main(
 			case APP_NAME.TAIMEE:
 				app_filter = TaimeeFilter(image=image, param_dict=filter_area_param_dict, show_check=args.show)
 			case APP_NAME.MERCARI:
-				sys.exit("Error: this app_name is not yet implemented: %s" % args.app)
+				sys.exit("Er
+from enum import Enuror: this app_name is not yet implemented: %s" % args.app)
 
 		
 		from tesseract_ocr import TesseractOCR, Output
@@ -1271,7 +1273,8 @@ def main(
 						yn = input(f"\nThe file path to save the image file area configuration:'{make_path}'\n already exists with a size as {make_path_size} bytes. Overwrite?(Enter 'Yes' or 'Affirmative' if you want to overwrite): ").lower()
 					except (EOFError, KeyboardInterrupt): # Ctrl+C or Ctrl+D/ctrl+Z
 						yn = ''
-					if yn != 'yes' and yn != 'affirmative':
+					if yn != '
+from enum import Enuyes' and yn != 'affirmative':
 						sys.exit("Exit since the user did not accept overwrite of: %s" % make_path)
 				org_area_dict[k] = vals if k == 'shift' else vals[0] # update
 				ocr_filter_table[APP_NAME[args.app].name.lower()] = org_area_dict
