@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 from prompt_toolkit.shortcuts import choice
 
-class ImageDirChecker:
+class ImageFileFeeder:
 	image_file_ext_list=['.jpg', '.jpeg', '.png', '.bmp']
 	date_pattern = re.compile(r'\d{4}-\d\d-\d\d') 
 
@@ -17,7 +17,7 @@ class ImageDirChecker:
 	def get_suffix_subset(self):
 		return self.suffix_subset
 
-	def matches(self, data_dir: Path, check_date_pattern=True, date_split_pattern=r"[_ ]") -> Iterator[tuple[Path, list[tuple[str, str] | str]]]:
+	def feed(self, data_dir: Path, check_date_pattern=True, date_split_pattern=r"[_ ]") -> Iterator[tuple[Path, list[tuple[str, str] | str]]]:
 		if check_date_pattern:
 			def check_date(stem: str):
 				for elem in re.split(date_split_pattern, stem):
@@ -48,12 +48,12 @@ def date_dir_feeder(data_dir:str | Path = '~/Documents/screen/') -> Iterator[tup
 		if is_yyyy(pt.name) and (sub_dirs:=mm_dir_filter(pt)):
 			yield pt.name, sub_dirs
 
-def date_dir_walker(data_dir:str | Path = '~/Documents/screen/', dir_checker=ImageDirChecker()) -> Iterator[tuple[str, list[Path]]]:
+def date_dir_walker(data_dir:str | Path = '~/Documents/screen/', dir_checker=ImageFileFeeder()) -> Iterator[tuple[str, list[Path]]]:
 	data_dir = Path(data_dir).expanduser()
 	for root, dirs, files in data_dir.walk():
 		for dir in dirs:
-			matching_files = [f.name for f in files if dir_checker.matches(dir)]
-			if dir_checker.matches(dir): # if is_yyyy(root.name) and (sub_dirs:=mm_dir_filter(root / dir)) and dir_checker.matches(root / dir):
+			matching_files = [f.name for f in files if dir_checker.feed(dir)]
+			if dir_checker.feed(dir): # if is_yyyy(root.name) and (sub_dirs:=mm_dir_filter(root / dir)) and dir_checker.matches(root / dir):
 					yield root, dir
 
 class NoValidChoiceException(Exception):
@@ -114,9 +114,9 @@ def is_mm(s: str):
 		return False
 
 			
-def main(dir_name, suffix_set:str):
-	image_dir_checker = ImageDirChecker(set(suffix_set.split(',')))
-	for match in image_dir_checker.matches(Path(dir_name)):
+def main(dir_name, suffix_set_str:str):
+	image_file_feeder = ImageFileFeeder(set(suffix_set_str.split(',')))
+	for match in image_file_feeder.feed(Path(dir_name)):
 		print(match)
 	'''month = choose_yyyy_mm_dir(suffix_subset={'.taimee'})
 	if month:
