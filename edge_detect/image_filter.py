@@ -959,8 +959,8 @@ def main(
 				)
 			)
 	parser.add_argument("--image_ext", nargs='+', default=['.png'], env_var='IMAGE_FILTER_IMAGE_EXT')
-	parser.add_argument("--image_dir", default='~/Pictures', env_var='IMAGE_FILTER_IMAGE_DIR')
-	parser.add_argument("--shot_month", nargs='*', env_var='IMAGE_FILTER_SHOT_MONTH', help='Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD]) included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like "[1,2,..]" )')
+	parser.add_argument("--image_dir", default='~/Documents/screenshots', env_var='IMAGE_FILTER_IMAGE_DIR')
+	parser.add_argument("--shot_month", action='append', type=int, env_var='IMAGE_FILTER_SHOT_MONTH', help='Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD]) included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like "[1,2,..]" )')
 	parser.add_argument('files', nargs='*', help='Image file fullpaths to commit OCR or to get parameters.')
 	parser.add_argument("--app_stem_end", env_var='IMAGE_FILTER_APP_STEM_END', default='taimee:_jp.co.taimee;mercari:_jp.mercari.work.android', help='Screenshot image file name pattern of the screenshot to execute OCR:(specified in format as "<app_name1>:<stem_end1>,<stem_end2>;..." )')
 	parser.add_argument("--app_border_ratio", env_var='IMAGE_FILTER_APP_BORDER_RATIO', default='taimee:2.2,3.2', help='Screenshot image file horizontal border ratio list of the app to execute OCR:(specified in format as "<app_name1>:<ratio1>,<ratio2>;..." )')
@@ -1016,30 +1016,49 @@ def main(
 			if stem.endswith(k) or k in stem.split('.'):
 				return v
 		raise ConfigError(f"Invalid stem: {stem}")
-
 	if not args.app:
 		if not args.files:
-			if args.shot_month:
-				from path_chooser import ImageFileFeeder
-				file_feeder = ImageFileFeeder(suffix_list=[])
-				dir_file_date_list = list(file_feeder.feed(args.image_dir, month_list=[int(m) for m in args.shot_month]))
-				args.files = sorted(set([(Path(dr) / f) for dr, fd in dir_file_date_list for f, _ in fd]), 
-								  key=lambda f: ImageFileFeeder.pick_date(f.stem) or date.min, 
-								  reverse=True)
-				args.app = APP_NAME(list(set(args.files[0].suffixes) & set(['.'+n.value for n in APP_NAME]))[0][1:])
-				logger.info("args.app is chosen by feeder: %s", args.app)
-				logger.info("%s files are chosen by feeder with date: %s", len(args.files), [d.isoformat() for d in set([d for _, fd in dir_file_date_list for f, d in fd])])
-			else:
 				from prompt_toolkit.shortcuts import choice
 				args.app = APP_NAME(choice(message="Choose an application:", options=[(n.name.lower(), {'taimee': 'Taimee Job', 'mercari': 'Mercari Work'}[n.value]) for n in APP_NAME]))
 				logger.info("args.app is chosen by user : %s", args.app)
 		else:
-			args.app = stem_to_app(Path(args.files[0]).stem)
+			args.app = stem_to_app(Path(args.files[args.nth - 1]).stem)
+			logger.info("args.app is chosen by file suffix: %s", args.app)
 	else:
 		try:
 			args.app = APP_NAME(args.app)
 		except ValueError:
 			raise ConfigError(f"Invalid application name: {args.app}. Valid choices are: {', '.join(n.name.lower() for n in APP_NAME)}")
+
+	if not args.files:
+		try:
+			suffix_list = [APP_NAME(args.app).value]
+		except ValueError:
+			suffix_list = []
+		from path_chooser import ImageFileFeeder
+		file_feeder = ImageFileFeeder(suffix_list=suffix_list)
+		dir_file_date_list = []
+		try:
+			dir_file_date_list = list(file_feeder.feed(Path(args.image_dir), month_list=args.shot_month or [m+1 for m in range(12)]))
+		except TypeError:
+			logger.error("Invalid image_dir: %s", args.image_dir)
+			raise ConfigError("Invalid image_dir: %s" % args.image_dir)
+		else:
+			logger.info("%s files are chosen by feeder with date: %s", len(dir_file_date_list), [d.isoformat() for d in set([d for _, fd in dir_file_date_list for f, d in fd])])
+		args.files = sorted(set([(Path(dr) / f) for dr, fd in dir_file_date_list for f, _ in fd]), 
+							key=lambda f: ImageFileFeeder.pick_date(f.stem) or date.min, 
+							reverse=True)
+	if not args.files:
+		logger.info("No files are chosen by feeder")
+		raise ConfigError("No files are chosen by feeder")
+	'''try:
+		args.app = args.app or APP_NAME(list(set(args.files[args.nth - 1].suffixes) & set(['.'+n.value for n in APP_NAME]))[args.nth - 1][1:])
+	except IndexError:
+		raise ConfigError("No files are chosen by feeder")
+	else:
+		logger.info("args.app is chosen by feeder: %s", args.app)
+		logger.info("%s files are chosen by feeder with date: %s", len(args.files), [d.isoformat() for d in set([d for _, fd in dir_file_date_list for f, d in fd])])'''
+
 
 	filter_area_param_dict = {}
 	# image_config_filename = (args.file) #.resolve()Path
