@@ -239,7 +239,23 @@ class TaimeeFilter(OCRFilter):
 		# find borders as bunches
 		border_offset_list: deque[tuple[int, int]] = deque()
 		# border_offset_list: deque[BorderOffset] = deque()
-
+		if show_check:
+			def do_show_check(title, param, image_list):
+				SUBPLOT_SIZE = 2
+				from matplotlib import pyplot as plt
+				fig, ax = plt.subplots(SUBPLOT_SIZE, 1)#, figsize=(10, 4*SUBPLOT_SIZE))
+				for r in range(SUBPLOT_SIZE):
+					ax[r].invert_yaxis()
+					ax[r].xaxis.tick_top()
+					ax[r].set_title(f"{title}: {param}")
+				ax[0].imshow(image_list[0], cmap='gray')
+				if len(image_list) > 1:
+					ax[1].imshow(image_list[1], cmap='gray')
+				else:
+					ax[1].axis('off')
+				plt.show()
+		else:
+			do_show_check = lambda title, param, image: None
 		# _border_offset_list: list[BorderOffset] = []
 		'''with-margin / without-margin
 			margin
@@ -286,7 +302,7 @@ class TaimeeFilter(OCRFilter):
 
 		if show_check:
 			show_image = self.image[self.y_margin + heading_area_param.y_offset:self.y_margin + border_offset_ranges[0].stop + heading_area_param.height, heading_area_param.x_offset:]
-			do_show_check("heading_area", heading_area_param, show_image)
+			do_show_check("heading_area", heading_area_param, [show_image, ])
 		self.area_param_dict: dict[ImageAreaParamName, ImageAreaParam] = {ImageAreaParamName.heading: heading_area_param}
 		# get shift area
 		try:
@@ -297,8 +313,10 @@ class TaimeeFilter(OCRFilter):
 			# scan_image = bin_image[area_range.start:area_range.stop, :]
 			area_param = ShiftAreaParam.from_image(bin_image, offset_range=area_range, image_check=show_check)
 		if show_check:
-			area_image = bin_image[area_param.y_offset:area_param.y_offset + area_param.height, :]
-			do_show_check("shift_area", area_param, area_image)
+			image_list = []
+			for pp in area_param.as_slice_param():
+				image_list.append(bin_image[pp[0]:pp[1], pp[2]:pp[3]])
+			do_show_check("shift_area", area_param, image_list)
 		self.area_param_dict[ImageAreaParamName.shift] = area_param
 		# get breaktime area
 		try:
@@ -309,7 +327,7 @@ class TaimeeFilter(OCRFilter):
 			area_param = BreaktimeAreaParam(y_offset=area_range.start, height=area_range.stop - area_range.start) # y_origin - area_top)
 		if show_check:
 			area_image = bin_image[area_param.y_offset:area_param.y_offset + area_param.height, :]
-			do_show_check("breaktime area", area_param, area_image)
+			do_show_check("breaktime area", area_param, [area_image])
 		self.area_param_dict[ImageAreaParamName.breaktime] = area_param
 		# get paystub area
 		try:
@@ -319,7 +337,7 @@ class TaimeeFilter(OCRFilter):
 			area_param = PaystubAreaParam(y_offset=border_offset_ranges[-1].stop)
 		if show_check:
 			area_image = bin_image[area_param.y_offset:, :]
-			do_show_check("paystub area", area_param, area_image)
+			do_show_check("paystub area", area_param, [area_image])
 		self.area_param_dict[ImageAreaParamName.paystub] = area_param
 		if show_check:
 			cv2.destroyAllWindows()

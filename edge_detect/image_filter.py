@@ -310,7 +310,7 @@ class ShiftAreaParam(ImageAreaParam):
 	@classmethod
 	def from_image(cls, image: np.ndarray, offset_range: range, image_check:bool=False) -> "ShiftAreaParam":
 		left, right = cls.check_image(image=image[offset_range.start:offset_range.stop, :], image_check=image_check)
-		return cls(y_offset=offset_range.start, height=offset_range.stop - offset_range.start, x_offset=left, width=right)
+		return cls(y_offset=offset_range.start, height=offset_range.stop - offset_range.start, x_offset=0, width=left, x_offset2=right)
 
 
 	@property
@@ -322,7 +322,7 @@ class ShiftAreaParam(ImageAreaParam):
 		return self.width
 
 	def as_slice_param(self) -> Sequence[Int4]:
-		return ((self.y_offset, self.y_offset + self.height, self.x_offset, self.x_offset + self.width), (self.y_offset, self.y_offset + self.height, self.x_offset2, -1))
+		return (self.y_offset, self.y_offset + self.height, self.x_offset, self.x_offset + self.width), (self.y_offset, self.y_offset + self.height, self.x_offset2, -1)
 
 
 @dataclass
