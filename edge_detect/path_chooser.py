@@ -19,8 +19,9 @@ class ImageFileFeeder:
 			if (match:=cls.date_pattern.match(elem) or cls.date_pattern2.match(elem)):
 				return Date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
 
-	def __init__(self, suffix_list = ['.taimee']):
+	def __init__(self, suffix_list = ['.taimee'], ext_list=['.png']):
 		self.suffix_subset = set([('.' + elem) if not elem.startswith('.') else elem for elem in suffix_list])
+		self.ext_list = set([('.' + elem) if not elem.startswith('.') else elem for elem in ext_list])
 
 	def get_suffix_subset(self):
 		return self.suffix_subset
@@ -35,7 +36,7 @@ class ImageFileFeeder:
 		for root, dirs, files in data_dir.walk(follow_symlinks=True):
 			date_list = []
 			for file in files:
-				if set((root / file).suffixes[:-1]) >= self.get_suffix_subset():
+				if set((root / file).suffixes[:-1]) >= self.get_suffix_subset() and (root / file).suffix in self.ext_list:
 					try:
 						if (date:= check_date(file.rsplit('.', 1)[0])).month in month_list:
 							date_list.append((file, date))
