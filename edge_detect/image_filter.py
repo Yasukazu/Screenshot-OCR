@@ -937,6 +937,7 @@ class ConfigFileExt(StrEnum):
 	TOML = auto()
 	INI = auto()
 	CFG = auto()
+	CONF = auto()
 
 class NoAppNameError(ConfigError):
 	"""No application name specified"""
@@ -944,13 +945,16 @@ class NoAppNameError(ConfigError):
 
 import yaml
 
+IMAGE_AREA_PARAM_STR = "image_area_param"
+
 def main(
-	config_dir = abspath(dirname(__file__)), config_file_node = "image-filter", config_file_ext_enum = ConfigFileExt
+	config_dir = abspath(dirname(__file__)), config_file_stem = "image-filter", config_file_ext_enum = ConfigFileExt, image_area_param_file_stem = IMAGE_AREA_PARAM_STR.replace('_', '-')
 ):
 	from taimee_filter import TaimeeFilter
 	OCR_FILTER = "ocr-filter"
-	config_sections = ['app_stem_end', 'common', 'image_area_param']
-	default_config_files=[str(Path(config_dir) / f"{config_file_node}.{ext.lower()}") for ext in config_file_ext_enum] + [str(Path(config_dir) / "image-area-param.ini")]
+	config_sections = ['app_stem_end', 'common'] + [ IMAGE_AREA_PARAM_STR + '.' + app.value for app in APP_NAME]
+	default_config_paths = [Path(config_dir) / f"{stem}.{ext.lower()}" for ext in config_file_ext_enum for stem in [config_file_stem, image_area_param_file_stem]]# if f.exists()]
+	default_config_files = [p for p in default_config_paths if p.exists()]
 	parser = ArgParser(
 			default_config_files=default_config_files,
 			config_file_parser_class=CompositeConfigParser(
@@ -965,22 +969,31 @@ def main(
 	parser.add_argument("--app_stem_end", env_var='IMAGE_FILTER_APP_STEM_END', default='taimee:_jp.co.taimee;mercari:_jp.mercari.work.android', help='Screenshot image file name pattern of the screenshot to execute OCR:(specified in format as "<app_name1>:<stem_end1>,<stem_end2>;..." )')
 	parser.add_argument("--app_border_ratio", env_var='IMAGE_FILTER_APP_BORDER_RATIO', default='taimee:2.2,3.2', help='Screenshot image file horizontal border ratio list of the app to execute OCR:(specified in format as "<app_name1>:<ratio1>,<ratio2>;..." )')
 	parser.add_argument("--app_suffix", action='store_true', default=True, help='Screenshot image file name has suffix(sub extention) of the same as app name i.e. "<stem>.<suffix>.<ext>" (default: True)')
-	#parser.add_argument("--taimee", env_var='IMAGE_FILTER_TAIMEE')
-	#parser.add_argument("--mercari", env_var='IMAGE_FILTER_MERCARI')
-	# parser = ArgumentParser()
+
 	# parser.add_argument('--filename_pattern', action='append', default=['*{app_stem_end}{image_ext}'], help='Image files to commit OCR or to get parameters. Can be specified multiple times. Default is: *{app_stem_end}{image_ext}')
-	parser.add_argument('--app', choices=[n.name.lower() for n in APP_NAME], type=str, help=f'Application name of the screenshot to execute OCR: choices={", ".join(n.name.lower() for n in APP_NAME)}') # 
+	parser.add_argument('--app', choices=[n.name.lower() for n in APP_NAME], env_var='IMAGE_FILTER_APP_NAME', help=f'Application name of the screenshot to execute OCR: choices={", ".join(n.name.lower() for n in APP_NAME)}') # 
 	# parser.add_argument('--toml', help=f'Configuration toml file name like {OCR_FILTER}')
 	parser.add_argument('--save', help='Output path to save OCR text of the image file as TOML format into the image file name extention as ".ocr-<app_name>.toml"')
 	# parser.add_argument('--dir', help='Image dir of files: ./')
 	parser.add_argument('--nth', type=int, default=1, help='Rank(default: 1) of files descending sorted(the latest, the first) by modified date as wildcard(*, ?)')
 	parser.add_argument('--glob-max', type=int, default=60, help='Pick up file max as pattern found in TOML')
 	parser.add_argument('--show', action='store_true', help='Show images to check')
-	parser.add_argument('--make', action='store_true', help=f'make config. from image(i.e. this arg. makes not to load a config file like "{OCR_FILTER}.toml")')
+	parser.add_argument('--make', action='store_true', help='make config. from image(i.e. this arg. makes not to use param configs in any config file;  specify image_area_param values like "--image_area_param heading:0,106,196,-1"')
 	parser.add_argument('--no-ocr', action='store_true', default=False, help='Do not execute OCR')
 	parser.add_argument('--ocr-conf', type=int, default=55, help='Confidence threshold for OCR')
 	parser.add_argument('--psm', type=int, default=6, help='PSM value for Tesseract')
-	parser.add_argument("--image_area_param", nargs='*', help='Screenshot image area name to parameter in config file as "image_area_param=<area_name>:0,106,196,-1"') # type=yaml.safe_load, 
+	parser.add_argument("--image_area_param", nargs='*', help='Screenshot image area name to parameter in config file [image_area_param] section as "<area_name>:0,106,196,-1" (e.g. "heading:0,106,196,-1")') # type=yaml.safe_load, 
+	def add_area_param(area, param):
+		parser.add_argument(f"--{area}", action='append', help=f'Screenshot image area name to parameter in config file [{IMAGE_AREA_PARAM_STR}] section as "{area}={param}"')
+	image_area_param_example={
+	'heading_area':[0,106,196,-1],
+	'shift_area':[221,488,0,345,375],
+	'breaktime_area':[490,714,0,-1],
+	'paystub_area':[714,-1,0,-1],
+	}
+	for k,v in image_area_param_example.items():
+		add_area_param(k, v)
+	# parser.add_argument("--heading_area", action='append', help=f'Screenshot image area name to parameter in config file [{IMAGE_AREA_PARAM_STR}] section as "heading_area=[0,106,196,-1]"') # type=yaml.safe_load, 
 	args = parser.parse_args()
 
 	is_app_to_stem_end_set = False
