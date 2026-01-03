@@ -982,7 +982,7 @@ def main(
 	parser.add_argument('--no-ocr', action='store_true', default=False, help='Do not execute OCR')
 	parser.add_argument('--ocr-conf', type=int, default=55, help='Confidence threshold for OCR')
 	parser.add_argument('--psm', type=int, default=6, help='PSM value for Tesseract')
-	# parser.add_argument("--image_area_param", nargs='*', help='Screenshot image area name to parameter in config file [image_area_param] section as "<area_name>:0,106,196,-1" (e.g. "heading:0,106,196,-1")') # type=yaml.safe_load, 
+	parser.add_argument("--area_param_file", help='Screenshot image area parameter config file: format as: in [image_area_param] section, items as "<area_name>=<p1>,<p2>,<p3>,<p4>" (e.g. "heading=0,106,196,-1")', type=Path)#yaml.safe_load)#type=Path Python dictionary like: image_area_param = { "taimee": { "heading": [0, 106, 196, -1], "shift": [221, 488, 0, 345, 375], "breaktime": [490, 714, 0, -1], "paystub": [714, -1, 0, -1] } )
 
 	# parser.add_argument("--heading_area", action='append', help=f'Screenshot image area name to parameter in config file [{IMAGE_AREA_PARAM_STR}] section as "heading_area=[0,106,196,-1]"') # type=yaml.safe_load, 
 	args = parser.parse_args()
@@ -1056,7 +1056,7 @@ def main(
 		logger.info("No files are chosen by feeder")
 		raise ConfigError("No files are chosen by feeder")
 
-	config_sections2 = [IMAGE_AREA_PARAM_STR + '.' + args.app.name.lower()]
+	'''config_sections2 = [IMAGE_AREA_PARAM_STR + '.' + args.app.name.lower()]
 	default_config_paths2 = [Path(config_dir) / f"{stem}.{ext.lower()}" for ext in config_file_ext_enum for stem in [image_area_param_file_stem]]
 	default_config_files2 = [p for p in default_config_paths2 if p.exists()]
 	parser2 = ArgParser(
@@ -1076,16 +1076,41 @@ def main(
 	}
 	for k,v in image_area_param_example.items():
 		add_area_param(k, v)
-	args2 = parser2.parse_args()
-	'''try:
+	def collect_area_options(argv:list[str]):
+		area_params:dict[str,str] = {}
+		for n, arg in enumerate(argv):
+			if arg.startswith('--'):
+				if '=' in arg:
+					key, value = arg[2:].split('=', 1)
+				else:
+					# Handle cases like --area value without equals
+					if n + 1 < len(argv) and not argv[n + 1].startswith('--'):
+						key = arg[2:]
+						value = argv[n + 1]
+					else:
+						raise ValueError(f"Invalid argument format: {arg}")
+				area_params[key] = value
+		return area_params
+	area_params = collect_area_options(sys.argv)	
+	args2 = parser2.parse_args(args=' '.join([f'--{k}={v}' for k, v in area_params.items()]))
+
+	try:
 		args.app = args.app or APP_NAME(list(set(args.files[args.nth - 1].suffixes) & set(['.'+n.value for n in APP_NAME]))[args.nth - 1][1:])
 	except IndexError:
 		raise ConfigError("No files are chosen by feeder")
 	else:
 		logger.info("args.app is chosen by feeder: %s", args.app)
-		logger.info("%s files are chosen by feeder with date: %s", len(args.files), [d.isoformat() for d in set([d for _, fd in dir_file_date_list for f, d in fd])])'''
-
-
+		logger.info("%s files are chosen by feeder with date: %s", len(args.files), [d.isoformat() for d in set([d for _, fd in dir_file_date_list for f, d in fd])])
+	'''
+	if args.area_param_file:
+		from configparser import ConfigParser
+		try:
+			area_param_config = ConfigParser()
+			area_param_config.read(args.area_param_file)
+			image_area_params = area_param_config[f'image_area_param.{args.app.name.lower()}']
+		except Exception as e:
+			logger.warning(f"Failed to read area parameter file {args.area_param_file}: {e}")
+			area_param_config = None
 	filter_area_param_dict = {}
 	# image_config_filename = (args.file) #.resolve()Path
 	filter_config_doc: TOMLDocument | None = None
