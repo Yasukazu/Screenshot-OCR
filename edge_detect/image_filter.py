@@ -1,3 +1,4 @@
+from itertools import groupby
 from typing import TypedDict
 from io import IOBase
 from enum import IntEnum, auto
@@ -381,12 +382,12 @@ class ImageFilterAreas:
 	salary: SalaryAreaParam # kyuuyo
 	y_offset: int = 0
 
-class ImageAreaParamName(Enum):
-	heading = HeadingAreaParam
-	shift = ShiftAreaParam
-	breaktime = BreaktimeAreaParam
-	paystub = PaystubAreaParam
-	salary = SalaryAreaParam
+class ImageAreaParamName(StrEnum):
+	HEADING = auto() # HeadingAreaParam
+	SHIFT = auto() # ShiftAreaParam
+	BREAKTIME = auto() # BreaktimeAreaParam
+	PAYSTUB = auto() # PaystubAreaParam
+	SALARY = auto() # SalaryAreaParam
 
 class ImageFilterParam(Enum):
 	y_offset = 0, 0
@@ -1071,29 +1072,16 @@ def main(
 	def get_image_area_param_dict(param_dict: dict[ImageAreaParamName, Sequence[int]] = {}) -> dict[ImageAreaParamName, Sequence[int]]:
 		nonlocal param_dict_loaded
 		if not param_dict_loaded and image_area_params is not None:
-			param_name_set = set([n.name for n in ImageAreaParamName])
-			for k, v in image_area_params.items():
+			for param_name, v in image_area_params.items():
 				try:
-					# k, v = elem.split(':')
-					if k in param_name_set:
-						param_dict[ImageAreaParamName[k]] = [int(p) for p in v.split(',')]
+					param_enum = ImageAreaParamName(param_name)
+					param_dict[param_enum] = [int(p) for p in v.split(',')]
 				except (ValueError, TypeError):
-					logger.warning("Invalid image area parameter: %s = %s (value type: %s)", k, v, type(v).__name__)
+					logger.warning("Invalid image area parameter: %s = %s (value type: %s)", param_name, v, type(v).__name__)
 			param_dict_loaded = True
 		return param_dict			
 
-	def get_image_area_param_config(app_name: APP_NAME) -> dict[ImageAreaParamName, Sequence[int]] | None:
-		try:
-			return args.image_area_param[app_name]
-		except TypeError:
-			image_area_param_dict = {}
-			for app in args.image_area_param.split(';'):
-				for app_name, image_area_param in app.split(':'):
-					if ImageAreaParamName[app_name] == app_name:
-						area_name, area_param = image_area_param.split(',', 1)
-						area_param_dict[area_name] = [int(p) for p in area_param.split(',')]
-						image_area_param_dict[ImageAreaParamName(app_name)] = {v for k, v in image_area_params}
-						return {ImageAreaParamName(k): v for k, v in image_area_params}
+
 
 	is_file_list_loaded = False
 	# from os import scan_dir
@@ -1183,7 +1171,7 @@ def main(
 		sys.exit("Error: image_file not found: %s" % image_file)
 	# image_fullpath = image_path.resolve()
 	# try:
-	filter_area_param_dict: dict[ImageAreaParamName, Sequence[int]] = {} if args.make else get_image_area_param_dict() 
+	# filter_area_param_dict: dict[ImageAreaParamName, Sequence[int]] = {} if args.make else get_image_area_param_dict() 
 
 	image = cv2.imread(str(image_file), cv2.IMREAD_GRAYSCALE) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
 	if image is None:
@@ -1194,7 +1182,7 @@ def main(
 	y_margin, borders, bin_image = OCRFilter.get_borders(image)
 	image_border_ratios = OCRFilter.convert_border_offset_ranges_to_ratio_list(borders)
 	# extract border ratio from app_border_ratio
-	is_image_border_ratio_right = True
+	is_image_border_ratio_OK = True
 	for ratio in args.app_border_ratio:
 		k, v = ratio.split(':')
 		if k == args.app.name.lower():
@@ -1202,14 +1190,14 @@ def main(
 			for n, r in enumerate(config_border_ratios):
 				if abs(1 - r / image_border_ratios[n]) > 0.1:
 					logger.warning("Warning: image_border_ratio differs significantly from config_border_ratio %s", r)
-					is_image_border_ratio_right = False
-					filter_area_param_dict = {}
+					is_image_border_ratio_OK = False
+					# filter_area_param_dict = {}
 					logger.info("No use of default filter parameters due to border ratio mismatch for %s", args.app.name.lower())
 
 	if not args.no_ocr:
 		match args.app:
 			case APP_NAME.TAIMEE:
-				app_filter = TaimeeFilter(image=image, param_dict=filter_area_param_dict, show_check=args.show, bin_image=bin_image)
+				app_filter = TaimeeFilter(image=image, param_dict=get_image_area_param_dict() if is_image_border_ratio_OK else {}, show_check=args.show, bin_image=bin_image)
 			case APP_NAME.MERCARI:
 				sys.exit("Error: this app_name is not yet implemented: %s" % args.app)
 

@@ -273,7 +273,7 @@ class TaimeeFilter(OCRFilter):
 		# self.y_origin = y_origin = border_offsets[0][1]
 		heading_area_figure_parts = {}
 		try:
-			area_param = TaimeeHeadingAreaParam(*param_dict[ImageAreaParamName.heading])
+			area_param = TaimeeHeadingAreaParam(*param_dict[ImageAreaParamName.HEADING])
 		except (KeyError, TypeError):
 			area_param: ImageAreaParam = TaimeeHeadingAreaParam.from_image(bin_image[:border_offset_ranges[0].stop, :], figure_parts=heading_area_figure_parts)
 			param_name = ImageAreaParamName(area_param)
@@ -283,10 +283,10 @@ class TaimeeFilter(OCRFilter):
 		if show_check:
 			show_image = self.image[self.y_margin + area_param.y_offset:self.y_margin + border_offset_ranges[0].stop + area_param.height, area_param.x_offset:]
 			do_show_check("heading_area", area_param, [show_image, ])
-		self.area_param_dict: dict[ImageAreaParamName, ImageAreaParam] = {ImageAreaParamName.heading: area_param}
+		self.area_param_dict: dict[ImageAreaParamName, ImageAreaParam] = {ImageAreaParamName.HEADING: area_param}
 		# get shift area
 		try:
-			area_param = ShiftAreaParam(*param_dict[ImageAreaParamName.shift])
+			area_param = ShiftAreaParam(*param_dict[ImageAreaParamName.SHIFT])
 		except (KeyError, TypeError):
 			area_range = border_offset_ranges[1] # list[0].elems[-1] + 1
 			# y_origin = border_offset_list[1].elems[0]
@@ -297,10 +297,10 @@ class TaimeeFilter(OCRFilter):
 			for pp in area_param.as_slice_param():
 				image_list.append(bin_image[pp[0]:pp[1], pp[2]:pp[3]])
 			do_show_check("shift_area", area_param, image_list)
-		self.area_param_dict[ImageAreaParamName.shift] = area_param
+		self.area_param_dict[ImageAreaParamName.SHIFT] = area_param
 		# get breaktime area
 		try:
-			area_param = BreaktimeAreaParam(*param_dict[ImageAreaParamName.breaktime])
+			area_param = BreaktimeAreaParam(*param_dict[ImageAreaParamName.BREAKTIME])
 		except (KeyError, TypeError):
 			area_range = border_offset_ranges[2]
 			# y_origin = border_offset_list[2].elems[0]
@@ -308,17 +308,17 @@ class TaimeeFilter(OCRFilter):
 		if show_check:
 			area_image = bin_image[area_param.y_offset:area_param.y_offset + area_param.height, :]
 			do_show_check("breaktime area", area_param, [area_image])
-		self.area_param_dict[ImageAreaParamName.breaktime] = area_param
+		self.area_param_dict[ImageAreaParamName.BREAKTIME] = area_param
 		# get paystub area
 		try:
-			area_param = PaystubAreaParam(*param_dict[ImageAreaParamName.paystub])
+			area_param = PaystubAreaParam(*param_dict[ImageAreaParamName.PAYSTUB])
 		except (KeyError, TypeError):
 			# area_range = border_offset_ranges[3] # elems[-1] + 1
 			area_param = PaystubAreaParam(y_offset=border_offset_ranges[-1].stop)
 		if show_check:
 			area_image = bin_image[area_param.y_offset:, :]
 			do_show_check("paystub area", area_param, [area_image])
-		self.area_param_dict[ImageAreaParamName.paystub] = area_param
+		self.area_param_dict[ImageAreaParamName.PAYSTUB] = area_param
 		if show_check:
 			cv2.destroyAllWindows()
 		
