@@ -927,7 +927,7 @@ class Settings(BaseSettings):
 	def cli_cmd(self) -> None:
 		return self.image_ext
 
-from configparser import ConfigParser
+from configparser import ConfigParser, SectionProxy
 from configargparse import ArgParser, CompositeConfigParser, TomlConfigParser, IniConfigParser, ConfigparserConfigFileParser
 from os.path import join as os_path_join
 from typing import Any
@@ -1102,6 +1102,7 @@ def main(
 		logger.info("args.app is chosen by feeder: %s", args.app)
 		logger.info("%s files are chosen by feeder with date: %s", len(args.files), [d.isoformat() for d in set([d for _, fd in dir_file_date_list for f, d in fd])])
 	'''
+	image_area_params: SectionProxy | None = None
 	if args.area_param_file:
 		from configparser import ConfigParser
 		try:
@@ -1111,18 +1112,17 @@ def main(
 		except Exception as e:
 			logger.warning(f"Failed to read area parameter file {args.area_param_file}: {e}")
 			area_param_config = None
-	filter_area_param_dict = {}
 	# image_config_filename = (args.file) #.resolve()Path
-	filter_config_doc: TOMLDocument | None = None
+	# filter_config_doc: TOMLDocument | None = None
 
 	param_dict_loaded = False
 	def get_image_area_param_dict(param_dict: dict[ImageAreaParamName, Sequence[int]] = {}) -> dict[ImageAreaParamName, Sequence[int]]:
 		nonlocal param_dict_loaded
-		if not param_dict_loaded:
+		if not param_dict_loaded and image_area_params is not None:
 			param_name_set = set([n.name for n in ImageAreaParamName])
-			for elem in args.image_area_param:
+			for k, v in image_area_params.items():
 				try:
-					k, v = elem.split(':')
+					# k, v = elem.split(':')
 					if k in param_name_set:
 						param_dict[ImageAreaParamName[k]] = [int(p) for p in v.split(',')]
 				except (ValueError, TypeError):
@@ -1230,12 +1230,12 @@ def main(
 	if not image_file.exists():
 		sys.exit("Error: image_file not found: %s" % image_file)
 	# image_fullpath = image_path.resolve()
-	try:
-		filter_area_param_dict: dict[ImageAreaParamName, Sequence[int]] = {} if args.make else get_image_area_param_dict() # args.image_area_param[app_name] # get_image_area_param_config(app_name)
-	except (TypeError, KeyError):
+	# try:
+	filter_area_param_dict: dict[ImageAreaParamName, Sequence[int]] = {} if args.make else get_image_area_param_dict() # args.image_area_param[app_name] # get_image_area_param_config(app_name)
+	''' except (TypeError, KeyError):
 		filter_area_param_dict = {}
 		if not args.make:
-			logger.warning("KeyError: '%s' not found in get_filter_config()", args.app)
+			logger.warning("KeyError: '%s' not found in get_filter_config()", args.app)'''
 
 	image = cv2.imread(str(image_file), cv2.IMREAD_GRAYSCALE) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
 	if image is None:
