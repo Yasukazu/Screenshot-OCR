@@ -8,6 +8,8 @@ from cv2.gapi import threshold
 import numpy as np
 import cv2
 from image_filter import HeadingAreaParam, FigurePart, XYRange, FromBottomLabelRange, Int4, XYOffset, ImageAreaParamName, ImageDictKey,PaystubAreaParam, BreaktimeAreaParam, ShiftAreaParam, ImageAreaParam
+from set_logger import set_logger
+logger = set_logger(__name__)
 
 @dataclass
 class TaimeeHeadingAreaParam(HeadingAreaParam):
@@ -202,14 +204,14 @@ class TaimeeFilter(OCRFilter):
 	BORDERS_MAX = 4
 	LABEL_TEXT_START = 'この店'
 
-	def __init__(self, image: np.ndarray | Path | str, param_dict: dict[ImageAreaParamName, Sequence[int]] = {}, show_check=False, thresh=OCRFilter.THRESHOLD):
+	def __init__(self, image: np.ndarray | Path | str, param_dict: dict[ImageAreaParamName, Sequence[int]] = {}, show_check=False, thresh=OCRFilter.THRESHOLD, bin_image:np.ndarray | None = None):
 		from image_filter import get_horizontal_border_bunches, ImageAreaParamName
 		self.image = image if isinstance(image, np.ndarray) else cv2.imread(str(image))
 		if self.image is None:
 			raise ValueError("Failed to load image")
 		self.params = param_dict
 		self.threshold = thresh
-		bin_image = cv2.threshold(self.image, self.threshold, 255, cv2.THRESH_BINARY)[1]
+		self.bin_image = cv2.threshold(self.image, self.threshold, 255, cv2.THRESH_BINARY)[1] if bin_image is None else bin_image
 
 		# find borders as bunches
 		border_offset_list: deque[tuple[int, int]] = deque()
@@ -267,18 +269,21 @@ class TaimeeFilter(OCRFilter):
 				canvas[rg.start:rg.stop, n] = 0
 			_plot([canvas])'''
 		self.y_margin = y_margin
-
+		self.from_image: set[ImageAreaParamName] = set()
 		# self.y_origin = y_origin = border_offsets[0][1]
 		heading_area_figure_parts = {}
 		try:
-			heading_area_param = TaimeeHeadingAreaParam(*param_dict[ImageAreaParamName.heading])
+			area_param = TaimeeHeadingAreaParam(*param_dict[ImageAreaParamName.heading])
 		except (KeyError, TypeError):
-			heading_area_param = TaimeeHeadingAreaParam.from_image(bin_image[:border_offset_ranges[0].stop, :], figure_parts=heading_area_figure_parts)
+			area_param: ImageAreaParam = TaimeeHeadingAreaParam.from_image(bin_image[:border_offset_ranges[0].stop, :], figure_parts=heading_area_figure_parts)
+			param_name = ImageAreaParamName(area_param)
+			self.from_image.add(param_name)
+			logger.info("heading area inferred from image %s from_image after heading: %s", param_name, self.from_image)
 
 		if show_check:
-			show_image = self.image[self.y_margin + heading_area_param.y_offset:self.y_margin + border_offset_ranges[0].stop + heading_area_param.height, heading_area_param.x_offset:]
-			do_show_check("heading_area", heading_area_param, [show_image, ])
-		self.area_param_dict: dict[ImageAreaParamName, ImageAreaParam] = {ImageAreaParamName.heading: heading_area_param}
+			show_image = self.image[self.y_margin + area_param.y_offset:self.y_margin + border_offset_ranges[0].stop + area_param.height, area_param.x_offset:]
+			do_show_check("heading_area", area_param, [show_image, ])
+		self.area_param_dict: dict[ImageAreaParamName, ImageAreaParam] = {ImageAreaParamName.heading: area_param}
 		# get shift area
 		try:
 			area_param = ShiftAreaParam(*param_dict[ImageAreaParamName.shift])

@@ -28,11 +28,9 @@ import matplotlib.pyplot as plt
 from inspect import isclass
 from fancy_dataclass import TOMLDataclass
 
-
 cwd = Path(__file__).resolve().parent
 sys.path.append(str(cwd.parent))
 from set_logger import set_logger
-
 logger = set_logger(__name__)
 from enum import StrEnum, auto
 
@@ -967,7 +965,7 @@ def main(
 	parser.add_argument("--shot_month", action='append', type=int, env_var='IMAGE_FILTER_SHOT_MONTH', help='Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD]) included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like "[1,2,..]" )')
 	parser.add_argument('files', nargs='*', help='Image file fullpaths to commit OCR or to get parameters.')
 	parser.add_argument("--app_stem_end", env_var='IMAGE_FILTER_APP_STEM_END', default='taimee:_jp.co.taimee;mercari:_jp.mercari.work.android', help='Screenshot image file name pattern of the screenshot to execute OCR:(specified in format as "<app_name1>:<stem_end1>,<stem_end2>;..." )')
-	parser.add_argument("--app_border_ratio", env_var='IMAGE_FILTER_APP_BORDER_RATIO', default='taimee:2.2,3.2', help='Screenshot image file horizontal border ratio list of the app to execute OCR:(specified in format as "<app_name1>:<ratio1>,<ratio2>;..." )')
+	parser.add_argument("--app_border_ratio", env_var='IMAGE_FILTER_APP_BORDER_RATIO', default='taimee:2.2,3.2', nargs='*', help='Screenshot image file horizontal border ratio list of the app to execute OCR:(specified in format as "<app_name1>:<ratio1>,<ratio2> ..." )')
 	parser.add_argument("--app_suffix", action='store_true', default=True, help='Screenshot image file name has suffix(sub extention) of the same as app name i.e. "<stem>.<suffix>.<ext>" (default: True)')
 
 	# parser.add_argument('--filename_pattern', action='append', default=['*{app_stem_end}{image_ext}'], help='Image files to commit OCR or to get parameters. Can be specified multiple times. Default is: *{app_stem_end}{image_ext}')
@@ -1056,52 +1054,6 @@ def main(
 		logger.info("No files are chosen by feeder")
 		raise ConfigError("No files are chosen by feeder")
 
-	'''config_sections2 = [IMAGE_AREA_PARAM_STR + '.' + args.app.name.lower()]
-	default_config_paths2 = [Path(config_dir) / f"{stem}.{ext.lower()}" for ext in config_file_ext_enum for stem in [image_area_param_file_stem]]
-	default_config_files2 = [p for p in default_config_paths2 if p.exists()]
-	parser2 = ArgParser(
-			default_config_files=default_config_files2,
-			config_file_parser_class=CompositeConfigParser(
-				[TomlConfigParser(config_sections2),
-				IniConfigParser(config_sections2, split_ml_text_to_list=True) ]
-				)
-			)
-	def add_area_param(area, param):
-		parser2.add_argument(f"--{area}", action='append', help=f'Screenshot image area name to parameter in config file [{IMAGE_AREA_PARAM_STR}] section as "{area}={param}"')
-	image_area_param_example={
-	'heading_area':[0,106,196,-1],
-	'shift_area':[221,488,0,345,375],
-	'breaktime_area':[490,714,0,-1],
-	'paystub_area':[714,-1,0,-1],
-	}
-	for k,v in image_area_param_example.items():
-		add_area_param(k, v)
-	def collect_area_options(argv:list[str]):
-		area_params:dict[str,str] = {}
-		for n, arg in enumerate(argv):
-			if arg.startswith('--'):
-				if '=' in arg:
-					key, value = arg[2:].split('=', 1)
-				else:
-					# Handle cases like --area value without equals
-					if n + 1 < len(argv) and not argv[n + 1].startswith('--'):
-						key = arg[2:]
-						value = argv[n + 1]
-					else:
-						raise ValueError(f"Invalid argument format: {arg}")
-				area_params[key] = value
-		return area_params
-	area_params = collect_area_options(sys.argv)	
-	args2 = parser2.parse_args(args=' '.join([f'--{k}={v}' for k, v in area_params.items()]))
-
-	try:
-		args.app = args.app or APP_NAME(list(set(args.files[args.nth - 1].suffixes) & set(['.'+n.value for n in APP_NAME]))[args.nth - 1][1:])
-	except IndexError:
-		raise ConfigError("No files are chosen by feeder")
-	else:
-		logger.info("args.app is chosen by feeder: %s", args.app)
-		logger.info("%s files are chosen by feeder with date: %s", len(args.files), [d.isoformat() for d in set([d for _, fd in dir_file_date_list for f, d in fd])])
-	'''
 	image_area_params: SectionProxy | None = None
 	if args.area_param_file:
 		from configparser import ConfigParser
@@ -1126,7 +1078,7 @@ def main(
 					if k in param_name_set:
 						param_dict[ImageAreaParamName[k]] = [int(p) for p in v.split(',')]
 				except (ValueError, TypeError):
-					logger.warning("Invalid image area parameter: %s", elem)
+					logger.warning("Invalid image area parameter: %s = %s (value type: %s)", k, v, type(v).__name__)
 			param_dict_loaded = True
 		return param_dict			
 
@@ -1231,32 +1183,33 @@ def main(
 		sys.exit("Error: image_file not found: %s" % image_file)
 	# image_fullpath = image_path.resolve()
 	# try:
-	filter_area_param_dict: dict[ImageAreaParamName, Sequence[int]] = {} if args.make else get_image_area_param_dict() # args.image_area_param[app_name] # get_image_area_param_config(app_name)
-	''' except (TypeError, KeyError):
-		filter_area_param_dict = {}
-		if not args.make:
-			logger.warning("KeyError: '%s' not found in get_filter_config()", args.app)'''
+	filter_area_param_dict: dict[ImageAreaParamName, Sequence[int]] = {} if args.make else get_image_area_param_dict() 
 
 	image = cv2.imread(str(image_file), cv2.IMREAD_GRAYSCALE) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
 	if image is None:
 		raise ValueError("Error: Could not load image: %s" % image_file)
-	'''filter_param_dict: dict[ImageAreaParamName, dict[str, str|float|None]] = {}
-	if not args.make:
-		for key in ImageAreaParamName:
-			try:
-				filter_param_dict[key] = filter_area_param_dict[key.name]
-			except KeyError:
-				filter_param_dict[key] = {}
-		ImageAreaParamName.heading:filter_area_param_dict.get('heading'),
-		ImageAreaParamName.breaktime:filter_area_param_dict.get('breaktime'),
-		ImageAreaParamName.shift:filter_area_param_dict.get('shift'),
-		ImageAreaParamName.paystub:filter_area_param_dict.get('paystub'),'''
+	bin_image = None
+	# check ratios
+	from ocr_filter import OCRFilter
+	y_margin, borders, bin_image = OCRFilter.get_borders(image)
+	image_border_ratios = OCRFilter.convert_border_offset_ranges_to_ratio_list(borders)
+	# extract border ratio from app_border_ratio
+	is_image_border_ratio_right = True
+	for ratio in args.app_border_ratio:
+		k, v = ratio.split(':')
+		if k == args.app.name.lower():
+			config_border_ratios = [float(i) for i in v.split(',')]
+			for n, r in enumerate(config_border_ratios):
+				if abs(1 - r / image_border_ratios[n]) > 0.1:
+					logger.warning("Warning: image_border_ratio differs significantly from config_border_ratio %s", r)
+					is_image_border_ratio_right = False
+					filter_area_param_dict = {}
+					logger.info("No use of default filter parameters due to border ratio mismatch for %s", args.app.name.lower())
 
-	# print(f"{para.__class__.__name__:para.as_toml() for para in taimee_filter.area_param_list}")
 	if not args.no_ocr:
 		match args.app:
 			case APP_NAME.TAIMEE:
-				app_filter = TaimeeFilter(image=image, param_dict=filter_area_param_dict, show_check=args.show)
+				app_filter = TaimeeFilter(image=image, param_dict=filter_area_param_dict, show_check=args.show, bin_image=bin_image)
 			case APP_NAME.MERCARI:
 				sys.exit("Error: this app_name is not yet implemented: %s" % args.app)
 
