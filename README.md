@@ -173,10 +173,15 @@ python edge_detect/image_filter.py --help
 
 ```text
 usage: image_filter.py [-h] [--image_ext IMAGE_EXT [IMAGE_EXT ...]] [--image_dir IMAGE_DIR]
-                       [--app_stem_end APP_STEM_END] [--app {taimee,mercari}] [--save SAVE]
-                       [--nth NTH] [--glob-max GLOB_MAX] [--show] [--make] [--no-ocr]
-                       [--ocr-conf OCR_CONF] [--psm PSM]
-                       [--image_area_param [IMAGE_AREA_PARAM ...]]
+                       [--shot_month SHOT_MONTH] [--app_stem_end APP_STEM_END]
+                       [--app_border_ratio [APP_BORDER_RATIO ...]] [--app_suffix]
+                       [--app {taimee,mercari}] [--save SAVE] [--nth NTH] [--glob-max GLOB_MAX] [--show]
+                       [--make] [--no-ocr] [--ocr-conf OCR_CONF] [--psm PSM]
+                       [--area_param_file AREA_PARAM_FILE]
+                       [files ...]
+
+positional arguments:
+  files                 Image file fullpaths to commit OCR or to get parameters.
 
 options:
   -h, --help            show this help message and exit
@@ -184,37 +189,48 @@ options:
                         [env var: IMAGE_FILTER_IMAGE_EXT]
   --image_dir IMAGE_DIR
                         [env var: IMAGE_FILTER_IMAGE_DIR]
+  --shot_month SHOT_MONTH
+                        Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD])
+                        included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like
+                        "[1,2,..]" ) [env var: IMAGE_FILTER_SHOT_MONTH]
   --app_stem_end APP_STEM_END
-                        Screenshot image file name pattern of the screenshot to execute
-                        OCR:(specified in format as "<app_name1>:<stem_end1>,<stem_end2>;..." )
-                        [env var: IMAGE_FILTER_APP_STEM_END]
+                        Screenshot image file name pattern of the screenshot to execute OCR:(specified
+                        in format as "<app_name1>:<stem_end1>,<stem_end2>;..." ) [env var:
+                        IMAGE_FILTER_APP_STEM_END]
+  --app_border_ratio [APP_BORDER_RATIO ...]
+                        Screenshot image file horizontal border ratio list of the app to execute
+                        OCR:(specified in format as "<app_name1>:<ratio1>,<ratio2> ..." ) [env var:
+                        IMAGE_FILTER_APP_BORDER_RATIO]
+  --app_suffix          Screenshot image file name has suffix(sub extention) of the same as app name
+                        i.e. "<stem>.<suffix>.<ext>" (default: True)
   --app {taimee,mercari}
-                        Application name of the screenshot to execute OCR: choices=taimee, mercari
-  --save SAVE           Output path to save OCR text of the image file as TOML format into the
-                        image file name extention as ".ocr-<app_name>.toml"
-  --nth NTH             Rank(default: 1) of files descending sorted(the latest, the first) by
-                        modified date as wildcard(*, ?)
+                        Application name of the screenshot to execute OCR: choices=taimee, mercari [env
+                        var: IMAGE_FILTER_APP_NAME]
+  --save SAVE           Output path to save OCR text of the image file as TOML format into the image
+                        file name extention as ".ocr-<app_name>.toml"
+  --nth NTH             Rank(default: 1) of files descending sorted(the latest, the first) by modified
+                        date as wildcard(*, ?)
   --glob-max GLOB_MAX   Pick up file max as pattern found in TOML
   --show                Show images to check
-  --make                make config. from image(i.e. this arg. makes not to load a config file
-                        like "ocr-filter.toml")
+  --make                make config. from image(i.e. this arg. makes not to use param configs in any
+                        config file; specify image_area_param values like "--image_area_param
+                        heading:0,106,196,-1"
   --no-ocr              Do not execute OCR
   --ocr-conf OCR_CONF   Confidence threshold for OCR
   --psm PSM             PSM value for Tesseract
-  --image_area_param [IMAGE_AREA_PARAM ...]
-                        Screenshot image area name to parameter in config file as
-                        "image_area_param=<area_name>:0,106,196,-1"
+  --area_param_file AREA_PARAM_FILE
+                        Screenshot image area parameter config file: format as: in [image_area_param]
+                        section, items as "<area_name>=<p1>,<p2>,<p3>,<p4>" (e.g.
+                        "heading=0,106,196,-1")
 
 Args that start with '--' can also be set in a config file
 (/home/yasukazu/github/screen/edge_detect/image-filter.toml or
-/home/yasukazu/github/screen/edge_detect/image-filter.ini or
-/home/yasukazu/github/screen/edge_detect/image-area-param.ini). Uses multiple config parser
-settings (in order):  [1] TOML: Config file syntax is Tom's Obvious, Minimal Language. See
-https://github.com/toml-lang/toml/blob/v0.5.0/README.md for details.  [2] INI: Uses configparser
-module to parse an INI file which allows multi-line values. See
-https://docs.python.org/3/library/configparser.html for details. This parser includes support for
-quoting strings literal as well as python list syntax evaluation. Alternatively lists can be
-constructed with a plain multiline string, each non-empty line will be converted to a list item.
-In general, command-line values override environment variables which override config file values
-which override defaults.
+/home/yasukazu/github/screen/edge_detect/image-filter.ini). Uses multiple config parser settings (in
+order):  [1] TOML: Config file syntax is Tom's Obvious, Minimal Language. See https://github.com/toml-
+lang/toml/blob/v0.5.0/README.md for details.  [2] INI: Uses configparser module to parse an INI file
+which allows multi-line values. See https://docs.python.org/3/library/configparser.html for details.
+This parser includes support for quoting strings literal as well as python list syntax evaluation.
+Alternatively lists can be constructed with a plain multiline string, each non-empty line will be
+converted to a list item.   In general, command-line values override environment variables which
+override config file values which override defaults.
 ```
