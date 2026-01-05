@@ -113,6 +113,9 @@ class ItemAreaParam(NamedTuple):
 type Int4 = tuple[int, int, int, int]
 # type ItemAreaParamType = Int4 | Sequence[Int4]
 
+class GetAreaParamException(Exception):
+	pass
+
 @dataclass
 class ImageAreaParam(TOMLDataclass):
 	y_offset: int = 0
@@ -148,9 +151,19 @@ class ImageAreaParam(TOMLDataclass):
 				raise InvalidValueError(f"width must be larger than {self.min_width()} except negative or None")
 
 	@classmethod
-	def from_image(cls, image: np.ndarray, offset:int=0) -> "ImageAreaParam":
-		height, width = image.shape[:2]
-		return cls(height=height, width=width)
+	def from_image(cls, image: np.ndarray, offset:int=0, offset_range: range=range(0), image_check:bool=False) -> "ImageAreaParam":
+		# height, width = image.shape[:2]
+		# return cls(height=height, width=width)
+		# manual(GUI)
+		from mouse_event import get_area, QuitKeyException
+		TLpos = [0, 0]
+		BRpos = [0, 0]
+		save = True
+		try:
+			area = get_area(f"{cls.__name__}", image, TLpos, BRpos)
+		except QuitKeyException e:
+			raise GetAreaParamException() from e
+		return cls(y_offset=TLpos[1], height = BRpos[1] - TLpos[1], x_offset=BRpos[0]) #offset_range.start, height=offset_range.stop - offset_range.start)
 
 	@property
 	def param(self)-> list[int]:
@@ -222,7 +235,6 @@ class FigurePart(Enum):
 	AVATAR = auto() # like (figure)
 	LABEL = auto() # like [string]
 
-# camel-converter
 @dataclass
 class HeadingAreaParam(ImageAreaParam):
 	'''
@@ -298,7 +310,7 @@ class ShiftAreaParam(ImageAreaParam):
 					stable = True
 					break 
 				last_zeros = zeros
-			return b if (b > 0 and stable) else -1
+			return b if (b > 0 and stable) else -1from_image
 		b = both_side_diff()
 		if b < 0:
 			raise ValueError("Center shape not found!")
@@ -382,12 +394,12 @@ class ImageFilterAreas:
 	salary: SalaryAreaParam # kyuuyo
 	y_offset: int = 0
 
-class ImageAreaParamName(StrEnum):
-	HEADING = auto() # HeadingAreaParam
-	SHIFT = auto() # ShiftAreaParam
-	BREAKTIME = auto() # BreaktimeAreaParam
-	PAYSTUB = auto() # PaystubAreaParam
-	SALARY = auto() # SalaryAreaParam
+class ImageAreaParamName(Enum):
+	HEADING = HeadingAreaParam
+	SHIFT = ShiftAreaParam
+	BREAKTIME = BreaktimeAreaParam
+	PAYSTUB = PaystubAreaParam
+	SALARY = SalaryAreaParam
 
 class ImageFilterParam(Enum):
 	y_offset = 0, 0

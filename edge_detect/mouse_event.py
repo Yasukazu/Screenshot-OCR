@@ -7,6 +7,9 @@ sys.path.append(str(cwd.parent))
 from set_logger import set_logger
 logger = set_logger()
 
+class QuitKeyException(Exception):
+	pass
+
 class mouseParam:
 	def __init__(self, input_img_name):
 		# event data as dict.
@@ -61,7 +64,11 @@ def get_area(window: str, image: np.ndarray,
 	is_reset = False
 	while 1:
 		key = cv2.waitKey(50)
-		if key == ord("q"):
+		if key in [ord("q"), ord("Q"), 17]: # Esc
+			cv2.destroyAllWindows()            
+			raise QuitKeyException()
+		elif key in [ord("s"), ord("S")]:
+			is_reset = True
 			break
 		#左クリックがあったら表示
 		match (event:=mouseData.getEvent()):
@@ -117,6 +124,7 @@ def get_area(window: str, image: np.ndarray,
 					logger.info("Reset")
 					is_reset = True
 				continue
+	cv2.destroyAllWindows()            
 
 if __name__ == "__main__":
 	from sys import argv
@@ -132,7 +140,6 @@ if __name__ == "__main__":
 	get_area(window_name, image, TLpos, BRpos)
 	print(f"TLpos: {TLpos}, BRpos: {BRpos}")
 			
-	cv2.destroyAllWindows()            
 
 	print(f"Got area rectangle: {TLpos=},{BRpos=}")
 '''マウスイベントの種類は以下の通りです．
