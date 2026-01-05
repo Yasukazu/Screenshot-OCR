@@ -1,4 +1,5 @@
 import cv2
+import numpy as np
 
 class mouseParam:
 	def __init__(self, input_img_name):
@@ -39,43 +40,69 @@ class mouseParam:
 	def getPos(self) -> tuple[int, int]:
 		return (self.mouseEvent["x"], self.mouseEvent["y"])
 		
-def main(window_name, image):
+def main(window: str, image: np.ndarray,
+	TLpos = [0, 0],
+	BRpos = [0, 0]
+):
 	copy_image = image.copy()
-	cv2.imshow(window_name, image)
+	cv2.imshow(window, image)
 	
 	#コールバックの設定
-	mouseData = mouseParam(window_name)
-	TLpos = [0, 0]	
-	BRpos = [0, 0]	
+	mouseData = mouseParam(window)
+
 	first_click = second_click = False
+	is_rect = False
+	is_l_button_down = False
 	while 1:
-		cv2.waitKey(200)
+		key = cv2.waitKey(50)
+		if key == ord("q"):
+			break
 		#左クリックがあったら表示
-		match mouseData.getEvent():
+		match (event:=mouseData.getEvent()):
+			case cv2.EVENT_LBUTTONUP:
+				if is_l_button_down:
+					pos = mouseData.getPos()
+					BRpos[0] = pos[0]
+					BRpos[1] = pos[1]
+					if is_rect:
+						image = copy_image.copy()
+					cv2.rectangle(image, (TLpos[0], TLpos[1]), (BRpos[0], BRpos[1]), 0, 1)
+					second_click = True
+					is_rect = True
+					cv2.imshow(window, image)
+					print(f"Redraw rectangle:{TLpos=},{BRpos=}")
+					is_l_button_down = False
 			case cv2.EVENT_LBUTTONDOWN:
+				is_l_button_down = True
 				pos = mouseData.getPos()
 				if not first_click:
 					TLpos[0] = pos[0]
 					TLpos[1] = pos[1]
 					first_click = True
-				else:
-					if not second_click:
-						BRpos[0] = pos[0]
-						BRpos[1] = pos[1]
-						second_click = True
+					print(f"{TLpos=}")
+
 			case cv2.EVENT_MOUSEMOVE:
-				if not second_click:
+				if not first_click:
+					continue
+
+				if is_l_button_down:
 					pos = mouseData.getPos()
 					BRpos[0] = pos[0]
 					BRpos[1] = pos[1]
-					if first_click:
-						cv2.rectangle(copy_image, (TLpos[0], TLpos[1]), (BRpos[0], BRpos[1]), 0, 1)
-						cv2.imshow(window_name, copy_image)
+					if is_rect:
+						image = copy_image.copy()
+					cv2.rectangle(image, (TLpos[0], TLpos[1]), (BRpos[0], BRpos[1]), 0, 1)
+					is_rect = True
+					cv2.imshow(window, image)
+					print(f"Redraw rectangle:{TLpos=},{BRpos=}")
 				# image[TLpos[1]:BRpos[1], TLpos[0]:BRpos[0]] &= (255-7)
 
-			#右クリックがあったら終了
+			# right click makes to reset
 			case cv2.EVENT_RBUTTONDOWN:
-				break;
+				first_click = second_click = False
+				for p in [TLpos, BRpos]:
+					p[0] = p[1] = 0
+				print("Reset")
 
 if __name__ == "__main__":
 	from sys import argv
@@ -83,11 +110,13 @@ if __name__ == "__main__":
 	image = cv2.imread(argv[1], cv2.IMREAD_GRAYSCALE)
 	
 	#表示するWindow名
-	window_name = "input window"
+	window_name = "HEAD" + ":Left click to set TOp Left point, then keep pressing it(i.e. 'drag'), move mouse to set Bottom Right point, then unpress the left button, then type 's' to save, type 'q' to exit"
 	
 	#画像の表示
-	main(window_name, image)
-
+	TLpos = [0, 0]
+	BRpos = [0, 0]
+	main(window_name, image, TLpos, BRpos)
+	print(f"TLpos: {TLpos}, BRpos: {BRpos}")
 			
 	cv2.destroyAllWindows()            
 	print("Finished")
