@@ -1,14 +1,19 @@
+from pathlib import Path
+import sys
 import cv2
 import numpy as np
+cwd = Path(__file__).resolve().parent
+sys.path.append(str(cwd.parent))
+from set_logger import set_logger
+logger = set_logger()
 
 class mouseParam:
 	def __init__(self, input_img_name):
-		#マウス入力用のパラメータ
+		# event data as dict.
 		self.mouseEvent = {"x":None, "y":None, "event":None, "flags":None}
-		#マウス入力の設定
+		# set callback
 		cv2.setMouseCallback(input_img_name, self.__CallBackFunc, None)
 	
-	#コールバック関数
 	def __CallBackFunc(self, eventType, x, y, flags, userdata):
 		
 		self.mouseEvent["x"] = x
@@ -70,7 +75,7 @@ def main(window: str, image: np.ndarray,
 					second_click = True
 					is_rect = True
 					cv2.imshow(window, image)
-					print(f"Redraw rectangle:{TLpos=},{BRpos=}")
+					logger.info("Redraw rectangle: %s, %s", TLpos, BRpos)
 					is_l_button_down = False
 			case cv2.EVENT_LBUTTONDOWN:
 				is_l_button_down = True
@@ -79,7 +84,7 @@ def main(window: str, image: np.ndarray,
 					TLpos[0] = pos[0]
 					TLpos[1] = pos[1]
 					first_click = True
-					print(f"{TLpos=}")
+					logger.info("TLpos:%s", TLpos)
 
 			case cv2.EVENT_MOUSEMOVE:
 				if not first_click:
@@ -94,7 +99,7 @@ def main(window: str, image: np.ndarray,
 					cv2.rectangle(image, (TLpos[0], TLpos[1]), (BRpos[0], BRpos[1]), 0, 1)
 					is_rect = True
 					cv2.imshow(window, image)
-					print(f"Redraw rectangle:{TLpos=},{BRpos=}")
+					logger.info("Redraw rectangle:%s, %s", TLpos, BRpos)
 				# image[TLpos[1]:BRpos[1], TLpos[0]:BRpos[0]] &= (255-7)
 
 			# right click makes to reset
@@ -102,7 +107,7 @@ def main(window: str, image: np.ndarray,
 				first_click = second_click = False
 				for p in [TLpos, BRpos]:
 					p[0] = p[1] = 0
-				print("Reset")
+				logger.info("Reset")
 
 if __name__ == "__main__":
 	from sys import argv
@@ -119,8 +124,8 @@ if __name__ == "__main__":
 	print(f"TLpos: {TLpos}, BRpos: {BRpos}")
 			
 	cv2.destroyAllWindows()            
-	print("Finished")
 
+	print(f"Got area rectangle: {TLpos=},{BRpos=}")
 '''マウスイベントの種類は以下の通りです．
 
 EVENT_MOUSEMOVE
