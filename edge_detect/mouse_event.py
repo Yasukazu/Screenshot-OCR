@@ -45,10 +45,10 @@ class mouseParam:
 	def getPos(self) -> tuple[int, int]:
 		return (self.mouseEvent["x"], self.mouseEvent["y"])
 		
-def main(window: str, image: np.ndarray,
+def get_area(window: str, image: np.ndarray,
 	TLpos = [0, 0],
 	BRpos = [0, 0]
-):
+) -> tuple[list[int], list[int]]:
 	copy_image = image.copy()
 	cv2.imshow(window, image)
 	
@@ -58,6 +58,7 @@ def main(window: str, image: np.ndarray,
 	first_click = second_click = False
 	is_rect = False
 	is_l_button_down = False
+	is_reset = False
 	while 1:
 		key = cv2.waitKey(50)
 		if key == ord("q"):
@@ -88,6 +89,11 @@ def main(window: str, image: np.ndarray,
 
 			case cv2.EVENT_MOUSEMOVE:
 				if not first_click:
+					image = copy_image.copy()
+					pos = mouseData.getPos()
+					image[pos[1], :] = 127
+					image[:, pos[0]] = 127
+					cv2.imshow(window, image)
 					continue
 
 				if is_l_button_down:
@@ -104,10 +110,13 @@ def main(window: str, image: np.ndarray,
 
 			# right click makes to reset
 			case cv2.EVENT_RBUTTONDOWN:
-				first_click = second_click = False
-				for p in [TLpos, BRpos]:
-					p[0] = p[1] = 0
-				logger.info("Reset")
+				if not is_reset:
+					first_click = second_click = False
+					for p in [TLpos, BRpos]:
+						p[0] = p[1] = 0
+					logger.info("Reset")
+					is_reset = True
+				continue
 
 if __name__ == "__main__":
 	from sys import argv
@@ -120,7 +129,7 @@ if __name__ == "__main__":
 	#画像の表示
 	TLpos = [0, 0]
 	BRpos = [0, 0]
-	main(window_name, image, TLpos, BRpos)
+	get_area(window_name, image, TLpos, BRpos)
 	print(f"TLpos: {TLpos}, BRpos: {BRpos}")
 			
 	cv2.destroyAllWindows()            
