@@ -957,11 +957,11 @@ class NoAppNameError(ConfigError):
 import yaml
 
 IMAGE_AREA_PARAM_STR = "image_area_param"
-
 def main(
 	config_dir = abspath(dirname(__file__)), config_file_stem = "image-filter", config_file_ext_enum = ConfigFileExt, image_area_param_file_stem = IMAGE_AREA_PARAM_STR.replace('_', '-')
 ):
 	from taimee_filter import TaimeeFilter
+	APP_NAME_TO_FILTER_CLASS = {APP_NAME.TAIMEE: TaimeeFilter}
 	OCR_FILTER = "ocr-filter"
 	config_sections = ['app_stem_end', 'common'] # [ IMAGE_AREA_PARAM_STR + '.' + app.value for app in APP_NAME]
 	default_config_paths = [Path(config_dir) / f"{stem}.{ext.lower()}" for ext in config_file_ext_enum for stem in [config_file_stem]] # image_area_param_file_stem]]# if f.exists()]
@@ -1067,6 +1067,21 @@ def main(
 		logger.info("No files are chosen by feeder")
 		raise ConfigError("No files are chosen by feeder")
 
+	_image_area_params: SectionProxy | None = None
+	def get_image_area_params() -> SectionProxy | None:
+		nonlocal _image_area_params
+		if _image_area_params:
+			return _image_area_params
+		if args.area_param_file:
+			from configparser import ConfigParser
+			area_param_config = ConfigParser()
+			try:
+				area_param_config.read(args.area_param_file)
+				return (_image_area_params:=area_param_config[f'image_area_param.{args.app.name.lower()}'])
+			except Exception as e:
+				logger.warning(f"Failed to read area parameter file {args.area_param_file}: {e}")
+				return None
+
 	image_area_params: SectionProxy | None = None
 	if args.area_param_file:
 		from configparser import ConfigParser
@@ -1080,20 +1095,46 @@ def main(
 	# image_config_filename = (args.file) #.resolve()Path
 	# filter_config_doc: TOMLDocument | None = None
 
-	param_dict_loaded = False
+	is_param_dict_loaded = False
 	def get_image_area_param_dict(param_dict: dict[ImageAreaParamName, Sequence[int]] = {}) -> dict[ImageAreaParamName, Sequence[int]]:
-		nonlocal param_dict_loaded
-		if not param_dict_loaded and image_area_params is not None:
+		nonlocal is_param_dict_loaded
+		if not is_param_dict_loaded and (image_area_params:=get_image_area_params()) is not None:
 			for param_name, v in image_area_params.items():
 				try:
 					param_enum = ImageAreaParamName(param_name)
 					param_dict[param_enum] = [int(p) for p in v.split(',')]
 				except (ValueError, TypeError):
 					logger.warning("Invalid image area parameter: %s = %s (value type: %s)", param_name, v, type(v).__name__)
-			param_dict_loaded = True
-		return param_dict			
+			is_param_dict_loaded = True
+		return param_dict
+	def get_area_param_dict(area_param_dict: dict[ImageAreaParamName, ImageAreaParam] = {}) -> dict[ImageAreaParamName, ImageAreaParam]:
+		nonlocal is_param_dict_loaded
+		if not is_param_dict_loaded and (image_area_params:=get_image_area_params()) is not None:
+			for param_name, v in image_area_params.items():
+				try:
+					param_enum = ImageAreaParamName(param_name)
+					param = [int(p) for p in v.split(',')]
+					param_obj = param_enum.value(*param)
+					area_param_dict[param_enum] = param_obj
+				except (ValueError, TypeError):
+					logger.warning("Invalid image area parameter: %s = %s (value type: %s)", param_name, v, type(v).__name__)
+			is_param_dict_loaded = True
+		return area_param_dict
 
-
+	def select_area_param_dict(area_param_dict: dict[ImageAreaParamName, ImageAreaParam] = {}, image: np.ndarray | None = None) -> dict[ImageAreaParamName, ImageAreaParam]:
+		for area_name in ImageAreaParamName:
+			if area_name not in area_param_dict:
+				if image:
+					logger.info("Try to get area params from image: %s", image.shape)
+					from .mouse_event import get_area
+					try:
+						TL, BR = get_area(area_name.name, image)
+					except TypeError: # unpack fail
+						logger.warning("Failed to get area from image for %s", area_name.name)
+						continue
+					param_obj = ImageAreaParam(TL[1], BR[1] - TL[1], TL[0], BR[0] - TL[0])
+					area_param_dict[area_name] = param_obj
+		return area_param_dict
 
 	is_file_list_loaded = False
 	# from os import scan_dir
@@ -1165,28 +1206,17 @@ def main(
 	if image_path_dir and not image_path_dir.exists():
 		sys.exit("Image dir. does not exist: %s" % image_path_dir)
 
-	# if not get_args_files(): # and args.toml:
-	# file_list = get_args_files() # [Path(f) for f in args.files]
-		# raise ValueError("Error: Image file name is not specified with --file option or not found in toml file as [image-path.%s]\nfilename='*_jp.co.taimee.png'" % app_name)
-	# filename_path = Path(image_file_pattern)
-#glob_path.glob(str(filename_path)) if f.is_file()]
-		# logger.info("Files: %s", file_list)
-		# sort by modified date descendingf
 	try:
 		image_file = get_args_files()[args.nth - 1]
 	except IndexError:
 		# image_file = file_list[0]
 		sys.exit(f"Index out of range for file_list by {args.nth=}")
 	logger.info("Selected file: %s", image_file.name)
-	# else: image_file = filename_path
 	if not image_file.exists():
 		sys.exit("Error: image_file not found: %s" % image_file)
-	# image_fullpath = image_path.resolve()
-	# try:
-	# filter_area_param_dict: dict[ImageAreaParamName, Sequence[int]] = {} if args.make else get_image_area_param_dict() 
 
 	image = cv2.imread(str(image_file), cv2.IMREAD_GRAYSCALE) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
-	if image is None:
+	if not image:
 		raise ValueError("Error: Could not load image: %s" % image_file)
 	bin_image = None
 	# check ratios
@@ -1196,8 +1226,8 @@ def main(
 	# extract border ratio from app_border_ratio
 	is_image_border_ratio_OK = True
 	for ratio in args.app_border_ratio:
-		k, v = ratio.split(':')
-		if k == args.app.name.lower():
+		area_name, v = ratio.split(':')
+		if area_name == args.app.name.lower():
 			config_border_ratios = [float(i) for i in v.split(',')]
 			for n, r in enumerate(config_border_ratios):
 				if abs(1 - r / image_border_ratios[n]) > 0.1:
@@ -1206,26 +1236,29 @@ def main(
 					# filter_area_param_dict = {}
 					logger.info("No use of default filter parameters due to border ratio mismatch for %s", args.app.name.lower())
 
-	if not args.no_ocr:
-		match args.app:
-			case APP_NAME.TAIMEE:
-				app_filter = TaimeeFilter(image=image, param_dict=get_image_area_param_dict() if is_image_border_ratio_OK else {}, show_check=args.show, bin_image=bin_image)
-			case APP_NAME.MERCARI:
-				sys.exit("Error: this app_name is not yet implemented: %s" % args.app)
 
-		
+	try:
+		app_filter_class = APP_NAME_TO_FILTER_CLASS[args.app]
+	except KeyError:
+		app_filter_class = OCRFilter
+		param_dict = select_area_param_dict(image=image)
+	else:
+		param_dict = get_image_area_param_dict() if is_image_border_ratio_OK else {} 
+	app_filter = app_filter_class(image=image, param_dict=param_dict, show_check=args.show, bin_image=bin_image) if not args.no_ocr else None
+
+	if app_filter is not None:	
 		from tesseract_ocr import TesseractOCR, Output
 		from tomli_w import dumps
 		ocr = TesseractOCR()
 		doc_dict = {}
 
 		print(f"# {image_file.name=}")
-		for k, area_param in app_filter.area_param_dict.items():
-			area_name = f"ocr-{k.name}"
+		for area_name, area_param in app_filter.area_param_dict.items():
+			ocr_area_name = f"ocr-{area_name.name}"
 			# area_tbl = table() area_tbl.add(comment(area_name)) area_tbl.add(nl())
 			area_dict = {}
 			pg_list = []
-			print(f"[{area_name}]")
+			print(f"[{ocr_area_name}]")
 			for pg, ocr_area in enumerate(area_param.crop_image(app_filter.image, app_filter.y_margin)):
 				pg_str = f"p{pg+1}"
 				ocr_result = ocr.exec(ocr_area, output_type=Output.DATAFRAME, psm=args.psm)
@@ -1289,20 +1322,20 @@ def main(
 		org_area_dict: dict = ocr_filter_table.get(args.app) or {}
 		for key, param in app_filter.area_param_dict.items():
 			different = False
-			k = key.name.lower()
+			area_name = key.name.lower()
 			vals = param.as_slice_param()
 			try:
-				if k == 'shift':
+				if area_name == 'shift':
 					for n, val in enumerate(vals):
-						different = (tuple(org_area_dict[k][n]) != val)
+						different = (tuple(org_area_dict[area_name][n]) != val)
 						if different:
 							break
 				else:
-					different = (tuple(org_area_dict[k]) != vals[0])
+					different = (tuple(org_area_dict[area_name]) != vals[0])
 				if different:
-					yn = input(f"Original image area value({org_area_dict[k]}) is different from new one ({vals}): overwrite('yes/no'):")
+					yn = input(f"Original image area value({org_area_dict[area_name]}) is different from new one ({vals}): overwrite('yes/no'):")
 					if yn.lower() not in ('y', 'yes'):
-						logger.info("Overwrite skipped for %s", k)
+						logger.info("Overwrite skipped for %s", area_name)
 						continue
 			except KeyError:
 				pass
@@ -1314,7 +1347,7 @@ def main(
 						yn = ''
 					if yn != 'yes' and yn != 'affirmative':
 						sys.exit("Exit since the user did not accept overwrite of: %s" % make_path)
-				org_area_dict[k] = vals if k == 'shift' else vals[0] # update
+				org_area_dict[area_name] = vals if area_name == 'shift' else vals[0] # update
 				ocr_filter_table[APP_NAME[args.app].name.lower()] = org_area_dict
 				try:
 					if config_file:

@@ -1,12 +1,37 @@
 from collections import deque
-from typing import Deque
+from typing import Deque, Sequence
 import numpy as np
 import cv2
 from pathlib import Path
 from matplotlib import pyplot as plt
+from .image_filter import APP_NAME, ImageAreaParamName, ImageAreaParam
 
 class OCRFilter:
 	THRESHOLD = 235
+	def __init__(self, image:np.ndarray, param_dict:dict[ImageAreaParamName, Sequence[int]] = {k:[] for k in ImageAreaParamName}, show_check=False, thresh=THRESHOLD, bin_image:np.ndarray | None = None):
+		self.image = image
+		self.param_dict = param_dict
+		self.show_check = show_check
+		self.thresh = thresh
+		self.bin_image = bin_image
+		self._area_param_dict: dict[ImageAreaParamName, ImageAreaParam] | None = None
+	
+	@property
+	def y_margin(self):
+		return 0
+
+	@property
+	def area_param_dict(self) -> dict[ImageAreaParamName, ImageAreaParam]:
+		if self._area_param_dict is not None:
+			return self._area_param_dict
+		dct: dict[ImageAreaParamName, ImageAreaParam] = {}
+		for name in ImageAreaParamName:
+			param = name.value
+			value = self.param_dict.get(name, [])
+			if value:
+				dct[name] = param(*value)
+		self._area_param_dict = dct
+		return dct
 
 	@classmethod
 	def convert_border_offset_ranges_to_ratio_list(cls, borders: list[range]) -> list[float]:

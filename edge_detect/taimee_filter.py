@@ -271,7 +271,16 @@ class TaimeeFilter(OCRFilter):
 		self.y_margin = y_margin
 		self.from_image: set[ImageAreaParamName] = set()
 		# self.y_origin = y_origin = border_offsets[0][1]
-		heading_area_figure_parts = {}
+		def get_param_from_image(range_num: int, area_enum: ImageAreaParamName ):
+			area_range = border_offset_ranges[range_num] # list[0].elems[-1] + 1
+			param_class = area_enum.value
+			area_param = param_class.from_image(bin_image, offset_range=area_range, image_check=show_check)
+			if show_check:
+				image_list = []
+				for pp in area_param.as_slice_param():
+					image_list.append(bin_image[pp[0]:pp[1], pp[2]:pp[3]])
+				do_show_check(area_enum.name, area_param, image_list)
+			self.area_param_dict[area_enum] = area_param
 		try:
 			area_param = TaimeeHeadingAreaParam(*param_dict[ImageAreaParamName.HEADING])
 		except (KeyError, TypeError):

@@ -51,7 +51,7 @@ class mouseParam:
 def get_area(window: str, image: np.ndarray,
 	TLpos = [0, 0],
 	BRpos = [0, 0]
-) -> tuple[list[int], list[int]]:
+) -> tuple[list[int], list[int]] | None:
 	copy_image = image.copy()
 	cv2.imshow(window, image)
 	
@@ -62,69 +62,71 @@ def get_area(window: str, image: np.ndarray,
 	is_rect = False
 	is_l_button_down = False
 	is_reset = False
-	while 1:
-		key = cv2.waitKey(50)
-		if key in [ord("q"), ord("Q"), 17]: # Esc
-			cv2.destroyAllWindows()            
-			raise QuitKeyException()
-		elif key in [ord("s"), ord("S")]:
-			is_reset = True
-			break
-		#左クリックがあったら表示
-		match (event:=mouseData.getEvent()):
-			case cv2.EVENT_LBUTTONUP:
-				if is_l_button_down:
+	try:
+		while 1:
+			key = cv2.waitKey(50)
+			if key in [ord("q"), ord("Q"), 17]: # Esc
+				raise QuitKeyException()
+			elif key in [ord("s"), ord("S")]:
+				is_reset = True
+				break
+			#左クリックがあったら表示
+			match (event:=mouseData.getEvent()):
+				case cv2.EVENT_LBUTTONUP:
+					if is_l_button_down:
+						pos = mouseData.getPos()
+						BRpos[0] = pos[0]
+						BRpos[1] = pos[1]
+						if is_rect:
+							image = copy_image.copy()
+						cv2.rectangle(image, (TLpos[0], TLpos[1]), (BRpos[0], BRpos[1]), 0, 1)
+						second_click = True
+						is_rect = True
+						cv2.imshow(window, image)
+						logger.info("Redraw rectangle: %s, %s", TLpos, BRpos)
+						is_l_button_down = False
+				case cv2.EVENT_LBUTTONDOWN:
+					is_l_button_down = True
 					pos = mouseData.getPos()
-					BRpos[0] = pos[0]
-					BRpos[1] = pos[1]
-					if is_rect:
-						image = copy_image.copy()
-					cv2.rectangle(image, (TLpos[0], TLpos[1]), (BRpos[0], BRpos[1]), 0, 1)
-					second_click = True
-					is_rect = True
-					cv2.imshow(window, image)
-					logger.info("Redraw rectangle: %s, %s", TLpos, BRpos)
-					is_l_button_down = False
-			case cv2.EVENT_LBUTTONDOWN:
-				is_l_button_down = True
-				pos = mouseData.getPos()
-				if not first_click:
-					TLpos[0] = pos[0]
-					TLpos[1] = pos[1]
-					first_click = True
-					logger.info("TLpos:%s", TLpos)
+					if not first_click:
+						TLpos[0] = pos[0]
+						TLpos[1] = pos[1]
+						first_click = True
+						logger.info("TLpos:%s", TLpos)
 
-			case cv2.EVENT_MOUSEMOVE:
-				if not first_click:
-					image = copy_image.copy()
-					pos = mouseData.getPos()
-					image[pos[1], :] = 127
-					image[:, pos[0]] = 127
-					cv2.imshow(window, image)
+				case cv2.EVENT_MOUSEMOVE:
+					if not first_click:
+						image = copy_image.copy()
+						pos = mouseData.getPos()
+						image[pos[1], :] = 127
+						image[:, pos[0]] = 127
+						cv2.imshow(window, image)
+						continue
+
+					if is_l_button_down:
+						pos = mouseData.getPos()
+						BRpos[0] = pos[0]
+						BRpos[1] = pos[1]
+						if is_rect:
+							image = copy_image.copy()
+						cv2.rectangle(image, (TLpos[0], TLpos[1]), (BRpos[0], BRpos[1]), 0, 1)
+						is_rect = True
+						cv2.imshow(window, image)
+						logger.info("Redraw rectangle:%s, %s", TLpos, BRpos)
+					# image[TLpos[1]:BRpos[1], TLpos[0]:BRpos[0]] &= (255-7)
+
+				# right click makes to reset
+				case cv2.EVENT_RBUTTONDOWN:
+					if not is_reset:
+						first_click = second_click = False
+						for p in [TLpos, BRpos]:
+							p[0] = p[1] = 0
+						logger.info("Reset")
+						is_reset = True
 					continue
-
-				if is_l_button_down:
-					pos = mouseData.getPos()
-					BRpos[0] = pos[0]
-					BRpos[1] = pos[1]
-					if is_rect:
-						image = copy_image.copy()
-					cv2.rectangle(image, (TLpos[0], TLpos[1]), (BRpos[0], BRpos[1]), 0, 1)
-					is_rect = True
-					cv2.imshow(window, image)
-					logger.info("Redraw rectangle:%s, %s", TLpos, BRpos)
-				# image[TLpos[1]:BRpos[1], TLpos[0]:BRpos[0]] &= (255-7)
-
-			# right click makes to reset
-			case cv2.EVENT_RBUTTONDOWN:
-				if not is_reset:
-					first_click = second_click = False
-					for p in [TLpos, BRpos]:
-						p[0] = p[1] = 0
-					logger.info("Reset")
-					is_reset = True
-				continue
-	cv2.destroyAllWindows()            
+	finally:
+		cv2.destroyWindow(window)
+	return TLpos, BRpos
 
 if __name__ == "__main__":
 	from sys import argv
