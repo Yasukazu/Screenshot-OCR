@@ -54,7 +54,7 @@ def get_area(window: str, image: np.ndarray,
 ) -> tuple[list[int], list[int]] | None:
 	copy_image = image.copy()
 	cv2.imshow(window, image)
-	
+	# window = window + ":Drag mouse to select area, then hit Space key to choose, Esc key to quit"	
 	#コールバックの設定
 	mouseData = mouseParam(window)
 
@@ -67,7 +67,7 @@ def get_area(window: str, image: np.ndarray,
 			key = cv2.waitKey(50)
 			if key in [ord("q"), ord("Q"), 17]: # Esc
 				raise QuitKeyException()
-			elif key in [ord("s"), ord("S")]:
+			elif key in [ord("s"), ord("S"), ord(" ")]:
 				is_reset = True
 				break
 			#左クリックがあったら表示
