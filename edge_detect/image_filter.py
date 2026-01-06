@@ -156,14 +156,12 @@ class ImageAreaParam(TOMLDataclass):
 		# return cls(height=height, width=width)
 		# manual(GUI)
 		from mouse_event import get_area, QuitKeyException
-		TLpos = [0, 0]
-		BRpos = [0, 0]
-		save = True
+
 		try:
-			area = get_area(f"{cls.__name__}", image, TLpos, BRpos)
-		except QuitKeyException e:
+			TLpos, BRpos = get_area(f"{cls.__name__}", image)
+		except QuitKeyException as e:
 			raise GetAreaParamException() from e
-		return cls(y_offset=TLpos[1], height = BRpos[1] - TLpos[1], x_offset=BRpos[0]) #offset_range.start, height=offset_range.stop - offset_range.start)
+		return cls(y_offset=TLpos[1], height = BRpos[1] - TLpos[1], x_offset=BRpos[0])#offset_range.start, height=offset_range.stop - offset_range.start)
 
 	@property
 	def param(self)-> list[int]:
@@ -310,7 +308,7 @@ class ShiftAreaParam(ImageAreaParam):
 					stable = True
 					break 
 				last_zeros = zeros
-			return b if (b > 0 and stable) else -1from_image
+			return b if (b > 0 and stable) else -1
 		b = both_side_diff()
 		if b < 0:
 			raise ValueError("Center shape not found!")
@@ -394,12 +392,27 @@ class ImageFilterAreas:
 	salary: SalaryAreaParam # kyuuyo
 	y_offset: int = 0
 
-class ImageAreaParamName(Enum):
-	HEADING = HeadingAreaParam
-	SHIFT = ShiftAreaParam
-	BREAKTIME = BreaktimeAreaParam
-	PAYSTUB = PaystubAreaParam
-	SALARY = SalaryAreaParam
+class ImageAreaParamName(StrEnum):
+	HEADING = auto() # HeadingAreaParam
+	SHIFT = auto() # ShiftAreaParam
+	BREAKTIME = auto() # BreaktimeAreaParam
+	PAYSTUB = auto() # PaystubAreaParam
+	SALARY = auto() # SalaryAreaParam
+	#@classmethod
+	def to_param_class(self):#, name: str):
+		match self:
+			case self.HEADING:
+				return HeadingAreaParam
+			case self.SHIFT:
+				return ShiftAreaParam
+			case self.BREAKTIME:
+				return BreaktimeAreaParam
+			case self.PAYSTUB:
+				return PaystubAreaParam
+			case self.SALARY:
+				return SalaryAreaParam
+			case _:
+				raise ValueError(f"Invalid enum value: {self}")
 
 class ImageFilterParam(Enum):
 	y_offset = 0, 0
@@ -1096,9 +1109,9 @@ def main(
 	# filter_config_doc: TOMLDocument | None = None
 
 	is_param_dict_loaded = False
-	def get_image_area_param_dict(param_dict: dict[ImageAreaParamName, Sequence[int]] = {}) -> dict[ImageAreaParamName, Sequence[int]]:
+	def get_image_area_param_dict(image_area_params: SectionProxy|None =get_image_area_params(), param_dict: dict[ImageAreaParamName, Sequence[int]] = {}) -> dict[ImageAreaParamName, Sequence[int]]:
 		nonlocal is_param_dict_loaded
-		if not is_param_dict_loaded and (image_area_params:=get_image_area_params()) is not None:
+		if (not is_param_dict_loaded) and (image_area_params is not None):
 			for param_name, v in image_area_params.items():
 				try:
 					param_enum = ImageAreaParamName(param_name)
@@ -1114,7 +1127,7 @@ def main(
 				try:
 					param_enum = ImageAreaParamName(param_name)
 					param = [int(p) for p in v.split(',')]
-					param_obj = param_enum.value(*param)
+					param_obj = param_enum.to_param_class(*param)
 					area_param_dict[param_enum] = param_obj
 				except (ValueError, TypeError):
 					logger.warning("Invalid image area parameter: %s = %s (value type: %s)", param_name, v, type(v).__name__)
@@ -1124,16 +1137,17 @@ def main(
 	def select_area_param_dict(area_param_dict: dict[ImageAreaParamName, ImageAreaParam] = {}, image: np.ndarray | None = None) -> dict[ImageAreaParamName, ImageAreaParam]:
 		for area_name in ImageAreaParamName:
 			if area_name not in area_param_dict:
-				if image:
+				if image is not None:
 					logger.info("Try to get area params from image: %s", image.shape)
-					from .mouse_event import get_area
+					from mouse_event import get_area, QuitKeyException
 					try:
 						TL, BR = get_area(area_name.name, image)
-					except TypeError: # unpack fail
+					except QuitKeyException:
 						logger.warning("Failed to get area from image for %s", area_name.name)
 						continue
-					param_obj = ImageAreaParam(TL[1], BR[1] - TL[1], TL[0], BR[0] - TL[0])
-					area_param_dict[area_name] = param_obj
+					else:
+						param_obj = ImageAreaParam(TL[1], BR[1] - TL[1], TL[0], BR[0] - TL[0])
+						area_param_dict[area_name] = param_obj
 		return area_param_dict
 
 	is_file_list_loaded = False
@@ -1142,7 +1156,7 @@ def main(
 		nonlocal is_file_list_loaded
 		if not is_file_list_loaded:
 			if args.files:
-				file_list += args.files
+				file_list += [Path(f) for f in args.files if Path(f).is_file() and Path(f).suffix in args.image_ext and '.'+args.app.name.lower() in Path(f).suffixes]
 				is_file_list_loaded = True
 				return file_list
 			_file_list = []
@@ -1165,49 +1179,11 @@ def main(
 		return False
 
 	image_path_dir: Path | None = None
-	is_app_name_set = False
-	def app_name()-> APP_NAME: # n=0, app_name_list=[]
-		try:
-			return args.app
-		except KeyError:
-			pass
-		if not args.app: # is not None:
-			raise NoAppNameError("No application name specified")
-		elif is_app_name_set:
-			return app_name_list[n]
-		else:
-			try:
-				_app_name = APP_NAME[args.app.upper()] # app_name_to_enum[args.app]
-				logger.info("app_name is set as '%s'", _app_name)
-			except KeyError:
-				raise ConfigError(f"No such app name:{args.app}")
-			else:
-				try: # try to extract app name from file name
-					_file = get_args_files()[args.nth - 1]
-					_app_name = None
-					for nm in args.file_stem_end: # APP_NAME:
-						if Path(_file).stem.endswith(nm.value):
-							_app_name = nm
-							if _app_name not in app_name_list:
-								app_name_list.append(_app_name)
-					if not app_name_list:
-						raise NoAppNameError("No app name is found in file names! Available names: {}".format([nm.value for nm in APP_NAME]))	
-					logger.info("Application name(s) is/are set as [%s] from file name:%s", [an.name.lower() for an in app_name_list], _file.name)
-				except (IndexError, NoAppNameError):
-					sys.exit("Needs application name spec. by '--app' option or file name(ending with {}).".format([nm.value for nm in APP_NAME]))
-		try:
-			image_path_dir = Path(args.image_dir).expanduser() # or get_filter_config()['image-path']['dir'])
-		except TypeError:
-			logger.info("Image dir keeps None since not args.dir or not get_filter_config")
-		except RuntimeError:
-			logger.info("Image dir user home expansion(starting with '~') failed.")
-
-
-	if image_path_dir and not image_path_dir.exists():
-		sys.exit("Image dir. does not exist: %s" % image_path_dir)
+	# if image_path_dir and not image_path_dir.exists(): sys.exit("Image dir. does not exist: %s" % image_path_dir)
 
 	try:
-		image_file = get_args_files()[args.nth - 1]
+		_file = get_args_files()[args.nth - 1]
+		image_file = image_path_dir / _file if image_path_dir else Path(_file)
 	except IndexError:
 		# image_file = file_list[0]
 		sys.exit(f"Index out of range for file_list by {args.nth=}")
@@ -1216,34 +1192,36 @@ def main(
 		sys.exit("Error: image_file not found: %s" % image_file)
 
 	image = cv2.imread(str(image_file), cv2.IMREAD_GRAYSCALE) #cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
-	if not image:
+	if image is None:
 		raise ValueError("Error: Could not load image: %s" % image_file)
 	bin_image = None
 	# check ratios
-	from ocr_filter import OCRFilter
-	y_margin, borders, bin_image = OCRFilter.get_borders(image)
-	image_border_ratios = OCRFilter.convert_border_offset_ranges_to_ratio_list(borders)
-	# extract border ratio from app_border_ratio
-	is_image_border_ratio_OK = True
-	for ratio in args.app_border_ratio:
-		area_name, v = ratio.split(':')
-		if area_name == args.app.name.lower():
-			config_border_ratios = [float(i) for i in v.split(',')]
-			for n, r in enumerate(config_border_ratios):
-				if abs(1 - r / image_border_ratios[n]) > 0.1:
-					logger.warning("Warning: image_border_ratio differs significantly from config_border_ratio %s", r)
-					is_image_border_ratio_OK = False
-					# filter_area_param_dict = {}
-					logger.info("No use of default filter parameters due to border ratio mismatch for %s", args.app.name.lower())
+	if args.app == APP_NAME.TAIMEE:
+		from ocr_filter import OCRFilter
+		y_margin, borders, bin_image = OCRFilter.get_borders(image)
+		image_border_ratios = OCRFilter.convert_border_offset_ranges_to_ratio_list(borders)
+		# extract border ratio from app_border_ratio
+		is_image_border_ratio_OK = True
+		for ratio in args.app_border_ratio:
+			area_name, v = ratio.split(':')
+			if area_name == args.app.name.lower():
+				config_border_ratios = [float(i) for i in v.split(',')]
+				for n, r in enumerate(config_border_ratios):
+					if abs(1 - r / image_border_ratios[n]) > 0.1:
+						logger.warning("Warning: image_border_ratio differs significantly from config_border_ratio %s", r)
+						is_image_border_ratio_OK = False
+						# filter_area_param_dict = {}
+						logger.info("No use of default filter parameters due to border ratio mismatch for %s", args.app.name.lower())
 
 
 	try:
 		app_filter_class = APP_NAME_TO_FILTER_CLASS[args.app]
 	except KeyError:
+		from ocr_filter import OCRFilter
 		app_filter_class = OCRFilter
 		param_dict = select_area_param_dict(image=image)
 	else:
-		param_dict = get_image_area_param_dict() if is_image_border_ratio_OK else {} 
+		param_dict = get_image_area_param_dict(get_image_area_params()) if is_image_border_ratio_OK else {} 
 	app_filter = app_filter_class(image=image, param_dict=param_dict, show_check=args.show, bin_image=bin_image) if not args.no_ocr else None
 
 	if app_filter is not None:	
@@ -1253,7 +1231,7 @@ def main(
 		doc_dict = {}
 
 		print(f"# {image_file.name=}")
-		for area_name, area_param in app_filter.area_param_dict.items():
+		for area_name, area_param in app_filter.param_dict.items():
 			ocr_area_name = f"ocr-{area_name.name}"
 			# area_tbl = table() area_tbl.add(comment(area_name)) area_tbl.add(nl())
 			area_dict = {}
@@ -1320,7 +1298,7 @@ def main(
 		from tomlkit import container as TKContainer
 		ocr_filter_table = org_config.get(OCR_FILTER) or org_config.add(OCR_FILTER, table())[OCR_FILTER]
 		org_area_dict: dict = ocr_filter_table.get(args.app) or {}
-		for key, param in app_filter.area_param_dict.items():
+		for key, param in app_filter.param_dict.items():
 			different = False
 			area_name = key.name.lower()
 			vals = param.as_slice_param()

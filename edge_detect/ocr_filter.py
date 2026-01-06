@@ -21,10 +21,10 @@ class OCRFilter:
 				value = self._param_dict[name]
 			except KeyError:
 				continue
-			if isinstance(value, ImageAreaParam):
-				param = value
+			if not isinstance(value, Sequence):
+				dct[name] = value
 			else:
-				param = name.value
+				param = name.to_param_class()
 				dct[name] = param(*value)
 		self._area_param_dict: dict[ImageAreaParamName, ImageAreaParam] = dct
 	
