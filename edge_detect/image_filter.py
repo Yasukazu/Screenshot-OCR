@@ -951,7 +951,7 @@ class Settings(BaseSettings):
 	def cli_cmd(self) -> None:
 		return self.image_ext
 
-from configparser import ConfigParser, SectionProxy
+from configparser import ConfigParser, NoSectionError, SectionProxy
 from configargparse import ArgParser, CompositeConfigParser, TomlConfigParser, IniConfigParser, ConfigparserConfigFileParser
 from os.path import join as os_path_join
 from typing import Any
@@ -967,7 +967,7 @@ class NoAppNameError(ConfigError):
 	"""No application name specified"""
 	pass
 
-import yaml
+
 
 IMAGE_AREA_PARAM_STR = "image_area_param"
 def main(
@@ -1006,9 +1006,8 @@ def main(
 	parser.add_argument('--no-ocr', action='store_true', default=False, help='Do not execute OCR')
 	parser.add_argument('--ocr-conf', type=int, default=55, help='Confidence threshold for OCR')
 	parser.add_argument('--psm', type=int, default=6, help='PSM value for Tesseract')
-	parser.add_argument("--area_param_file", help='Screenshot image area parameter config file: format as: in [image_area_param] section, items as "<area_name>=<p1>,<p2>,<p3>,<p4>" (e.g. "heading=0,106,196,-1")', type=Path)#yaml.safe_load)#type=Path Python dictionary like: image_area_param = { "taimee": { "heading": [0, 106, 196, -1], "shift": [221, 488, 0, 345, 375], "breaktime": [490, 714, 0, -1], "paystub": [714, -1, 0, -1] } )
+	parser.add_argument("--area_param_file", help='Screenshot image area parameter config file: format as: in [image_area_param.<app>] section, items as "<area_name>=<p1>,<p2>,<p3>,<p4>" (e.g. "heading=0,106,196,-1")', type=Path)
 
-	# parser.add_argument("--heading_area", action='append', help=f'Screenshot image area name to parameter in config file [{IMAGE_AREA_PARAM_STR}] section as "heading_area=[0,106,196,-1]"') # type=yaml.safe_load, 
 	args = parser.parse_args()
 
 	is_app_to_stem_end_set = False
@@ -1081,19 +1080,21 @@ def main(
 		raise ConfigError("No files are chosen by feeder")
 
 	_image_area_params: SectionProxy | None = None
-	def get_image_area_params() -> SectionProxy | None:
+	def get_image_area_params() -> SectionProxy:
 		nonlocal _image_area_params
-		if _image_area_params:
+		if _image_area_params is not None:
 			return _image_area_params
-		if args.area_param_file:
-			from configparser import ConfigParser
-			area_param_config = ConfigParser()
-			try:
-				area_param_config.read(args.area_param_file)
-				return (_image_area_params:=area_param_config[f'image_area_param.{args.app.name.lower()}'])
-			except Exception as e:
-				logger.warning(f"Failed to read area parameter file {args.area_param_file}: {e}")
-				return None
+		area_param_config = ConfigParser()
+		try:
+			with open(args.area_param_file, encoding='utf8') as rf:
+				area_param_config.read_file(rf)
+				return (_image_area_params:=area_param_config[f'image_area_param.{args.app}'])
+		except (TypeError, FileNotFoundError) as e:
+			logger.error("Area parameter file is %s: %s", "None" if isinstance(e, TypeError) else "not found", args.area_param_file)
+			raise ConfigError("Area parameter file is %s: %s" % ("None" if isinstance(e, TypeError) else "not found", args.area_param_file)) from e
+		except NoSectionError as e:
+			logger.error("Failed to read area parameter file %s", args.area_param_file)
+			raise ConfigError("Failed to read area parameter file %s" % args.area_param_file) from e
 
 	image_area_params: SectionProxy | None = None
 	if args.area_param_file:
@@ -1109,7 +1110,7 @@ def main(
 	# filter_config_doc: TOMLDocument | None = None
 
 	is_param_dict_loaded = False
-	def get_image_area_param_dict(image_area_params: SectionProxy|None =get_image_area_params(), param_dict: dict[ImageAreaParamName, Sequence[int]] = {}) -> dict[ImageAreaParamName, Sequence[int]]:
+	def get_image_area_param_dict(image_area_params: SectionProxy=get_image_area_params(), param_dict: dict[ImageAreaParamName, Sequence[int]] = {}) -> dict[ImageAreaParamName, Sequence[int]]:
 		nonlocal is_param_dict_loaded
 		if (not is_param_dict_loaded) and (image_area_params is not None):
 			for param_name, v in image_area_params.items():
@@ -1196,6 +1197,7 @@ def main(
 		raise ValueError("Error: Could not load image: %s" % image_file)
 	bin_image = None
 	# check ratios
+	is_image_border_ratio_OK = None
 	if args.app == APP_NAME.TAIMEE:
 		from ocr_filter import OCRFilter
 		y_margin, borders, bin_image = OCRFilter.get_borders(image)
@@ -1219,9 +1221,16 @@ def main(
 	except KeyError:
 		from ocr_filter import OCRFilter
 		app_filter_class = OCRFilter
-		param_dict = select_area_param_dict(image=image)
+		is_filter_for_app = False
 	else:
-		param_dict = get_image_area_param_dict(get_image_area_params()) if is_image_border_ratio_OK else {} 
+		is_filter_for_app = True
+
+	try:
+		param_dict = get_image_area_param_dict(get_image_area_params()) if is_image_border_ratio_OK is not False else {} 
+	except ConfigError:
+		param_dict = select_area_param_dict(image=image)
+	except NameError:
+		param_dict = {}
 	app_filter = app_filter_class(image=image, param_dict=param_dict, show_check=args.show, bin_image=bin_image) if not args.no_ocr else None
 
 	if app_filter is not None:	
