@@ -1,28 +1,21 @@
 from itertools import groupby
 from typing import TypedDict
 from io import IOBase
-from enum import IntEnum, auto
-from dataclasses import field
 from pathlib import Path
 from datetime import date
 from typing import Iterator, Sequence, NamedTuple, Optional, Sequence
-from dataclasses import dataclass
-from enum import Enum
+from dataclasses import dataclass, field
+from enum import Enum, StrEnum, auto
 import sys
 
 from tomlkit import TOMLDocument
+from dotenv import load_dotenv
 
-cwd = Path(__file__).resolve().parent
-sys.path.append(str(cwd.parent))
-
-import matplotlib.pyplot as plt
 from cv2 import UMat
 import cv2
 
 from camel_converter import to_snake
 
-# from cvc2.typing import MatLike
-# import matplotlib.pyplot as plt
 import numpy as np
 from numpy import ndarray
 import matplotlib.pyplot as plt
@@ -30,10 +23,9 @@ from inspect import isclass
 from fancy_dataclass import TOMLDataclass
 
 cwd = Path(__file__).resolve().parent
-sys.path.append(str(cwd.parent))
+sys.path.insert(0, str(cwd.parent))
 from set_logger import set_logger
 logger = set_logger(__name__)
-from enum import StrEnum, auto
 
 class APP_NAME(StrEnum):
 	''' name of app: value is stem end '''
@@ -973,6 +965,7 @@ IMAGE_AREA_PARAM_STR = "image_area_param"
 def main(
 	config_dir = abspath(dirname(__file__)), config_file_stem = "image-filter", config_file_ext_enum = ConfigFileExt, image_area_param_file_stem = IMAGE_AREA_PARAM_STR.replace('_', '-')
 ):
+	load_dotenv(f"{config_dir}/image-filter.env")
 	from taimee_filter import TaimeeFilter
 	APP_NAME_TO_FILTER_CLASS = {APP_NAME.TAIMEE: TaimeeFilter}
 	OCR_FILTER = "ocr-filter"
@@ -987,10 +980,10 @@ def main(
 				)
 			)
 	parser.add_argument("--image_ext", nargs='+', default=['.png'], env_var='IMAGE_FILTER_IMAGE_EXT')
-	parser.add_argument("--image_dir", default='~/Documents/screenshots', env_var='IMAGE_FILTER_IMAGE_DIR')
+	parser.add_argument("--image_dir", default='~/Documents/screenshots', env_var='IMAGE_FILTER_IMAGE_DIR', type=Path)
 	parser.add_argument("--shot_month", action='append', type=int, env_var='IMAGE_FILTER_SHOT_MONTH', help='Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD]) included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like "[1,2,..]" )')
 	parser.add_argument('files', nargs='*', help='Image file fullpaths to commit OCR or to get parameters.')
-	parser.add_argument("--app_stem_end", env_var='IMAGE_FILTER_APP_STEM_END', default='taimee:_jp.co.taimee;mercari:_jp.mercari.work.android', help='Screenshot image file name pattern of the screenshot to execute OCR:(specified in format as "<app_name1>:<stem_end1>,<stem_end2>;..." )')
+	parser.add_argument("--app_stem_end", env_var='IMAGE_FILTER_APP_STEM_END', default='taimee:_jp.co.taimee mercari:_jp.mercari.work.android', help='Screenshot image file name pattern of the screenshot to execute OCR:(specified in format as "<app_name1>:<stem_end1>,<stem_end2> ..." )')
 	parser.add_argument("--app_border_ratio", env_var='IMAGE_FILTER_APP_BORDER_RATIO', default='taimee:2.2,3.2', nargs='*', help='Screenshot image file horizontal border ratio list of the app to execute OCR:(specified in format as "<app_name1>:<ratio1>,<ratio2> ..." )')
 	parser.add_argument("--app_suffix", action='store_true', default=True, help='Screenshot image file name has suffix(sub extention) of the same as app name i.e. "<stem>.<suffix>.<ext>" (default: True)')
 
@@ -1006,9 +999,34 @@ def main(
 	parser.add_argument('--no-ocr', action='store_true', default=False, help='Do not execute OCR')
 	parser.add_argument('--ocr-conf', type=int, default=55, help='Confidence threshold for OCR')
 	parser.add_argument('--psm', type=int, default=6, help='PSM value for Tesseract')
-	parser.add_argument("--area_param_file", help='Screenshot image area parameter config file: format as: in [image_area_param.<app>] section, items as "<area_name>=<p1>,<p2>,<p3>,<p4>" (e.g. "heading=0,106,196,-1")', type=Path)
+	parser.add_argument("--area_param_dir", help='Screenshot image area parameter config file directory', type=Path, env_var='IMAGE_FILTER_AREA_PARAM_DIR')
+	parser.add_argument("--area_param_file", help='Screenshot image area parameter config file: format as INI or TOML(".ini" or ".toml" extention respectively): in [image_area_param.<app>] section, items as "<area_name>=[<p1>,<p2>,<p3>,<p4>]" (e.g. "heading=[0,106,196,-1]")', type=Path, env_var='IMAGE_FILTER_AREA_PARAM_FILE',default='image-area-param.ini')
 
 	args = parser.parse_args()
+	if args.area_param_dir:
+		try:
+			args.area_param_dir = Path(args.area_param_dir).expanduser()
+		except TypeError:
+			logger.error("Invalid area_param_dir: %s", args.area_param_dir)
+			raise ConfigError(f"Invalid area_param_dir: {args.area_param_dir}")
+		except RuntimeError:
+			logger.error("Failed to expand area_param_dir: %s", args.area_param_dir)
+			raise ConfigError(f"Failed to expand area_param_dir: {args.area_param_dir}")
+	if args.area_param_file:
+		if args.area_param_file.name[0] == '~':
+			try:
+				args.area_param_file = Path(args.area_param_file[0]).expanduser()
+			except RuntimeError:
+				logger.error("Failed to expand area param file.")
+				raise ConfigError("Failed to expand area param file.")
+		else:
+			if args.area_param_dir:
+				args.area_param_file = args.area_param_dir / args.area_param_file
+			else:
+				args.area_param_file = Path(args.area_param_file)
+		if not args.area_param_file.exists():
+			logger.error("area param file does not exist.")
+			raise ConfigError("area param file does not exist.")
 
 	is_app_to_stem_end_set = False
 	def get_app_to_stem_end_dict(app_to_stem_end_dict:dict[APP_NAME, set[str]]={}, stem_end_to_app_dict:dict[str, APP_NAME]={}) -> tuple[dict[APP_NAME, set[str]],dict[str, APP_NAME] ]:
@@ -1080,21 +1098,25 @@ def main(
 		raise ConfigError("No files are chosen by feeder")
 
 	_image_area_params: SectionProxy | None = None
-	def get_image_area_params() -> SectionProxy:
+	def get_image_area_params(app=args.app) -> SectionProxy:
 		nonlocal _image_area_params
 		if _image_area_params is not None:
 			return _image_area_params
 		area_param_config = ConfigParser()
+		key = f'image_area_param.{app}'
 		try:
 			with open(args.area_param_file, encoding='utf8') as rf:
 				area_param_config.read_file(rf)
-				return (_image_area_params:=area_param_config[f'image_area_param.{args.app}'])
+				return (_image_area_params:=area_param_config[key])
 		except (TypeError, FileNotFoundError) as e:
 			logger.error("Area parameter file is %s: %s", "None" if isinstance(e, TypeError) else "not found", args.area_param_file)
 			raise ConfigError("Area parameter file is %s: %s" % ("None" if isinstance(e, TypeError) else "not found", args.area_param_file)) from e
-		except NoSectionError as e:
-			logger.error("Failed to read area parameter file %s", args.area_param_file)
-			raise ConfigError("Failed to read area parameter file %s" % args.area_param_file) from e
+		except KeyError as e:
+			logger.warning("Failed to read area parameter file %s: %s", args.area_param_file, e)
+			return e # ConfigError("Failed to read area parameter file %s: %s" % (args.area_param_file, e)) from e
+		except NoSectionError:
+			logger.warning("Failed to read area parameter file %s", args.area_param_file)
+			raise # ConfigError("Failed to read area parameter file %s" % args.area_param_file) from e
 
 	image_area_params: SectionProxy | None = None
 	if args.area_param_file:
@@ -1112,7 +1134,7 @@ def main(
 	is_param_dict_loaded = False
 	def get_image_area_param_dict(image_area_params: SectionProxy=get_image_area_params(), param_dict: dict[ImageAreaParamName, Sequence[int]] = {}) -> dict[ImageAreaParamName, Sequence[int]]:
 		nonlocal is_param_dict_loaded
-		if (not is_param_dict_loaded) and (image_area_params is not None):
+		if (not is_param_dict_loaded) :
 			for param_name, v in image_area_params.items():
 				try:
 					param_enum = ImageAreaParamName(param_name)
@@ -1221,16 +1243,33 @@ def main(
 	except KeyError:
 		from ocr_filter import OCRFilter
 		app_filter_class = OCRFilter
-		is_filter_for_app = False
+		specific_filter_for_app = False
 	else:
-		is_filter_for_app = True
+		specific_filter_for_app = True
 
-	try:
-		param_dict = get_image_area_param_dict(get_image_area_params()) if is_image_border_ratio_OK is not False else {} 
-	except ConfigError:
+	param_dict = None
+	section = None
+	if specific_filter_for_app:
+		try:
+			area_params = get_image_area_params()
+		except KeyError as e:
+			section = e # section
+			logger.warning("Going to get filter parameters manually due to config error for %s", args.app.name.lower())
+		else:
+			if isinstance(area_params, SectionProxy):
+				param_dict = get_image_area_param_dict(area_params)
+			else:
+				section = area_params
+	if not param_dict:
 		param_dict = select_area_param_dict(image=image)
-	except NameError:
-		param_dict = {}
+		area_param_config = ConfigParser()
+		area_param_config[section] = {k:v.param for k, v in param_dict.items()}
+		try:
+			with open(args.area_param_file, 'w', encoding='utf8') as wf:
+				area_param_config.write(wf)
+		except Exception as e:
+			logger.warning("Failed to write area parameter file: %s", e)
+
 	app_filter = app_filter_class(image=image, param_dict=param_dict, show_check=args.show, bin_image=bin_image) if not args.no_ocr else None
 
 	if app_filter is not None:	
