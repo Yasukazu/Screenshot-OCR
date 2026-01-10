@@ -1,9 +1,11 @@
+from configparser import ConfigParser
 from itertools import groupby
 from typing import TypedDict
 from io import IOBase
 from pathlib import Path
 from datetime import date
 from typing import Iterator, Sequence, NamedTuple, Optional, Sequence
+from returns.pipeline import is_successful
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum, auto
 import sys
@@ -13,7 +15,8 @@ from dotenv import load_dotenv
 
 from cv2 import UMat
 import cv2
-
+from returns.result import safe, attempt, Result, Failure, Success
+# from returns.io import IO
 from camel_converter import to_snake
 
 import numpy as np
@@ -927,6 +930,30 @@ class MakeError(MainError):
 	def __init__(self, msg: str):
 		self.msg = msg
 
+class MainException(Exception):
+	''' base exception of main '''
+	def __init__(self, msg: str):
+		self.msg = msg
+
+class KeyException(MainException):
+	''' Key probrem '''
+	def __init__(self, msg: str, key: str):
+		self.msg = msg
+		self.key = key
+
+class SectionKeyException(KeyException):
+	''' Section Key probrem '''
+	def __init__(self, msg: str, key: str, section: str):
+		super().__init__(msg, key)
+		self.section = section
+
+class ConfigKeyException(KeyException):
+	''' Config Section probrem '''
+	def __init__(self, msg: str, key: str, config: ConfigParser):
+		super().__init__(msg, key)
+		self.key = key
+		self.config = config
+
 from os.path import abspath, dirname
 from pydantic_settings import BaseSettings, SettingsConfigDict, CliApp
 
@@ -1098,29 +1125,33 @@ def main(
 		raise ConfigError("No files are chosen by feeder")
 
 	_image_area_params: SectionProxy | None = None
+	@safe
 	def get_image_area_params(app=args.app) -> SectionProxy:
 		nonlocal _image_area_params
 		if _image_area_params is not None:
 			return _image_area_params
 		area_param_config = ConfigParser()
-		key = f'image_area_param.{app}'
+		section = f'image_area_param.{app}'
 		try:
 			with open(args.area_param_file, encoding='utf8') as rf:
 				area_param_config.read_file(rf)
-				return (_image_area_params:=area_param_config[key])
+				try:
+					_image_area_params = area_param_config[section]
+				except KeyError as e:
+					logger.warning("Failed to read area parameter file %s: %s", args.area_param_file, e)
+					raise ConfigKeyException("Failed to read area parameter section", key=section, config=area_param_config) from e
 		except (TypeError, FileNotFoundError) as e:
 			logger.error("Area parameter file is %s: %s", "None" if isinstance(e, TypeError) else "not found", args.area_param_file)
 			raise ConfigError("Area parameter file is %s: %s" % ("None" if isinstance(e, TypeError) else "not found", args.area_param_file)) from e
-		except KeyError as e:
-			logger.warning("Failed to read area parameter file %s: %s", args.area_param_file, e)
-			return e # ConfigError("Failed to read area parameter file %s: %s" % (args.area_param_file, e)) from e
+
 		except NoSectionError:
 			logger.warning("Failed to read area parameter file %s", args.area_param_file)
-			raise # ConfigError("Failed to read area parameter file %s" % args.area_param_file) from e
+			raise # ConfigError("Failed to read area parameter file %s" % args.area_param_file) from e	
+		else:
+			return _image_area_params
 
 	image_area_params: SectionProxy | None = None
 	if args.area_param_file:
-		from configparser import ConfigParser
 		try:
 			area_param_config = ConfigParser()
 			area_param_config.read(args.area_param_file)
@@ -1247,22 +1278,33 @@ def main(
 	else:
 		specific_filter_for_app = True
 
+	specific_filter_for_app = True
 	param_dict = None
 	section = None
+	param_config = None
 	if specific_filter_for_app:
-		try:
-			area_params = get_image_area_params()
-		except KeyError as e:
-			section = e # section
+		#try:
+		area_params_result = get_image_area_params()
+		if is_successful(area_params_result):
+			area_params = area_params_result.unwrap()
+			param_dict = get_image_area_param_dict(area_params)
+		else:
+			exception = area_params_result.failure()	#case ConfigKeyException():
+			section = exception.key
+			param_config = exception.config # section
+			logger.warning("Going to get filter parameters manually due to config error for %s", args.app.name.lower())
+		'''except ConfigKeyException as e:
+			section = e.key
+			param_config = e.config # section
 			logger.warning("Going to get filter parameters manually due to config error for %s", args.app.name.lower())
 		else:
 			if isinstance(area_params, SectionProxy):
 				param_dict = get_image_area_param_dict(area_params)
 			else:
-				section = area_params
+				section = area_params'''
 	if not param_dict:
 		param_dict = select_area_param_dict(image=image)
-		area_param_config = ConfigParser()
+		area_param_config = param_config # ConfigParser()
 		area_param_config[section] = {k:v.param for k, v in param_dict.items()}
 		try:
 			with open(args.area_param_file, 'w', encoding='utf8') as wf:
