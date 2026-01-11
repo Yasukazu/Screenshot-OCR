@@ -5,7 +5,6 @@ from io import IOBase
 from pathlib import Path
 from datetime import date
 from typing import Iterator, Sequence, NamedTuple, Optional, Sequence
-from returns.pipeline import is_successful
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum, auto
 import sys
@@ -15,7 +14,9 @@ from dotenv import load_dotenv
 
 from cv2 import UMat
 import cv2
-from returns.result import safe, attempt, Result, Failure, Success
+from returns.result import safe #, attempt, Result, Failure, Success
+from returns.pipeline import is_successful
+# from returns.primitives.exceptions import UnwrapFailedError
 # from returns.io import IO
 from camel_converter import to_snake
 
@@ -127,6 +128,10 @@ class ImageAreaParam(TOMLDataclass):
 	@classmethod
 	def min_width(cls):
 		return 9
+
+	@classmethod
+	def from_str(cls, str: str) -> "ImageAreaParam":
+		return cls.from_param([int(i) for i in str.strip('[]').split(',')])
 
 	@classmethod
 	def from_param(cls, param: Sequence[int]) -> "ImageAreaParam":
@@ -1126,26 +1131,27 @@ def main(
 
 	_image_area_params: SectionProxy | None = None
 	@safe
-	def get_image_area_params(app=args.app) -> SectionProxy:
+	def get_image_area_params(app=args.app, section_stem = 'image_area_param', area_param_file = args.area_param_file) -> SectionProxy:
+		''' Get image area parameters using ConfigParser'''
 		nonlocal _image_area_params
 		if _image_area_params is not None:
 			return _image_area_params
 		area_param_config = ConfigParser()
-		section = f'image_area_param.{app}'
+		section = f'{section_stem}.{app}'
 		try:
-			with open(args.area_param_file, encoding='utf8') as rf:
+			with open(area_param_file, encoding='utf8') as rf:
 				area_param_config.read_file(rf)
 				try:
 					_image_area_params = area_param_config[section]
 				except KeyError as e:
-					logger.warning("Failed to read area parameter file %s: %s", args.area_param_file, e)
+					logger.warning("Failed to read area parameter file %s: %s", area_param_file, e)
 					raise ConfigKeyException("Failed to read area parameter section", key=section, config=area_param_config) from e
 		except (TypeError, FileNotFoundError) as e:
-			logger.error("Area parameter file is %s: %s", "None" if isinstance(e, TypeError) else "not found", args.area_param_file)
-			raise ConfigError("Area parameter file is %s: %s" % ("None" if isinstance(e, TypeError) else "not found", args.area_param_file)) from e
+			logger.error("Area parameter file is %s: %s", "None" if isinstance(e, TypeError) else "not found", area_param_file)
+			raise ConfigError("Area parameter file is %s: %s" % ("None" if isinstance(e, TypeError) else "not found", area_param_file)) from e
 
 		except NoSectionError:
-			logger.warning("Failed to read area parameter file %s", args.area_param_file)
+			logger.warning("Failed to read area parameter file %s", area_param_file)
 			raise # ConfigError("Failed to read area parameter file %s" % args.area_param_file) from e	
 		else:
 			return _image_area_params
@@ -1274,43 +1280,46 @@ def main(
 	except KeyError:
 		from ocr_filter import OCRFilter
 		app_filter_class = OCRFilter
-		specific_filter_for_app = False
-	else:
-		specific_filter_for_app = True
+		#specific_filter_for_app = False
+	#else: specific_filter_for_app = True
 
-	specific_filter_for_app = True
 	param_dict = None
 	section = None
 	param_config = None
-	if specific_filter_for_app:
-		#try:
-		area_params_result = get_image_area_params()
-		if is_successful(area_params_result):
-			area_params = area_params_result.unwrap()
-			param_dict = get_image_area_param_dict(area_params)
-		else:
-			exception = area_params_result.failure()	#case ConfigKeyException():
+	#try:
+	area_params_result = get_image_area_params()
+	if is_successful(area_params_result):
+		param_str_dict = area_params_result.unwrap()
+		param_dict = {ImageAreaParamName(k): ImageAreaParam.from_str(v) for k, v in param_str_dict.items()}# get_image_area_param_dict(area_params)
+	else:
+		exception = area_params_result.failure()	#case ConfigKeyException():
+		if isinstance(exception, ConfigKeyException):
 			section = exception.key
 			param_config = exception.config # section
 			logger.warning("Going to get filter parameters manually due to config error for %s", args.app.name.lower())
-		'''except ConfigKeyException as e:
-			section = e.key
-			param_config = e.config # section
-			logger.warning("Going to get filter parameters manually due to config error for %s", args.app.name.lower())
 		else:
-			if isinstance(area_params, SectionProxy):
-				param_dict = get_image_area_param_dict(area_params)
-			else:
-				section = area_params'''
+			logger.error("Failed to get filter parameters: %s", exception)
+	'''except ConfigKeyException as e:
+		section = e.key
+		param_config = e.config # section
+		logger.warning("Going to get filter parameters manually due to config error for %s", args.app.name.lower())
+	else:
+		if isinstance(area_params, SectionProxy):
+			param_dict = get_image_area_param_dict(area_params)
+		else:
+			section = area_params'''
 	if not param_dict:
 		param_dict = select_area_param_dict(image=image)
-		area_param_config = param_config # ConfigParser()
-		area_param_config[section] = {k:v.param for k, v in param_dict.items()}
-		try:
-			with open(args.area_param_file, 'w', encoding='utf8') as wf:
-				area_param_config.write(wf)
-		except Exception as e:
-			logger.warning("Failed to write area parameter file: %s", e)
+		if section and param_config:
+			area_param_config = param_config # ConfigParser()
+			area_param_config[section] = {k:f'{v.param}' for k, v in param_dict.items()}
+			try:
+				with open(args.area_param_file, 'w', encoding='utf8') as wf:
+					area_param_config.write(wf)
+			except Exception as e:
+				logger.warning("Failed to write area parameter file: %s", e)
+			else:
+				logger.info("Wrote param config by user input: %s", args.area_param_file)
 
 	app_filter = app_filter_class(image=image, param_dict=param_dict, show_check=args.show, bin_image=bin_image) if not args.no_ocr else None
 
@@ -1448,17 +1457,7 @@ PaystubAreaParam = [714, -1, 0, -1]'''
 if __name__ == "__main__":
 	try:
 		main()
-		sys.exit(0)
-	except ConfigError as e:
-		logger.error("ConfigError: %s", e)
-		sys.exit(1)
-	except MakeError as e:
-		logger.error("MakeError: %s", e)
-		sys.exit(2)
 	except SystemExit as e:
 		if e.code != 0:
 			logger.error("SystemExit: %s", e)
 			raise
-	except Exception as e:
-		logger.error("Error: %s", e)
-		raise
