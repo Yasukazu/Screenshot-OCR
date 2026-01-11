@@ -1130,9 +1130,10 @@ def main(
 		raise ConfigError("No files are chosen by feeder")
 
 	_image_area_params: SectionProxy | None = None
+	IMAGE_AREA_PARAM_SECTION_STEM: str = 'image_area_param'
 	@safe
-	def get_image_area_params(app=args.app, section_stem = 'image_area_param', area_param_file = args.area_param_file) -> SectionProxy:
-		''' Get image area parameters using ConfigParser'''
+	def get_image_area_params_section(app=args.app, section_stem = IMAGE_AREA_PARAM_SECTION_STEM, area_param_file = args.area_param_file) -> SectionProxy:
+		''' Get image area parameters' section of ConfigParser'''
 		nonlocal _image_area_params
 		if _image_area_params is not None:
 			return _image_area_params
@@ -1169,7 +1170,7 @@ def main(
 	# filter_config_doc: TOMLDocument | None = None
 
 	is_param_dict_loaded = False
-	def get_image_area_param_dict(image_area_params: SectionProxy=get_image_area_params(), param_dict: dict[ImageAreaParamName, Sequence[int]] = {}) -> dict[ImageAreaParamName, Sequence[int]]:
+	def get_image_area_param_dict(image_area_params: SectionProxy=get_image_area_params_section(), param_dict: dict[ImageAreaParamName, Sequence[int]] = {}) -> dict[ImageAreaParamName, Sequence[int]]:
 		nonlocal is_param_dict_loaded
 		if (not is_param_dict_loaded) :
 			for param_name, v in image_area_params.items():
@@ -1182,7 +1183,7 @@ def main(
 		return param_dict
 	def get_area_param_dict(area_param_dict: dict[ImageAreaParamName, ImageAreaParam] = {}) -> dict[ImageAreaParamName, ImageAreaParam]:
 		nonlocal is_param_dict_loaded
-		if not is_param_dict_loaded and (image_area_params:=get_image_area_params()) is not None:
+		if not is_param_dict_loaded and (image_area_params:=get_image_area_params_section()) is not None:
 			for param_name, v in image_area_params.items():
 				try:
 					param_enum = ImageAreaParamName(param_name)
@@ -1287,12 +1288,16 @@ def main(
 	section = None
 	param_config = None
 	#try:
-	area_params_result = get_image_area_params()
-	if is_successful(area_params_result):
-		param_str_dict = area_params_result.unwrap()
-		param_dict = {ImageAreaParamName(k): ImageAreaParam.from_str(v) for k, v in param_str_dict.items()}# get_image_area_param_dict(area_params)
+	area_params_section = get_image_area_params_section()
+	if is_successful(area_params_section):
+		param_str_dict = area_params_section.unwrap()
+		try:
+			param_dict = {ImageAreaParamName(k): ImageAreaParam.from_str(v) for k, v in param_str_dict.items()}# get_image_area_param_dict(area_params)
+		except ValueError as e:
+			logger.error("Failed to get filter parameters: %s", e)
+			
 	else:
-		exception = area_params_result.failure()	#case ConfigKeyException():
+		exception = area_params_section.failure()	#case ConfigKeyException():
 		if isinstance(exception, ConfigKeyException):
 			section = exception.key
 			param_config = exception.config # section
@@ -1310,16 +1315,17 @@ def main(
 			section = area_params'''
 	if not param_dict:
 		param_dict = select_area_param_dict(image=image)
-		if section and param_config:
-			area_param_config = param_config # ConfigParser()
-			area_param_config[section] = {k:f'{v.param}' for k, v in param_dict.items()}
-			try:
-				with open(args.area_param_file, 'w', encoding='utf8') as wf:
-					area_param_config.write(wf)
-			except Exception as e:
-				logger.warning("Failed to write area parameter file: %s", e)
-			else:
-				logger.info("Wrote param config by user input: %s", args.area_param_file)
+		# save to config file
+		section = IMAGE_AREA_PARAM_SECTION_STEM + '.' + args.app.name.lower() 
+		area_param_config = param_config if param_config is not None else ConfigParser()
+		area_param_config[section] = {k:f'{v.param}' for k, v in param_dict.items()}
+		try:
+			with open(args.area_param_file, 'w', encoding='utf8') as wf:
+				area_param_config.write(wf)
+		except Exception as e:
+			logger.warning("Failed to write area parameter file: %s", e)
+		else:
+			logger.info("Wrote param config by user input: %s", args.area_param_file)
 
 	app_filter = app_filter_class(image=image, param_dict=param_dict, show_check=args.show, bin_image=bin_image) if not args.no_ocr else None
 
