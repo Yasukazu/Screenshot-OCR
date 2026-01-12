@@ -1,12 +1,21 @@
 from collections import deque
-from typing import Deque, Sequence
+from typing import Deque, NamedTuple, Sequence
+import re
+from re import Pattern
 import numpy as np
 import cv2
 from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).parent))
 from image_filter import ImageAreaParamName, ImageAreaParam
+class MonthDay(NamedTuple):
+	month: int
+	day: int
 
+class DatePatterns(NamedTuple):
+	hours: Pattern
+	month_date: Pattern
+	day_of_week: Pattern
 class OCRFilter:
 	THRESHOLD = 235
 	def __init__(self, image:np.ndarray, param_dict:dict[ImageAreaParamName, Sequence[int] | ImageAreaParam] = {k:[] for k in ImageAreaParamName}, show_check=False, thresh=THRESHOLD, bin_image:np.ndarray | None = None):
@@ -30,9 +39,11 @@ class OCRFilter:
 	
 	@property
 	def y_margin(self):
-		return 0
+		return self._y_margin
+	@y_margin.setter
+	def y_margin(self, value: int):
+		self._y_margin = value
 
-	@property
 	def param_dict(self) -> dict[ImageAreaParamName, ImageAreaParam]:
 		if self._area_param_dict is not None:
 			return self._area_param_dict

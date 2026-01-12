@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from cv2.gapi import threshold
 import numpy as np
 import cv2
+from returns.pipeline import is_successful
 from image_filter import HeadingAreaParam, FigurePart, XYRange, FromBottomLabelRange, Int4, XYOffset, ImageAreaParamName, ImageDictKey,PaystubAreaParam, BreaktimeAreaParam, ShiftAreaParam, ImageAreaParam
 from set_logger import set_logger
 logger = set_logger(__name__)
@@ -189,20 +190,52 @@ class TaimeeHeadingAreaParam(HeadingAreaParam):
 				from tesseract_ocr import TesseractOCR, Output
 				ocr = TesseractOCR()
 				ocr_area = image[image.shape[0] + from_bottom_label_range.from_bottom:, start_x:]
-				ocr_result = ocr.exec(ocr_area, output_type=Output.DATAFRAME, psm=7)
+				result = ocr.exec(ocr_area, output_type=Output.DATAFRAME, psm=7)
+				if is_successful(result):
+					ocr_result = result.unwrap()
+				else:
+					raise ValueError("Failed to get ocr result")
 				label_text = ''.join(list(ocr_result[ocr_result['conf'] > 50]['text']))
 				if not label_text.startswith(
 				lts:=cls.get_label_text_start()):
 					raise ValueError("Improper text start: " + lts)
 			figure_parts[FigurePart.LABEL] = from_bottom_label_range
 		return XYOffset(x=figure_parts[FigurePart.AVATAR].x.stop, y=figure_parts[FigurePart.LABEL].from_bottom)
-
-from ocr_filter import OCRFilter
+import re
+from re import Match
+from datetime import date as Date
+from tool_pyocr import MDateError
+from ocr_filter import OCRFilter, MonthDay, DatePatterns
 
 class TaimeeFilter(OCRFilter):
 	BORDERS_MIN = 3
 	BORDERS_MAX = 4
 	LABEL_TEXT_START = 'この店'
+	M_DATE_PATT = DatePatterns(hours=re.compile(r"(\d\d:\d\d)"),
+		month_date=re.compile(r"(1?\d)\s*月\s*([123]?\d)\s*日"),
+		day_of_week=re.compile(r"\(\s*([日月火水木木金土])\s*\)"))
+
+	from returns.result import safe
+	@classmethod
+	@safe
+	def extract_month_day_and_hours_from_shift_area_text(cls, txt_lines: Sequence[str], year: int = Date.today().year) -> tuple[MonthDay, list[Match]]:
+		''' return[0]: MonthDay as (month:int, day:int), return[1]: list[Match] as "hh:mm" '''
+		'''day_of_week = None
+			if (mt:=cls.M_DATE_PATT.day_of_week.search(shift_text)):
+				day_of_week = mt.groups()[0]
+				break
+		if not day_of_week:
+			raise MDateError(f"Could not resolve date! AppType.M txt_lines!:{txt_lines}") '''
+		for shift_text in txt_lines:
+			if (hours:=cls.M_DATE_PATT.hours.findall(shift_text)):
+				for shift_text in txt_lines:
+					m_d = cls.M_DATE_PATT.month_date.search(shift_text)
+					if m_d:
+						grps = m_d.groups()
+						date = MonthDay(int(grps[0]), int(grps[1]))
+						return date, hours
+
+		raise MDateError(f"Could not resolve date! AppType.M txt_lines!:{txt_lines}") 
 
 	def __init__(self, image: np.ndarray | Path | str, param_dict: dict[ImageAreaParamName, Sequence[int]] = {}, show_check=False, thresh=OCRFilter.THRESHOLD, bin_image:np.ndarray | None = None):
 		from image_filter import get_horizontal_border_bunches, ImageAreaParamName
@@ -281,13 +314,13 @@ class TaimeeFilter(OCRFilter):
 					image_list.append(bin_image[pp[0]:pp[1], pp[2]:pp[3]])
 				do_show_check(area_enum.name, area_param, image_list)
 			self.area_param_dict[area_enum] = area_param
+		param_name = ImageAreaParamName.HEADING
 		try:
-			area_param = TaimeeHeadingAreaParam(*param_dict[ImageAreaParamName.HEADING])
+			area_param = TaimeeHeadingAreaParam(*param_dict[param_name])
 		except (KeyError, TypeError):
-			area_param: ImageAreaParam = TaimeeHeadingAreaParam.from_image(bin_image[:border_offset_ranges[0].stop, :], figure_parts=heading_area_figure_parts)
-			param_name = ImageAreaParamName(area_param)
+			area_param: ImageAreaParam = TaimeeHeadingAreaParam.from_image(bin_image[:border_offset_ranges[0].stop, :])# figure_parts=heading_area_figure_parts)
 			self.from_image.add(param_name)
-			logger.info("heading area inferred from image %s from_image after heading: %s", param_name, self.from_image)
+			logger.info("heading area inferred from image %s ", area_param)
 
 		if show_check:
 			show_image = self.image[self.y_margin + area_param.y_offset:self.y_margin + border_offset_ranges[0].stop + area_param.height, area_param.x_offset:]

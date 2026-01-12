@@ -187,6 +187,8 @@ class ImageAreaParam(TOMLDataclass):
 		return ((self.y_offset, (self.y_offset + self.height) if self.height and self.height > 0 else -1, self.x_offset, (self.x_offset + self.width) if self.width and self.width > 0 else -1),)
 
 	def crop_image(self, image: np.ndarray, y_margin: int = 0) -> Iterator[np.ndarray]:
+		if image.size == 0:
+			raise ValueError("Image size is 0")
 		for param in self.as_slice_param():
 			y_start = y_margin + param[0]
 			y_stop = y_margin + param[1] if param[1] > 0 else param[1]
@@ -1341,7 +1343,7 @@ def main(
 
 		print(f"# {image_file.name=}")
 		month_day:tuple[int, int] | None = None
-		for area_name, area_param in app_filter.param_dict.items():
+		for area_name, area_param in app_filter.params.items():
 			ocr_area_name = f"ocr-{area_name.name}"
 			# area_tbl = table() area_tbl.add(comment(area_name)) area_tbl.add(nl())
 			area_dict = {}
@@ -1349,7 +1351,12 @@ def main(
 			print(f"[{ocr_area_name}]")
 			for col, ocr_area in enumerate(area_param.crop_image(app_filter.image, app_filter.y_margin)):
 				col_str = f"c{col+1}"
-				ocr_result = ocr.exec(ocr_area, output_type=Output.DATAFRAME, psm=args.psm)
+				result = ocr.exec(ocr_area, output_type=Output.DATAFRAME, psm=args.psm)
+				if is_successful(result):
+					ocr_result = result.unwrap()
+				else:
+					logger.error("Failed to get ocr result: %s", result.failure())
+					ocr_result = None
 				max_line = max(ocr_result['line_num'])
 				def textline(n, conf=args.ocr_conf):
 					return ocr_result[(ocr_result['line_num'] == n) & (ocr_result['conf'] > conf)]# ['text'] # return ''.join(

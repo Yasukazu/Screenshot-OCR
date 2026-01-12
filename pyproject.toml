@@ -22,6 +22,7 @@ dependencies = [
     "pdf2image>=1.17.0",
     "pillow>=11.1.0",
     "prompt-toolkit>=3.0.52",
+    "pydal>=20260110.1",
     "pydantic>=2.12.5",
     "pydantic-settings>=2.12.0",
     "pytesseract>=0.3.13",

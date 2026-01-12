@@ -1,4 +1,5 @@
 from enum import Enum
+from returns.result import safe
 from pytesseract import pytesseract, image_to_data, image_to_boxes
 from pathlib import Path
 import numpy as np
@@ -25,7 +26,10 @@ class TesseractOCR:
 		tessdata_path = Path(self.tessdata_dir).expanduser()
 		return f'--tessdata-dir {tessdata_path}'
 
+	@safe
 	def exec(self, image: np.ndarray, lang="jpn", output_type=Output.DICT, data_or_boxes=True, psm:int|None=None):
+		if image.size == 0:
+			raise ValueError("Image size is 0")
 		if psm is not None:
 			psm_value = int(psm)
 		else:
