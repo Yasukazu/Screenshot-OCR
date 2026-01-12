@@ -8,7 +8,7 @@ from typing import Iterator, Sequence, NamedTuple, Optional, Sequence
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum, auto
 import sys
-
+import atexit
 from tomlkit import TOMLDocument
 from dotenv import load_dotenv
 
@@ -1016,6 +1016,7 @@ def main(
 	parser.add_argument("--shot_month", action='append', type=int, env_var='IMAGE_FILTER_SHOT_MONTH', help='Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD]) included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like "[1,2,..]" )')
 	parser.add_argument('files', nargs='*', help='Image file fullpaths to commit OCR or to get parameters.')
 	parser.add_argument("--app_stem_end", env_var='IMAGE_FILTER_APP_STEM_END', default='taimee:_jp.co.taimee mercari:_jp.mercari.work.android', help='Screenshot image file name pattern of the screenshot to execute OCR:(specified in format as "<app_name1>:<stem_end1>,<stem_end2> ..." )')
+	parser.add_argument("--image_area_param_section_stem", env_var='IMAGE_AREA_PARAM_SECTION_STEM ', default='image_area_param')
 	parser.add_argument("--app_border_ratio", env_var='IMAGE_FILTER_APP_BORDER_RATIO', default='taimee:2.2,3.2', nargs='*', help='Screenshot image file horizontal border ratio list of the app to execute OCR:(specified in format as "<app_name1>:<ratio1>,<ratio2> ..." )')
 	parser.add_argument("--app_suffix", action='store_true', default=True, help='Screenshot image file name has suffix(sub extention) of the same as app name i.e. "<stem>.<suffix>.<ext>" (default: True)')
 
@@ -1132,7 +1133,7 @@ def main(
 	_image_area_params: SectionProxy | None = None
 	IMAGE_AREA_PARAM_SECTION_STEM: str = 'image_area_param'
 	@safe
-	def get_image_area_params_section(app=args.app, section_stem = IMAGE_AREA_PARAM_SECTION_STEM, area_param_file = args.area_param_file) -> SectionProxy:
+	def get_image_area_params_section(app=args.app, section_stem = args.image_area_param_section_stem, area_param_file = args.area_param_file) -> SectionProxy:
 		''' Get image area parameters' section of ConfigParser'''
 		nonlocal _image_area_params
 		if _image_area_params is not None:
@@ -1299,8 +1300,9 @@ def main(
 	else:
 		exception = area_params_section.failure()	#case ConfigKeyException():
 		if isinstance(exception, ConfigKeyException):
-			section = exception.key
-			param_config = exception.config # section
+			assert '.'.join([args.image_area_param_section_stem + '.' + args.app]) == exception.key
+			assert isinstance(exception.config, ConfigParser)
+			param_config = exception.config
 			logger.warning("Going to get filter parameters manually due to config error for %s", args.app.name.lower())
 		else:
 			logger.error("Failed to get filter parameters: %s", exception)
@@ -1315,18 +1317,20 @@ def main(
 			section = area_params'''
 	if not param_dict:
 		param_dict = select_area_param_dict(image=image)
-		# save to config file
-		section = IMAGE_AREA_PARAM_SECTION_STEM + '.' + args.app.name.lower() 
+		section = '.'.join([args.image_area_param_section_stem + '.' + args.app])
 		area_param_config = param_config if param_config is not None else ConfigParser()
 		area_param_config[section] = {k:f'{v.param}' for k, v in param_dict.items()}
-		try:
-			with open(args.area_param_file, 'w', encoding='utf8') as wf:
-				area_param_config.write(wf)
-		except Exception as e:
-			logger.warning("Failed to write area parameter file: %s", e)
-		else:
-			logger.info("Wrote param config by user input: %s", args.area_param_file)
 
+		# make a function to save the param_config to a config file
+		def save_param_dict_atexit():
+			try:
+				with open(args.area_param_file, 'w', encoding='utf8') as wf:
+					area_param_config.write(wf)
+			except Exception as e:
+				logger.warning("Failed to write area parameter file: %s", e)
+			else:
+				logger.info("Saved `param_config` generated from user input as a file: %s", args.area_param_file)
+		atexit.register(save_param_dict_atexit)
 	app_filter = app_filter_class(image=image, param_dict=param_dict, show_check=args.show, bin_image=bin_image) if not args.no_ocr else None
 
 	if app_filter is not None:	
