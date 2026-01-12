@@ -1034,7 +1034,7 @@ def main(
 	parser.add_argument('--psm', type=int, default=6, help='PSM value for Tesseract')
 	parser.add_argument("--area_param_dir", help='Screenshot image area parameter config file directory', type=Path, env_var='IMAGE_FILTER_AREA_PARAM_DIR')
 	parser.add_argument("--area_param_file", help='Screenshot image area parameter config file: format as INI or TOML(".ini" or ".toml" extention respectively): in [image_area_param.<app>] section, items as "<area_name>=[<p1>,<p2>,<p3>,<p4>]" (e.g. "heading=[0,106,196,-1]")', type=Path, env_var='IMAGE_FILTER_AREA_PARAM_FILE',default='image-area-param.ini')
-
+	parser.add_argument("--ocr_filter_sqlite_db_name", env_var='OCR_FILTER_SQLITE_DB_NAME', default='ocr-filter.db', help='SQLite DB file is created under `image_dir`/{yyyy} directory(yyyy is like 2025)')
 	args = parser.parse_args()
 	if args.area_param_dir:
 		try:
@@ -1337,17 +1337,18 @@ def main(
 		from tesseract_ocr import TesseractOCR, Output
 		from tomli_w import dumps
 		ocr = TesseractOCR()
-		doc_dict = {}
+		doc_dict: dict[str, str] = {} # newline-sepalated text columns which is tab-separated
 
 		print(f"# {image_file.name=}")
+		month_day:tuple[int, int] | None = None
 		for area_name, area_param in app_filter.param_dict.items():
 			ocr_area_name = f"ocr-{area_name.name}"
 			# area_tbl = table() area_tbl.add(comment(area_name)) area_tbl.add(nl())
 			area_dict = {}
-			pg_list = []
+			col_list = []
 			print(f"[{ocr_area_name}]")
-			for pg, ocr_area in enumerate(area_param.crop_image(app_filter.image, app_filter.y_margin)):
-				pg_str = f"p{pg+1}"
+			for col, ocr_area in enumerate(area_param.crop_image(app_filter.image, app_filter.y_margin)):
+				col_str = f"c{col+1}"
 				ocr_result = ocr.exec(ocr_area, output_type=Output.DATAFRAME, psm=args.psm)
 				max_line = max(ocr_result['line_num'])
 				def textline(n, conf=args.ocr_conf):
@@ -1356,17 +1357,23 @@ def main(
 				for r in range(1, max_line + 1):
 					line = textline(r) 
 					df_list.append(line) # '\n'.join(line))
-				ocr_text = [' '.join(df['text']) for df in df_list]
-				print(f"{pg_str}={ocr_text}")
-				pg_list.append(ocr_text)
+				ocr_text_lines = [' '.join(df['text']) for df in df_list]
+				if area_name == ImageAreaParamName.SHIFT:
+					from mercari_filter import MercariFilter
+					from tool_pyocr import MDateError
+					month_day_hours = app_filter_class.extract_month_day_and_hours_from_shift_area_text(ocr_text_lines)
+					if is_successful(month_day_hours):
+						month_day, hours = month_day_hours.unwrap()
+
+				print(f"{col_str}={ocr_text_lines}")
+				col_list.append(ocr_text_lines)
 				# area_tbl.add(comment(pg_str)) area_tbl.add(nl()) area_tbl.add(comment(ocr_text)) area_tbl.add(nl())
-			if len(pg_list) > 1:
-				for p, pg in enumerate(pg_list):
-					pg_str = f"p{p+1}"
-					area_dict[pg_str] = '\n'.join(pg) 
-				doc_dict[area_name] = area_dict
-			else:
-				doc_dict[area_name] = '\n'.join(pg_list[0])
+			'''if len(col_list) > 1:
+				for p, col in enumerate(col_list):
+					# col_str = f"p{p+1}"
+					area_dict[p] = '\n'.join(col) '''
+			doc_dict[f"{area_name}"] = '\n'.join(['\t'.join(col) for col in col_list])
+			# else: doc_dict[area_name] = '\n'.join(col_list[0])
 			# doc.add(area_tbl)
 		if args.save:
 			save_path = Path(args.save) / f"{image_file.stem}.ocr-{args.app}'.toml'"
