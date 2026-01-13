@@ -4,9 +4,10 @@ from typing import TypedDict
 from io import IOBase
 from pathlib import Path
 from datetime import date
-from typing import Iterator, Sequence, NamedTuple, Optional, Sequence
+from typing import Iterator, Sequence, NamedTuple
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum, auto
+from datetime import date as Date
 import sys
 import atexit
 from tomlkit import TOMLDocument
@@ -24,6 +25,7 @@ import numpy as np
 from numpy import ndarray
 import matplotlib.pyplot as plt
 from inspect import isclass
+from peewee import OperationalError
 from fancy_dataclass import TOMLDataclass
 
 cwd = Path(__file__).resolve().parent
@@ -1037,6 +1039,7 @@ def main(
 	parser.add_argument("--area_param_dir", help='Screenshot image area parameter config file directory', type=Path, env_var='IMAGE_FILTER_AREA_PARAM_DIR')
 	parser.add_argument("--area_param_file", help='Screenshot image area parameter config file: format as INI or TOML(".ini" or ".toml" extention respectively): in [image_area_param.<app>] section, items as "<area_name>=[<p1>,<p2>,<p3>,<p4>]" (e.g. "heading=[0,106,196,-1]")', type=Path, env_var='IMAGE_FILTER_AREA_PARAM_FILE',default='image-area-param.ini')
 	parser.add_argument("--ocr_filter_sqlite_db_name", env_var='OCR_FILTER_SQLITE_DB_NAME', default='ocr-filter.db', help='SQLite DB file is created under `image_dir`/{yyyy} directory(yyyy is like 2025)')
+	parser.add_argument("--data_year", env_var='OCR_FILTER_DATA_YEAR', type=int, help='Year for DB data (like 2025)')
 	args = parser.parse_args()
 	if args.area_param_dir:
 		try:
@@ -1339,10 +1342,10 @@ def main(
 		from tesseract_ocr import TesseractOCR, Output
 		from tomli_w import dumps
 		ocr = TesseractOCR()
-		doc_dict: dict[str, str] = {} # newline-sepalated text columns which is tab-separated
-
+		from ocr_filter_model import insert_ocr_data
 		print(f"# {image_file.name=}")
 		month_day:tuple[int, int] | None = None
+		doc_dict: dict[ImageAreaParamName, str] = {} # newline-sepalated text columns which is tab-separated
 		for area_name, area_param in app_filter.params.items():
 			ocr_area_name = f"ocr-{area_name.name}"
 			# area_tbl = table() area_tbl.add(comment(area_name)) area_tbl.add(nl())
@@ -1355,8 +1358,8 @@ def main(
 				if is_successful(result):
 					ocr_result = result.unwrap()
 				else:
-					logger.error("Failed to get ocr result: %s", result.failure())
-					ocr_result = None
+					logger.warning("Failed to get ocr result: %s", result.failure())
+					continue # ocr_result = None
 				max_line = max(ocr_result['line_num'])
 				def textline(n, conf=args.ocr_conf):
 					return ocr_result[(ocr_result['line_num'] == n) & (ocr_result['conf'] > conf)]# ['text'] # return ''.join(
@@ -1366,20 +1369,27 @@ def main(
 					df_list.append(line) # '\n'.join(line))
 				ocr_text_lines = [' '.join(df['text']) for df in df_list]
 				if area_name == ImageAreaParamName.SHIFT:
-					from mercari_filter import MercariFilter
 					from tool_pyocr import MDateError
 					month_day_hours = app_filter_class.extract_month_day_and_hours_from_shift_area_text(ocr_text_lines)
 					if is_successful(month_day_hours):
 						month_day, hours = month_day_hours.unwrap()
-
 				print(f"{col_str}={ocr_text_lines}")
 				col_list.append(ocr_text_lines)
+				doc_dict[area_name] = '\n'.join(['\t'.join(col) for col in col_list])
 				# area_tbl.add(comment(pg_str)) area_tbl.add(nl()) area_tbl.add(comment(ocr_text)) area_tbl.add(nl())
 			'''if len(col_list) > 1:
 				for p, col in enumerate(col_list):
 					# col_str = f"p{p+1}"
 					area_dict[p] = '\n'.join(col) '''
-			doc_dict[f"{area_name}"] = '\n'.join(['\t'.join(col) for col in col_list])
+		if month_day is not None:
+			try:
+				inserted_item = insert_ocr_data(args.app, args.data_year, int(month_day.month), int(month_day.day), doc_dict, image_file)
+			except TypeError as e:
+				logger.error("Conversion from str to int failed: %s", e)
+			except OperationalError as e:
+				logger.error("Database operation failed: %s", e)
+			else:
+				logger.info("Inserted OCR data into database: %s", inserted_item)
 			# else: doc_dict[area_name] = '\n'.join(col_list[0])
 			# doc.add(area_tbl)
 		if args.save:
@@ -1388,7 +1398,7 @@ def main(
 				yn = input(f"\nThe file path to save the image file area configuration:{save_path} already exists. Overwrite?(Enter 'Yes' or 'Affirmative' if you want to overwparser.parse_args()rite)").lower()
 				if yn != 'yes' and yn != 'affirmative':
 					sys.exit("Exit since the user not accept overwrite of: %s" % save_path)
-			toml_text = dumps(doc_dict, multiline_strings=True)
+			toml_text = dumps({f"{area_name}":v for area_name, v in doc_dict.items()}, multiline_strings=True)
 			with save_path.open('w') as wf:
 				wf.write(toml_text)
 			logger.info("Saved toml file into: %s\n%s", save_path, toml_text)
