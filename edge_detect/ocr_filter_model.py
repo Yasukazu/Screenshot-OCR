@@ -19,8 +19,8 @@ except FileNotFoundError as e:
 	sys_exit(1)
 from os import environ
 try:
-	OCR_FILTER_DATA_YEAR = int(environ["OCR_FILTER_DATA_YEAR"])
-	OCR_FILTER_DATA_MONTH = int(environ["OCR_FILTER_DATA_MONTH"])
+	# OCR_FILTER_DATA_YEAR = int(environ["OCR_FILTER_DATA_YEAR"])
+	# OCR_FILTER_DATA_MONTH = int(environ["OCR_FILTER_DATA_MONTH"])
 	OCR_FILTER_SQLITE_DB_PATH = Path(environ["OCR_FILTER_SQLITE_DB_DIR"]).expanduser() / environ["OCR_FILTER_SQLITE_DB_NAME"]
 except KeyError as e:
 	logger.error(f"Key error to load environment variables: {e}")
@@ -52,9 +52,8 @@ class App(BaseModel):
 class ImageRoot(BaseModel):
 	root = TextField(unique=True)
 	
-class ImageFile(BaseModel):
-	file = TextField(unique=True)
-	# class Meta: table_name = 'image_file_dir'
+'''class ImageFile(BaseModel):
+	file = TextField(unique=True)'''
 
 class PaystubOCR(BaseModel):
 	app = ForeignKeyField(App, backref='paystub_ocr')
@@ -65,7 +64,7 @@ class PaystubOCR(BaseModel):
 	from_shift = DateTimeField(null=True)
 	to_shift = DateTimeField(null=True)
 	root = ForeignKeyField(ImageRoot, backref='paystub_ocr')
-	file = ForeignKeyField(ImageFile, backref='paystub_ocr')
+	file = TextField()
 	image_file_name = TextField(null=True)
 	checksum = TextField(null=True, unique=True)
 	title = TextField(null=True)
@@ -87,32 +86,37 @@ class PaystubOCR(BaseModel):
 def insert_ocr_data(app: APP_NAME, year: int, month: int, day: int, data: dict[ImageAreaParamName, str], file: Path, hours:Sequence[str]|None=None):
 	if not database.is_connection_usable():
 		database.connect()
-	app_model = {APP_NAME.TAIMEE : App.get(App.name=='taimee'),
-	APP_NAME.MERCARI : App.get(App.name=='mercari')}[app]
-	file_model = ImageFile.create(file=file.name)
-	root_model = ImageRoot.create(root=file.parent.name)
-	new_item = PaystubOCR.create(
-		app=app_model,
-		year=year,
-		month=month,
-		day=day,
-		modified_at=Datetime.now(),
-		heading_text=data.get(ImageAreaParamName.HEADING),
-		shift_text=data.get(ImageAreaParamName.SHIFT),
-		breaktime_text=data.get(ImageAreaParamName.BREAKTIME),
-		paystub_text=data.get(ImageAreaParamName.PAYSTUB),
-		salary_text=data.get(ImageAreaParamName.SALARY),
-		root=root_model,
-		file=file_model
-	)
-	database.commit()
-	return new_item
+	App.create_table(safe=True)
+	ImageRoot.create_table(safe=True)
+	PaystubOCR.create_table(safe=True)
+	app_model = App.get_or_create(name=app)
+	resolved_root = str(file.parent.resolve()) 
+	root_model = ImageRoot.get_or_create(root=resolved_root)
+	# except ImageRoot.DoesNotExist: root_model = ImageRoot.create(root=resolved_root)
+	old_item = PaystubOCR.get_or_none(app=app_model, year=year, month=month, day=day)
+	if not old_item: # if not old_item:
+		new_item = PaystubOCR.create(
+			app=app_model,
+			year=year,
+			month=month,
+			day=day,
+			modified_at=Datetime.now(),
+			heading_text=data.get(ImageAreaParamName.HEADING),
+			shift_text=data.get(ImageAreaParamName.SHIFT),
+			breaktime_text=data.get(ImageAreaParamName.BREAKTIME),
+			paystub_text=data.get(ImageAreaParamName.PAYSTUB),
+			salary_text=data.get(ImageAreaParamName.SALARY),
+			root=root_model,
+			file=file.name
+		)
+		database.commit()
+		return new_item
 	# database.close()
 
 if __name__ == "__main__":
 	if not database.is_connection_usable():
 		database.connect()
-	database.create_tables([PaystubOCR, ImageFile, ImageRoot, App])
+	database.create_tables([PaystubOCR, ImageRoot, App])
 	taimee = App.create(name='taimee')
 	mercari = App.create(name='mercari')
 	database.commit()
