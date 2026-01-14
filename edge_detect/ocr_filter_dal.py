@@ -40,9 +40,37 @@ schm = f"sqlite://{environ['OCR_FILTER_DAL_DB_NAME']}"
 db = DAL(schm,  folder=OCR_FILTER_SQLITE_DB_PATH.parent) # check_same_thread=False,
 
 app_table = db.define_table('app', Field('id', 'integer', primary_key=True), Field('name', 'string', unique=True))
+image_root_table = db.define_table('image_root',
+	Field('id', 'integer', primary_key=True),
+	Field('root', 'string', unique=True)
+)
+paystub_ocr_table = db.define_table('paystub_ocr',
+	Field('id', 'integer', primary_key=True),
+	Field('app', db.app), # foreign key
+	Field('year', 'integer'),
+	Field('month', 'integer'),
+	Field('day', 'integer'),
+	#modified_at = DateTimeField()
+	# from_shift = DateTimeField(null=True)
+	# to_shift = DateTimeField(null=True)
+	# root = ForeignKeyField(ImageRoot, backref='paystub_ocr')
+	Field('root', db.image_root),
+	Field('file', 'string'),
+	# image_file_name = TextField(null=True)
+	# checksum = TextField(null=True, unique=True)
+	Field('title', 'string'),
+	Field('heading_text', 'string'),
+	Field('shift_text', 'string'),
+	Field('breaktime_text', 'string'),
+	Field('paystub_text', 'string'),
+	Field('salary_text', 'string'),
+	# ocr_result = BareField(null=True)
+	Field('wages', 'integer') 
+	)
+
 for name in APP_NAME:
 	if not db.app(name=name):
-		app_id1= db.app.insert(name=name)
+		db.app.insert(name=name)
 '''if not db.app(name=APP_NAME.MERCARI):
 	app_id2 = db.app.insert(name=APP_NAME.MERCARI)'''
 db.commit()
