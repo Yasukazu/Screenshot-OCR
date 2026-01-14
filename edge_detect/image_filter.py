@@ -1039,8 +1039,25 @@ def main(
 	parser.add_argument("--area_param_dir", help='Screenshot image area parameter config file directory', type=Path, env_var='IMAGE_FILTER_AREA_PARAM_DIR')
 	parser.add_argument("--area_param_file", help='Screenshot image area parameter config file: format as INI or TOML(".ini" or ".toml" extention respectively): in [image_area_param.<app>] section, items as "<area_name>=[<p1>,<p2>,<p3>,<p4>]" (e.g. "heading=[0,106,196,-1]")', type=Path, env_var='IMAGE_FILTER_AREA_PARAM_FILE',default='image-area-param.ini')
 	parser.add_argument("--ocr_filter_sqlite_db_name", env_var='OCR_FILTER_SQLITE_DB_NAME', default='ocr-filter.db', help='SQLite DB file is created under `image_dir`/{yyyy} directory(yyyy is like 2025)')
-	parser.add_argument("--data_year", env_var='OCR_FILTER_DATA_YEAR', type=int, help='Year for DB data (like 2025)')
+	parser.add_argument("--data_year", env_var='OCR_FILTER_DATA_YEAR', type=int, default=0, help='Year for DB data (like 2025)')
+
 	args = parser.parse_args()
+
+	def get_data_year(month: int =0):
+		if args.data_year == 0:
+			if not month:
+				raise ConfigError("(data_year and month) are not specified")
+			cur_year = Date.today().year
+			cur_month = Date.today().month
+			'''month_array = list(range(1, 13))
+			cur_index = month_array.index(cur_month)
+			arg_index = month_array.index(month)'''
+			if month <= cur_month:
+				return cur_year
+			else:
+				return cur_year - 1
+		return args.data_year
+
 	if args.area_param_dir:
 		try:
 			args.area_param_dir = Path(args.area_param_dir).expanduser()
@@ -1342,7 +1359,6 @@ def main(
 		from tesseract_ocr import TesseractOCR, Output
 		from tomli_w import dumps
 		ocr = TesseractOCR()
-		from ocr_filter_model import insert_ocr_data
 		print(f"# {image_file.name=}")
 		month_day:tuple[int, int] | None = None
 		doc_dict: dict[ImageAreaParamName, str] = {} # newline-sepalated text columns which is tab-separated
@@ -1382,8 +1398,12 @@ def main(
 					# col_str = f"p{p+1}"
 					area_dict[p] = '\n'.join(col) '''
 		if month_day is not None:
+			from ocr_filter_model import insert_ocr_data
 			try:
-				inserted_item = insert_ocr_data(args.app, args.data_year, int(month_day.month), int(month_day.day), doc_dict, image_file)
+				month: int = (month_day.month)
+				day: int = (month_day.day)
+				year: int = get_data_year(month)
+				inserted_item = insert_ocr_data(args.app, year, month, day, doc_dict, image_file)
 			except TypeError as e:
 				logger.error("Conversion from str to int failed: %s", e)
 			except OperationalError as e:

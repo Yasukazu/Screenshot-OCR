@@ -60,13 +60,13 @@ class PaystubOCR(BaseModel):
 	year = IntegerField()
 	month = IntegerField()
 	day = IntegerField()
-	modified_at = DateTimeField()
+	# modified_at = DateTimeField()
 	from_shift = DateTimeField(null=True)
 	to_shift = DateTimeField(null=True)
 	root = ForeignKeyField(ImageRoot, backref='paystub_ocr')
 	file = TextField()
-	image_file_name = TextField(null=True)
-	checksum = TextField(null=True, unique=True)
+	# image_file_name = TextField()
+	# checksum = TextField(null=True, unique=True)
 	title = TextField(null=True)
 	heading_text = TextField(null=True)
 	shift_text = TextField(null=True)
@@ -78,9 +78,9 @@ class PaystubOCR(BaseModel):
 
 	class Meta:
 		# table_name = '-'.join(['paystub', OCR_FILTER_DATA_MONTH])
-		indexes = (
+		'''indexes = (
 			(('app', 'day', 'month'), True),
-		)
+		)'''
 		primary_key = CompositeKey('app', 'year', 'month', 'day')
 
 def insert_ocr_data(app: APP_NAME, year: int, month: int, day: int, data: dict[ImageAreaParamName, str], file: Path, hours:Sequence[str]|None=None):
@@ -89,29 +89,40 @@ def insert_ocr_data(app: APP_NAME, year: int, month: int, day: int, data: dict[I
 	App.create_table(safe=True)
 	ImageRoot.create_table(safe=True)
 	PaystubOCR.create_table(safe=True)
-	app_model = App.get_or_create(name=app)
+	app_obj, created = App.get_or_create(name=app)
 	resolved_root = str(file.parent.resolve()) 
-	root_model = ImageRoot.get_or_create(root=resolved_root)
+	root_obj, created= ImageRoot.get_or_create(root=resolved_root)
 	# except ImageRoot.DoesNotExist: root_model = ImageRoot.create(root=resolved_root)
-	old_item = PaystubOCR.get_or_none(app=app_model, year=year, month=month, day=day)
+	old_item = PaystubOCR.get_or_none(app==app_obj, year==year, month==month, day==day)
+	checksum = get_file_checksum_md5(file)
 	if not old_item: # if not old_item:
 		new_item = PaystubOCR.create(
-			app=app_model,
+			app=app_obj,
 			year=year,
 			month=month,
 			day=day,
-			modified_at=Datetime.now(),
+			# modified_at=Datetime.now(),
 			heading_text=data.get(ImageAreaParamName.HEADING),
 			shift_text=data.get(ImageAreaParamName.SHIFT),
 			breaktime_text=data.get(ImageAreaParamName.BREAKTIME),
 			paystub_text=data.get(ImageAreaParamName.PAYSTUB),
 			salary_text=data.get(ImageAreaParamName.SALARY),
-			root=root_model,
-			file=file.name
+			root=root_obj,
+			file=file.name,
+			checksum=checksum,
 		)
 		database.commit()
 		return new_item
 	# database.close()
+import hashlib
+
+def get_file_checksum_md5(filename, blocksize=65536):
+	""" calculate md5 checksum of a file """
+	hash_obj = hashlib.md5()
+	with open(filename, "rb") as f:
+		for block in iter(lambda: f.read(blocksize), b""):
+			hash_obj.update(block)
+	return hash_obj.hexdigest()
 
 if __name__ == "__main__":
 	if not database.is_connection_usable():
