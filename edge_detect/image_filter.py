@@ -1032,7 +1032,7 @@ def main(
 	parser.add_argument('--nth', type=int, default=1, help='Rank(default: 1) of files descending sorted(the latest, the first) by modified date as wildcard(*, ?)')
 	parser.add_argument('--glob-max', type=int, default=60, help='Pick up file max as pattern found in TOML')
 	parser.add_argument('--show', action='store_true', help='Show images to check')
-	parser.add_argument('--make', action='store_true', help='make config. from image(i.e. this arg. makes not to use param configs in any config file;  specify image_area_param values like "--image_area_param heading:0,106,196,-1"')
+	parser.add_argument('--make', help='make a image area param config file from image in TOML format(i.e. this arg. makes not to use param configs in any config file;  specify image_area_param values like "--image_area_param heading:0,106,196,-1"')
 	parser.add_argument('--no-ocr', action='store_true', default=False, help='Do not execute OCR')
 	parser.add_argument('--ocr-conf', type=int, default=55, help='Confidence threshold for OCR')
 	parser.add_argument('--psm', type=int, default=6, help='PSM value for Tesseract')
@@ -1133,6 +1133,7 @@ def main(
 	if not args.files:
 		try:
 			suffix_list = [APP_NAME(args.app).value]
+			
 		except ValueError:
 			suffix_list = []
 		from path_chooser import ImageFileFeeder
@@ -1353,7 +1354,7 @@ def main(
 			else:
 				logger.info("Saved `param_config` generated from user input as a file: %s", args.area_param_file)
 		atexit.register(save_param_dict_atexit)
-	app_filter = app_filter_class(image=image, param_dict=param_dict, show_check=args.show, bin_image=bin_image) if not args.no_ocr else None
+	app_filter = app_filter_class(image=image, param_dict=param_dict, show_check=args.show, bin_image=bin_image)# if not args.no_ocr else None
 
 	if app_filter is not None:	
 		from tesseract_ocr import TesseractOCR, Output
@@ -1409,7 +1410,8 @@ def main(
 			except OperationalError as e:
 				logger.error("Database operation failed: %s", e)
 			else:
-				logger.info("Inserted OCR data into database: %s", inserted_item)
+				if inserted_item is not None:
+					logger.info("Inserted OCR data into database: %s", inserted_item)
 			# else: doc_dict[area_name] = '\n'.join(col_list[0])
 			# doc.add(area_tbl)
 		if args.save:
@@ -1425,7 +1427,7 @@ def main(
 
 
 	if args.make:
-		make_path = Path(args.toml) # Path(args.make + '.toml') if not args.make.endswith('.toml') else Path(args.make)
+		make_path = Path(args.make + '.toml') if not args.make.endswith('.toml') else Path(args.make) # Path(args.toml)
 
 		from tomlkit.toml_file import TOMLFile
 		from tomlkit import table
@@ -1450,7 +1452,7 @@ def main(
 		# print(f"[ocr-filter.{label}]", file=wf)
 		from tomlkit import container as TKContainer
 		ocr_filter_table = org_config.get(OCR_FILTER) or org_config.add(OCR_FILTER, table())[OCR_FILTER]
-		org_area_dict: dict = ocr_filter_table.get(args.app) or {}
+		org_area_dict: dict = ocr_filter_table[args.app] if ocr_filter_table else {}
 		for key, param in app_filter.param_dict.items():
 			different = False
 			area_name = key.name.lower()
