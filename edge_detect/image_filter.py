@@ -999,9 +999,10 @@ class NoAppNameError(ConfigError):
 
 IMAGE_AREA_PARAM_STR = "image_area_param"
 def main(
-	config_dir = abspath(dirname(__file__)), config_file_stem = "image-filter", config_file_ext_enum = ConfigFileExt, image_area_param_file_stem = IMAGE_AREA_PARAM_STR.replace('_', '-')
+	config_dir = abspath(dirname(__file__)), config_file_stem = "image-filter", config_file_ext_enum = ConfigFileExt, image_area_param_file_stem = IMAGE_AREA_PARAM_STR.replace('_', '-'),
+	env_file = "image-filter.env",
 ):
-	load_dotenv(f"{config_dir}/image-filter.env")
+	load_dotenv(f"{config_dir}/{env_file}")
 	from taimee_filter import TaimeeFilter
 	APP_NAME_TO_FILTER_CLASS = {APP_NAME.TAIMEE: TaimeeFilter}
 	OCR_FILTER = "ocr-filter"
@@ -1079,6 +1080,7 @@ def main(
 				args.area_param_file = args.area_param_dir / args.area_param_file
 			else:
 				args.area_param_file = Path(args.area_param_file)
+			logger.info("area param file is set: %s", args.area_param_file)
 		if not args.area_param_file.exists():
 			logger.error("area param file does not exist.")
 			raise ConfigError("area param file does not exist.")
@@ -1190,11 +1192,13 @@ def main(
 		except Exception as e:
 			logger.warning(f"Failed to read area parameter file {args.area_param_file}: {e}")
 			area_param_config = None
+		else:
+			logger.info("Area parameter file is read: %s as %s", args.area_param_file, image_area_params)
 	# image_config_filename = (args.file) #.resolve()Path
 	# filter_config_doc: TOMLDocument | None = None
 
 	is_param_dict_loaded = False
-	def get_image_area_param_dict(image_area_params: SectionProxy=get_image_area_params_section(), param_dict: dict[ImageAreaParamName, Sequence[int]] = {}) -> dict[ImageAreaParamName, Sequence[int]]:
+	def get_image_area_param_dict(image_area_params: SectionProxy=get_image_area_params_section().unwrap(), param_dict: dict[ImageAreaParamName, Sequence[int]] = {}) -> dict[ImageAreaParamName, Sequence[int]]:
 		nonlocal is_param_dict_loaded
 		if (not is_param_dict_loaded) :
 			for param_name, v in image_area_params.items():
@@ -1319,6 +1323,9 @@ def main(
 			param_dict = {ImageAreaParamName(k): ImageAreaParam.from_str(v) for k, v in param_str_dict.items()}# get_image_area_param_dict(area_params)
 		except ValueError as e:
 			logger.error("Failed to get filter parameters: %s", e)
+		else:
+			if param_dict:
+				logger.info("Filter parameters are read: %s", param_dict)
 			
 	else:
 		exception = area_params_section.failure()	#case ConfigKeyException():
