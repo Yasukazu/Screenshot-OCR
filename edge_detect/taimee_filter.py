@@ -212,7 +212,7 @@ class TaimeeFilter(OCRFilter):
 	BORDERS_MAX = 4
 	LABEL_TEXT_START = 'この店'
 	M_DATE_PATT = DatePatterns(hours=re.compile(r"(\d\d:\d\d)"),
-		month_date=re.compile(r"(1?\d)\s*月\s*([123]?\d)\s*日"),
+		month_date=re.compile(r"(1?\d)\s*月\s*([123]?\d)"), # \s*日
 		day_of_week=re.compile(r"\(\s*([日月火水木木金土])\s*\)"))
 
 	from returns.result import safe

@@ -9,7 +9,7 @@ cwd = Path(__file__).resolve().parent
 sys_path.insert(0, str(cwd.parent))
 from set_logger import set_logger
 logger = set_logger(__name__)
-from image_filter import APP_NAME, ImageAreaParamName
+from edge_detect.image_filter import APP_NAME, ImageAreaParamName
 
 try:
 	with (cwd / "ocr-filter.env").open() as envf:
@@ -60,13 +60,13 @@ class PaystubOCR(BaseModel):
 	year = IntegerField()
 	month = IntegerField()
 	day = IntegerField()
-	# modified_at = DateTimeField()
+	modified_at = DateTimeField()
 	from_shift = DateTimeField(null=True)
 	to_shift = DateTimeField(null=True)
 	root = ForeignKeyField(ImageRoot, backref='paystub_ocr')
 	file = TextField()
 	# image_file_name = TextField()
-	# checksum = TextField(null=True, unique=True)
+	checksum = TextField(null=True, unique=True)
 	title = TextField(null=True)
 	heading_text = TextField(null=True)
 	shift_text = TextField(null=True)
@@ -90,8 +90,12 @@ def insert_ocr_data(app: APP_NAME, year: int, month: int, day: int, data: dict[I
 	ImageRoot.create_table(safe=True)
 	PaystubOCR.create_table(safe=True)
 	app_obj, created = App.get_or_create(name=app)
+	if created:
+		logger.info("Created app: %s as app_obj: %s", app, app_obj)
 	resolved_root = str(file.parent.resolve()) 
 	root_obj, created= ImageRoot.get_or_create(root=resolved_root)
+	if created:
+		logger.info("Created root: %s as root_obj: %s", resolved_root, root_obj)
 	# except ImageRoot.DoesNotExist: root_model = ImageRoot.create(root=resolved_root)
 	old_item = PaystubOCR.get_or_none(app==app_obj, year==year, month==month, day==day)
 	checksum = get_file_checksum_md5(file)
@@ -101,7 +105,7 @@ def insert_ocr_data(app: APP_NAME, year: int, month: int, day: int, data: dict[I
 			year=year,
 			month=month,
 			day=day,
-			# modified_at=Datetime.now(),
+			modified_at=Datetime.now(),
 			heading_text=data.get(ImageAreaParamName.HEADING),
 			shift_text=data.get(ImageAreaParamName.SHIFT),
 			breaktime_text=data.get(ImageAreaParamName.BREAKTIME),
@@ -132,3 +136,9 @@ if __name__ == "__main__":
 	mercari = App.create(name='mercari')
 	database.commit()
 	database.close()
+'''
+query = ofm.PaystubOCR.select(ofm.PaystubOCR,ofm.App,ofm.ImageRoot).join(ofm.App).switch(ofm.PaystubOCR).join(ofm.ImageRoot)
+
+In [21]: str(query)
+Out[21]: 'SELECT "t1"."app_id", "t1"."year", "t1"."month", "t1"."day", "t1"."modified_at", "t1"."from_shift", "t1"."to_shift", "t1"."root_id", "t1"."file", "t1"."checksum", "t1"."title", "t1"."heading_text", "t1"."shift_text", "t1"."breaktime_text", "t1"."paystub_text", "t1"."salary_text", "t1"."ocr_result", "t1"."wages", "t2"."id", "t2"."name", "t3"."id", "t3"."root" FROM "paystubocr" AS "t1" INNER JOIN "app" AS "t2" ON ("t1"."app_id" = "t2"."id") INNER JOIN "imageroot" AS "t3" ON ("t1"."root_id" = "t3"."id")'
+'''
