@@ -1,6 +1,6 @@
 from configparser import ConfigParser
 from itertools import groupby
-from typing import TypedDict
+from typing import Type, TypedDict
 from io import IOBase
 from pathlib import Path
 from datetime import date
@@ -403,7 +403,7 @@ class ImageAreaParamName(StrEnum):
 	PAYSTUB = auto() # PaystubAreaParam
 	SALARY = auto() # SalaryAreaParam
 	#@classmethod
-	def to_param_class(self):#, name: str):
+	def to_param_class(self) -> Type[ImageAreaParam]:#, name: str):
 		match self:
 			case self.HEADING:
 				return HeadingAreaParam
@@ -1253,7 +1253,28 @@ def main(
 			args.app = APP_NAME(args.app)
 		except ValueError:
 			raise ConfigError(
-				f"Invalid application name: {args.app}. Valid choices are: {', '.join(n.name.lower() for n in APP_NAME)}"
+				f"Invalid application name: {args.app}."
+			)
+
+	def select_area_param(
+		area_param_name: ImageAreaParamName,
+		image: np.ndarray
+	) -> ImageAreaParam:
+
+		if image is None or image.size == 0:
+			logger.error("Image is None or size 0")
+			raise ValueError("Image is None or size 0")
+		logger.info("Try to get area params [%s] from image: %s", area_param_name, image.shape)
+		from mouse_event import get_area, QuitKeyException
+		try:
+			TL, BR = get_area(area_param_name, image)
+		except QuitKeyException:
+			logger.warning(
+				"Failed to get area from image for %s", area_param_name
+			)
+		else:
+			return ImageAreaParam(
+				TL[1], BR[1] - TL[1], TL[0], BR[0] - TL[0]
 			)
 
 	if not args.files:
@@ -1295,7 +1316,7 @@ def main(
 		raise ConfigError("No files are chosen by feeder")
 
 	_image_area_params: SectionProxy | None = None
-	IMAGE_AREA_PARAM_SECTION_STEM: str = "image_area_param"
+	# IMAGE_AREA_PARAM_SECTION_STEM: str = "image_area_param"
 
 	@safe
 	def get_image_area_params_section(
@@ -1362,51 +1383,7 @@ def main(
 	# image_config_filename = (args.file) #.resolve()Path
 	# filter_config_doc: TOMLDocument | None = None
 
-	is_param_dict_loaded = False
 
-	def get_image_area_param_dict(
-		image_area_params: SectionProxy = get_image_area_params_section().unwrap(),
-		param_dict: dict[ImageAreaParamName, Sequence[int]] = {},
-	) -> dict[ImageAreaParamName, Sequence[int]]:
-		nonlocal is_param_dict_loaded
-		if not is_param_dict_loaded:
-			for param_name, v in image_area_params.items():
-				try:
-					param_enum = ImageAreaParamName(param_name)
-					param_dict[param_enum] = [int(p) for p in v.split(",")]
-				except (ValueError, TypeError):
-					logger.warning(
-						"Invalid image area parameter: %s = %s (value type: %s)",
-						param_name,
-						v,
-						type(v).__name__,
-					)
-			is_param_dict_loaded = True
-		return param_dict
-
-	def get_area_param_dict(
-		area_param_dict: dict[ImageAreaParamName, ImageAreaParam] = {},
-	) -> dict[ImageAreaParamName, ImageAreaParam]:
-		nonlocal is_param_dict_loaded
-		if (
-			not is_param_dict_loaded
-			and (image_area_params := get_image_area_params_section()) is not None
-		):
-			for param_name, v in image_area_params.items():
-				try:
-					param_enum = ImageAreaParamName(param_name)
-					param = [int(p) for p in v.split(",")]
-					param_obj = param_enum.to_param_class(*param)
-					area_param_dict[param_enum] = param_obj
-				except (ValueError, TypeError):
-					logger.warning(
-						"Invalid image area parameter: %s = %s (value type: %s)",
-						param_name,
-						v,
-						type(v).__name__,
-					)
-			is_param_dict_loaded = True
-		return area_param_dict
 
 	def select_area_param_dict(
 		area_param_dict: dict[ImageAreaParamName, ImageAreaParam] = {},
@@ -1558,18 +1535,7 @@ def main(
 			)
 		else:
 			logger.error("Failed to get filter parameters: %s", exception)
-	"""except ConfigKeyException as e:
-		section = e.key
-		param_config = e.config # section
-	is_app_to_stem_end_set = False
-	def get_app_to_stem_end_dict(app_to_stem_end_dict:dict[APP_NAME, set[str]]={}, stem_end_to_app_dict:dict[str, APP_NAME]={}) -> tuple[dict[APP_NAME, set[str]],dict[str, APP_NAME] ]:
-		nonlocal is_app_to_ste
-		logger.warning("Going to get filter parameters manually due to config error for %s", args.app.name.lower())
-	else:
-		if isinstance(area_params, SectionProxy):
-			param_dict = get_image_area_param_dict, 112, 199, 508(area_params)
-		else:
-			section = area_params"""
+
 	if not param_dict:
 		param_dict = select_area_param_dict(image=image)
 		section = ".".join([args.image_area_param_section_stem + "." + args.app])
@@ -1604,7 +1570,11 @@ def main(
 	doc_dict: dict[
 		ImageAreaParamName, str
 	] = {}  # newline-sepalated text columns which is tab-separated
-	for area_name, area_param in app_filter.params.items():
+	for area_name in ImageAreaParamName: #, area_param in app_filter.param_dict.items():
+		try:
+			area_param = app_filter.param_dict[area_name]
+		except KeyError:
+
 		ocr_area_name = f"ocr-{area_name.name}"
 		# area_tbl = table() area_tbl.add(comment(area_name)) area_tbl.add(nl())
 		area_dict = {}
