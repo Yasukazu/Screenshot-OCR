@@ -98,8 +98,8 @@ def insert_ocr_data(app: APP_NAME, year: int, month: int, day: int, data: dict[I
 		logger.info("Created root: %s as root_obj: %s", resolved_root, root_obj)
 	# except ImageRoot.DoesNotExist: root_model = ImageRoot.create(root=resolved_root)
 	old_item = PaystubOCR.get_or_none(app==app_obj, year==year, month==month, day==day)
-	checksum = get_file_checksum_md5(file)
-	if not old_item: # if not old_item:
+	if old_item is not None: # if not old_item:
+		checksum = get_file_checksum_md5(file)
 		new_item = PaystubOCR.create(
 			app=app_obj,
 			year=year,

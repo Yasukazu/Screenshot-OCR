@@ -237,17 +237,17 @@ class TaimeeFilter(OCRFilter):
 
 		raise MDateError(f"Could not resolve date! AppType.M txt_lines!:{txt_lines}") 
 
-	def __init__(self, image: np.ndarray | Path | str, param_dict: dict[ImageAreaParamName, Sequence[int]|ImageAreaParam] = {}, show_check=False, thresh=OCRFilter.THRESHOLD, bin_image:np.ndarray | None = None, y_margin:int = 0):
+	def __init__(self, image: np.ndarray | Path | str, param_dict: dict[ImageAreaParamName, Sequence[int]|ImageAreaParam] = {}, show_check=False, thresh=OCRFilter.THRESHOLD, bin_image:np.ndarray | None = None, y_offset:int = 0):
 		from image_filter import get_horizontal_border_bunches, ImageAreaParamName
 		self.image = image if isinstance(image, np.ndarray) else cv2.imread(str(image))
 		if self.image is None:
 			raise ValueError("Failed to load image")
-		if y_margin > 0:
+		if y_offset:
 			for k, v in param_dict.items():
 				if isinstance(v, ImageAreaParam):
-					v.y_offset += y_margin
+					v.y_offset += y_offset
 				elif isinstance(v, Sequence):
-					v = [e + y_margin if n == 0 else e for (n, e) in enumerate(v)]
+					v = [e + y_offset if n == 0 else e for (n, e) in enumerate(v)]
 				# param_dict = {k: [v[0] + y_margin, *v[1:]] for k, v in param_dict.items()}
 
 		self.params = param_dict
@@ -297,11 +297,11 @@ class TaimeeFilter(OCRFilter):
 
 
 		margin_area = border_offset_list.popleft()
-		y_margin = border_offset_list[0][0]
-		bin_image = bin_image[y_margin:, :]
+		y_offset = border_offset_list[0][0]
+		bin_image = bin_image[y_offset:, :]
 		border_offset_array = np.array(border_offset_list)
 		del(border_offset_list)
-		border_offset_array -= y_margin # border_offsets[0][0]
+		border_offset_array -= y_offset # border_offsets[0][0]
 		border_offset_ranges = [range(t, p) for t, p in border_offset_array.tolist()]
 		'''if __debug__:
 			canvas = bin_image.copy()
@@ -309,7 +309,7 @@ class TaimeeFilter(OCRFilter):
 			for n, rg in enumerate(border_offset_ranges):
 				canvas[rg.start:rg.stop, n] = 0
 			_plot([canvas])'''
-		self.y_margin = y_margin
+		self.y_margin = y_offset
 		self.from_image: set[ImageAreaParamName] = set()
 		# self.y_origin = y_origin = border_offsets[0][1]
 		def get_param_from_image(range_num: int, area_enum: ImageAreaParamName ):

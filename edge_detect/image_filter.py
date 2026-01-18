@@ -564,6 +564,9 @@ def _plot(images: Sequence[np.ndarray]):
 		for n, image in enumerate(images):
 			ax[n].imshow(image)
 		plt.show()
+		# print("Press a key to continue...")
+		plt.waitforbuttonpress() # stand by here
+		# print("Key pressed! Continuing...")
 @dataclass
 class BinaryImage:
 	given_image: ndarray | Path | str
@@ -1572,7 +1575,7 @@ def main(
 	atexit.register(save_param_dict_atexit)
 
 	app_filter = app_filter_class(
-		image=image, param_dict=param_dict, show_check=args.show, bin_image=bin_image, y_margin=y_margin
+		image=image, param_dict=param_dict, show_check=args.show, bin_image=bin_image, y_offset=-y_margin
 	)  # if not args.no_ocr else None
 
 	# if app_filter is not None:
@@ -1597,7 +1600,7 @@ def main(
 		col_list = []
 		print(f"[{ocr_area_name}]")
 		for col, ocr_area in enumerate(
-			area_param.crop_image(app_filter.image, 0)#app_filter.y_margin)
+			area_param.crop_image(app_filter.image[app_filter.y_margin :, :], 0)#app_filter.y_margin)
 		):
 			if args.show_ocr_area:
 				_plot([ocr_area, app_filter.image[app_filter.y_margin :, :]])
