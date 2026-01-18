@@ -1572,7 +1572,7 @@ def main(
 	atexit.register(save_param_dict_atexit)
 
 	app_filter = app_filter_class(
-		image=image, param_dict=param_dict, show_check=args.show, bin_image=bin_image
+		image=image, param_dict=param_dict, show_check=args.show, bin_image=bin_image, y_margin=y_margin
 	)  # if not args.no_ocr else None
 
 	# if app_filter is not None:

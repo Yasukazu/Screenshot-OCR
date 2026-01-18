@@ -237,11 +237,19 @@ class TaimeeFilter(OCRFilter):
 
 		raise MDateError(f"Could not resolve date! AppType.M txt_lines!:{txt_lines}") 
 
-	def __init__(self, image: np.ndarray | Path | str, param_dict: dict[ImageAreaParamName, Sequence[int]] = {}, show_check=False, thresh=OCRFilter.THRESHOLD, bin_image:np.ndarray | None = None):
+	def __init__(self, image: np.ndarray | Path | str, param_dict: dict[ImageAreaParamName, Sequence[int]|ImageAreaParam] = {}, show_check=False, thresh=OCRFilter.THRESHOLD, bin_image:np.ndarray | None = None, y_margin:int = 0):
 		from image_filter import get_horizontal_border_bunches, ImageAreaParamName
 		self.image = image if isinstance(image, np.ndarray) else cv2.imread(str(image))
 		if self.image is None:
 			raise ValueError("Failed to load image")
+		if y_margin > 0:
+			for k, v in param_dict.items():
+				if isinstance(v, ImageAreaParam):
+					v.y_offset += y_margin
+				elif isinstance(v, Sequence):
+					v = [e + y_margin if n == 0 else e for (n, e) in enumerate(v)]
+				# param_dict = {k: [v[0] + y_margin, *v[1:]] for k, v in param_dict.items()}
+
 		self.params = param_dict
 		self.threshold = thresh
 		self.bin_image = cv2.threshold(self.image, self.threshold, 255, cv2.THRESH_BINARY)[1] if bin_image is None else bin_image
