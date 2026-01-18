@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+from typing import NamedTuple
 import cv2
 import numpy as np
 cwd = Path(__file__).resolve().parent
@@ -10,77 +11,123 @@ logger = set_logger()
 class QuitKeyException(Exception):
 	pass
 
-class mouseParam:
+class NoMouseEvent(Exception):
+	pass
+
+class MouseEvent(NamedTuple):
+	x: int
+	y: int
+	event: int
+	flags: int
+
+class MouseParam:
 	def __init__(self, input_img_name):
 		# event data as dict.
 		self.mouseEvent = {"x":None, "y":None, "event":None, "flags":None}
+		self._mouse_event: MouseEvent | None = None
 		# set callback
 		cv2.setMouseCallback(input_img_name, self.__CallBackFunc, None)
 	
 	def __CallBackFunc(self, eventType, x, y, flags, userdata):
 		
+		self._mouse_event = MouseEvent(x, y, eventType, flags)
 		self.mouseEvent["x"] = x
 		self.mouseEvent["y"] = y
 		self.mouseEvent["event"] = eventType    
 		self.mouseEvent["flags"] = flags    
 
-	#マウス入力用のパラメータを返すための関数
+	@property
+	def data(self) -> MouseEvent:
+		if not self._mouse_event:
+			raise NoMouseEvent("No mouse event")
+		return self._mouse_event
+
+	@property
+	def y(self) -> int:
+		if not self._mouse_event:
+			raise NoMouseEvent("No mouse event")
+		return self._mouse_event.y
+
+	@property
+	def pos(self) -> tuple[int, int]:
+		''' x, y '''
+		if not self._mouse_event:
+			raise NoMouseEvent("No mouse event")
+		return (self._mouse_event.x, self._mouse_event.y)
+
+	@property
+	def event(self) -> int:
+		if not self._mouse_event:
+			raise NoMouseEvent("No mouse event")
+		return self._mouse_event.event
+
+	@property
+	def flags(self) -> int:
+		if not self._mouse_event:
+			raise NoMouseEvent("No mouse event")
+		return self._mouse_event.flags
+
 	def getData(self):
+		''' all mouse event data '''
 		return self.mouseEvent
 	
-	#マウスイベントを返す関数
 	def getEvent(self):
+		''' mouse event '''
 		return self.mouseEvent["event"]                
 
-	#マウスフラグを返す関数
 	def getFlags(self):
+		''' mouse flags '''
 		return self.mouseEvent["flags"]                
 
-	#xの座標を返す関数
 	def getX(self):
+		''' mouse X co-od. '''
 		return self.mouseEvent["x"]  
 
-	#yの座標を返す関数
 	def getY(self):
+		''' mouse Y co-od. '''
 		return self.mouseEvent["y"]  
 
-	#xとyの座標を返す関数
 	def getPos(self) -> tuple[int, int]:
+		''' mouse (X, Y) co-od. '''
 		return (self.mouseEvent["x"], self.mouseEvent["y"])
 		
 def get_area(window: str, image: np.ndarray,
-	TLpos = [0, 0],
-	BRpos = [0, 0]
-) -> tuple[list[int], list[int]] | None:
+	TL_BR_list = [] # TLpos = [0, 0], BRpos = [0, 0]
+) -> list[tuple[int, int], tuple[int, int]]:
+	''' returns TL_BR(Top-Left, Bottom-Right) tuple list.
+	Quit key set(['Q', 'q', 17]) raises QuitKeyException '''
+	usage = "Drag mouse to select a rectangle area from top-left to bottom-right, (Right click to reset the area), then hit Space/Enter/S key to choose, Esc/Q key to quit"	
+	print(usage)
 	copy_image = image.copy()
 	cv2.imshow(window, image)
-	# window = window + ":Drag mouse to select area, then hit Space key to choose, Esc key to quit"	
-	#コールバックの設定
-	mouseData = mouseParam(window)
 
-	first_click = second_click = False
+	mouseData = MouseParam(window) #call back func.
+
+	first_click = False
 	is_rect = False
 	is_l_button_down = False
 	is_reset = False
+	TLpos: tuple[int, int] = (0, 0) # top left
+	BRpos: tuple[int, int] = (0, 0) # bottom right
 	try:
 		while 1:
 			key = cv2.waitKey(50)
 			if key in [ord("q"), ord("Q"), 17]: # Esc
 				raise QuitKeyException()
-			elif key in [ord("s"), ord("S"), ord(" ")]:
+			elif key in [ord("s"), ord("S"), ord(" "), ord("\n"), ord("\r")]:
+
 				is_reset = True
 				break
-			#左クリックがあったら表示
-			match (event:=mouseData.getEvent()):
+			# show if left click
+			match (data:=mouseData.data).event:
 				case cv2.EVENT_LBUTTONUP:
 					if is_l_button_down:
-						pos = mouseData.getPos()
-						BRpos[0] = pos[0]
-						BRpos[1] = pos[1]
+						# pos = data.pos # mouseData.getPos()
+						BRpos = data.x, data.y # [0] = pos[0]
 						if is_rect:
 							image = copy_image.copy()
 						cv2.rectangle(image, (TLpos[0], TLpos[1]), (BRpos[0], BRpos[1]), 0, 1)
-						second_click = True
+						# second_click = True
 						is_rect = True
 						cv2.imshow(window, image)
 						logger.info("Redraw rectangle: %s, %s", TLpos, BRpos)
@@ -89,11 +136,10 @@ def get_area(window: str, image: np.ndarray,
 					is_l_button_down = True
 					pos = mouseData.getPos()
 					if not first_click:
-						TLpos[0] = pos[0]
-						TLpos[1] = pos[1]
+						TLpos = data.x, data.y # [0] = pos[0]
+						# TLpos[0] = pos[0] TLpos[1] = pos[1]
 						first_click = True
 						logger.info("TLpos:%s", TLpos)
-
 				case cv2.EVENT_MOUSEMOVE:
 					if not first_click:
 						image = copy_image.copy()
@@ -102,11 +148,9 @@ def get_area(window: str, image: np.ndarray,
 						image[:, pos[0]] = 127
 						cv2.imshow(window, image)
 						continue
-
 					if is_l_button_down:
 						pos = mouseData.getPos()
-						BRpos[0] = pos[0]
-						BRpos[1] = pos[1]
+						BRpos = data.x, data.y # [0] = pos[0]
 						if is_rect:
 							image = copy_image.copy()
 						cv2.rectangle(image, (TLpos[0], TLpos[1]), (BRpos[0], BRpos[1]), 0, 1)
@@ -118,15 +162,15 @@ def get_area(window: str, image: np.ndarray,
 				# right click makes to reset
 				case cv2.EVENT_RBUTTONDOWN:
 					if not is_reset:
-						first_click = second_click = False
-						for p in [TLpos, BRpos]:
-							p[0] = p[1] = 0
+						first_click = False
+						TLpos = BRpos = (0, 0)
+						# for p in [TLpos, BRpos]: p[0] = p[1] = 0
 						logger.info("Reset")
 						is_reset = True
 					continue
 	finally:
 		cv2.destroyWindow(window)
-	return TLpos, BRpos
+	return TL_BR_list
 
 if __name__ == "__main__":
 	from sys import argv
