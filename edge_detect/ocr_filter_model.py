@@ -35,16 +35,17 @@ except (TypeError) as e:
 if not OCR_FILTER_SQLITE_DB_PATH.exists():
 	logger.info("OCR_FILTER_SQLITE_DB_PATH does not exist. It will be created.")'''
 from datetime import date as Date
-from peewee import OperationalError, Model, SqliteDatabase, IntegerField, TextField, BlobField, BareField, CompositeKey, ForeignKeyField, DateField, DateTimeField
+from peewee import DatabaseProxy, OperationalError, Model, SqliteDatabase, IntegerField, TextField, BlobField, BareField, CompositeKey, ForeignKeyField, DateField, DateTimeField
+database_proxy = DatabaseProxy()
 database_environ_str = 'OCR_FILTER_SQLITE_DB_PATH'
-database = SqliteDatabase(environ[database_environ_str], pragmas={'foreign_keys': 1})
-
+# database = SqliteDatabase(environ[database_environ_str], pragmas={'foreign_keys': 1})
+# database_proxy.initialize(database)
 class UnknownField(object):
 	def __init__(self, *_, **__): pass
 
 class BaseModel(Model):
 	class Meta:
-		database = database
+		database = database_proxy
 
 class App(BaseModel):
 	name = TextField(unique=True)
@@ -83,22 +84,21 @@ class PaystubOCR(BaseModel):
 		)'''
 		primary_key = CompositeKey('app', 'year', 'month', 'day')
 
-def init(db_path: str=environ['OCR_FILTER_SQLITE_DB_PATH']):
-	global database
-	database = SqliteDatabase(db_path, pragmas={'foreign_keys': 1})
-	database.connect()
+def init_database(db_path: str, pragmas={'foreign_keys': 1}) -> DatabaseProxy:
+	db = SqliteDatabase(db_path, pragmas=pragmas)
+	database_proxy.initialize(db)
+	# database = SqliteDatabase(db_path, pragmas={'foreign_keys': 1})
+	db.connect()
 	App.create_table(safe=True)
 	ImageRoot.create_table(safe=True)
 	PaystubOCR.create_table(safe=True)
+	return database_proxy
 
 # init()
 
-def insert_ocr_data(app: APP_NAME, year: int, month: int, day: int, data: dict[ImageAreaParamName, str], file: Path, hours:Sequence[str]|None=None):
-	if not database.is_connection_usable():
-		database.connect()
-	App.create_table(safe=True)
-	ImageRoot.create_table(safe=True)
-	PaystubOCR.create_table(safe=True)
+def insert_ocr_data(db_path: str, app: APP_NAME, year: int, month: int, day: int, data: dict[ImageAreaParamName, str], file: Path, hours:Sequence[str]|None=None) -> DatabaseProxy | None:
+	database_proxy = init_database(db_path)
+
 	app_obj, created = App.get_or_create(name=app)
 	if created:
 		logger.info("Created app: %s as app_obj: %s", app, app_obj)
@@ -107,7 +107,7 @@ def insert_ocr_data(app: APP_NAME, year: int, month: int, day: int, data: dict[I
 	if created:
 		logger.info("Created root: %s as root_obj: %s", resolved_root, root_obj)
 	# except ImageRoot.DoesNotExist: root_model = ImageRoot.create(root=resolved_root)
-	old_item = PaystubOCR.get_or_none(app==app_obj, year==year, month==month, day==day)
+	old_item = PaystubOCR.get_or_none(PaystubOCR.app==app_obj, PaystubOCR.year==year, PaystubOCR.month==month, PaystubOCR.day==day)
 	if old_item is None: # if not old_item:
 		checksum = get_file_checksum_md5(file)
 		new_item = PaystubOCR.create(
@@ -125,8 +125,8 @@ def insert_ocr_data(app: APP_NAME, year: int, month: int, day: int, data: dict[I
 			file=file.name,
 			checksum=checksum,
 		)
-		database.commit()
-		return new_item
+		database_proxy.commit()
+		return database_proxy
 	# database.close()
 import hashlib
 
