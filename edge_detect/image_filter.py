@@ -1397,16 +1397,17 @@ def main(
 	# image_config_filename = (args.file) #.resolve()Path
 	# filter_config_doc: TOMLDocument | None = None
 
-
-	# TODO: param image_area_param_name_set
 	def fill_area_param_dict(
 		area_param_dict: dict[ImageAreaParamName, ImageAreaParam] = {},
 		image: np.ndarray | None = None,
-		exclude_set: set[ImageAreaParamName] = set()
+		exclude_set: set[ImageAreaParamName] = set(),
+		y_margin: int = 0
 	) -> dict[ImageAreaParamName, ImageAreaParam]:
-		for area_name in set(ImageAreaParamName) - exclude_set:
+		for key in exclude_set:
+			area_param_dict.pop(key, None)
+		for area_name in set(ImageAreaParamName):
 			if area_name not in area_param_dict:
-				if not image or image.size == 0:
+				if image is None or image.size == 0:
 					logger.error("Image is None or size 0")
 					raise ValueError("Image is None or size 0")
 				logger.info("Try to get area params from image: %s", image.shape)
@@ -1420,7 +1421,7 @@ def main(
 					continue
 				else:
 					param_obj = ImageAreaParam(
-						TL[1], BR[1] - TL[1], TL[0], BR[0] - TL[0]
+						TL[1] + y_margin, BR[1] - TL[1], TL[0], BR[0] - TL[0]
 					)
 					area_param_dict[area_name] = param_obj
 		return area_param_dict
@@ -1550,7 +1551,7 @@ def main(
 			logger.error("Failed to get filter parameters: %s", exception)
 
 	# if not param_dict:
-	param_dict = fill_area_param_dict(param_dict, image=image, exclude_set=args.exclude_area_param_set)
+	param_dict = fill_area_param_dict(param_dict, image=bin_image[y_margin:, :], exclude_set=args.exclude_area_param_set) #, y_margin=y_margin)
 	section = ".".join([args.image_area_param_section_stem + "." + args.app])
 	area_param_config = param_config if param_config is not None else ConfigParser()
 	area_param_config[section] = {k: f"{v.param}" for k, v in param_dict.items()}

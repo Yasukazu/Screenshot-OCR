@@ -93,7 +93,7 @@ class MouseParam:
 		
 def get_area(window: str, image: np.ndarray,
 	TL_BR_list = [] # TLpos = [0, 0], BRpos = [0, 0]
-) -> list[tuple[int, int], tuple[int, int]]:
+) -> list[tuple[int, int]]:
 	''' returns TL_BR(Top-Left, Bottom-Right) tuple list.
 	Quit key set(['Q', 'q', 17]) raises QuitKeyException '''
 	usage = "Drag mouse to select a rectangle area from top-left to bottom-right, (Right click to reset the area), then hit Space/Enter/S key to choose, Esc/Q key to quit"	
@@ -110,7 +110,7 @@ def get_area(window: str, image: np.ndarray,
 	TLpos: tuple[int, int] = (0, 0) # top left
 	BRpos: tuple[int, int] = (0, 0) # bottom right
 	try:
-		while 1:
+		while not is_reset:
 			key = cv2.waitKey(50)
 			if key in [ord("q"), ord("Q"), 17]: # Esc
 				raise QuitKeyException()
@@ -119,58 +119,61 @@ def get_area(window: str, image: np.ndarray,
 				is_reset = True
 				break
 			# show if left click
-			match (data:=mouseData.data).event:
-				case cv2.EVENT_LBUTTONUP:
-					if is_l_button_down:
-						# pos = data.pos # mouseData.getPos()
-						BRpos = data.x, data.y # [0] = pos[0]
-						if is_rect:
-							image = copy_image.copy()
-						cv2.rectangle(image, (TLpos[0], TLpos[1]), (BRpos[0], BRpos[1]), 0, 1)
-						# second_click = True
-						is_rect = True
-						cv2.imshow(window, image)
-						logger.info("Redraw rectangle: %s, %s", TLpos, BRpos)
-						is_l_button_down = False
-				case cv2.EVENT_LBUTTONDOWN:
-					is_l_button_down = True
-					pos = mouseData.getPos()
-					if not first_click:
-						TLpos = data.x, data.y # [0] = pos[0]
-						# TLpos[0] = pos[0] TLpos[1] = pos[1]
-						first_click = True
-						logger.info("TLpos:%s", TLpos)
-				case cv2.EVENT_MOUSEMOVE:
-					if not first_click:
-						image = copy_image.copy()
+			try:
+				match (data:=mouseData.data).event:
+					case cv2.EVENT_LBUTTONUP:
+						if is_l_button_down:
+							# pos = data.pos # mouseData.getPos()
+							BRpos = data.x, data.y # [0] = pos[0]
+							if is_rect:
+								image = copy_image.copy()
+							cv2.rectangle(image, (TLpos[0], TLpos[1]), (BRpos[0], BRpos[1]), 0, 1)
+							# second_click = True
+							is_rect = True
+							cv2.imshow(window, image)
+							logger.info("Redraw rectangle: %s, %s", TLpos, BRpos)
+							is_l_button_down = False
+					case cv2.EVENT_LBUTTONDOWN:
+						is_l_button_down = True
 						pos = mouseData.getPos()
-						image[pos[1], :] = 127
-						image[:, pos[0]] = 127
-						cv2.imshow(window, image)
-						continue
-					if is_l_button_down:
-						pos = mouseData.getPos()
-						BRpos = data.x, data.y # [0] = pos[0]
-						if is_rect:
+						if not first_click:
+							TLpos = data.x, data.y # [0] = pos[0]
+							# TLpos[0] = pos[0] TLpos[1] = pos[1]
+							first_click = True
+							logger.info("TLpos:%s", TLpos)
+					case cv2.EVENT_MOUSEMOVE:
+						if not first_click:
 							image = copy_image.copy()
-						cv2.rectangle(image, (TLpos[0], TLpos[1]), (BRpos[0], BRpos[1]), 0, 1)
-						is_rect = True
-						cv2.imshow(window, image)
-						logger.info("Redraw rectangle:%s, %s", TLpos, BRpos)
-					# image[TLpos[1]:BRpos[1], TLpos[0]:BRpos[0]] &= (255-7)
+							pos = mouseData.getPos()
+							image[pos[1], :] = 127
+							image[:, pos[0]] = 127
+							cv2.imshow(window, image)
+							continue
+						if is_l_button_down:
+							pos = mouseData.getPos()
+							BRpos = data.x, data.y # [0] = pos[0]
+							if is_rect:
+								image = copy_image.copy()
+							cv2.rectangle(image, (TLpos[0], TLpos[1]), (BRpos[0], BRpos[1]), 0, 1)
+							is_rect = True
+							cv2.imshow(window, image)
+							logger.info("Redraw rectangle:%s, %s", TLpos, BRpos)
+						# image[TLpos[1]:BRpos[1], TLpos[0]:BRpos[0]] &= (255-7)
 
-				# right click makes to reset
-				case cv2.EVENT_RBUTTONDOWN:
-					if not is_reset:
-						first_click = False
-						TLpos = BRpos = (0, 0)
-						# for p in [TLpos, BRpos]: p[0] = p[1] = 0
-						logger.info("Reset")
-						is_reset = True
-					continue
+					# right click makes to reset
+					case cv2.EVENT_RBUTTONDOWN:
+						if not is_reset:
+							first_click = False
+							TLpos = BRpos = (0, 0)
+							# for p in [TLpos, BRpos]: p[0] = p[1] = 0
+							logger.info("Reset")
+							is_reset = True
+						continue
+			except NoMouseEvent:
+				pass
 	finally:
 		cv2.destroyWindow(window)
-	return TL_BR_list
+	return [TLpos, BRpos]
 
 if __name__ == "__main__":
 	from sys import argv

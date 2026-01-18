@@ -11,6 +11,7 @@ dependencies = [
     "config-argument-parser>=1.5.1",
     "configargparse>=1.7.1",
     "console-menu>=0.8.0",
+    "dataset>=1.5.2",
     "fancy-dataclass>=0.10.1",
     "img2pdf>=0.5.1,<0.6.0",
     "jsonargparse>=4.45.0",
@@ -50,6 +51,7 @@ dev = [
     "toml>=0.10.2",
     "duckdb>=1.4.3",
     "peewee>=3.19.0",
+    "pydal>=20260110.1",
 ]
 
 [build-system]

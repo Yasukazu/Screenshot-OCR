@@ -20,21 +20,23 @@ class OCRFilter:
 	THRESHOLD = 235
 	def __init__(self, image:np.ndarray, param_dict:dict[ImageAreaParamName, Sequence[int] | ImageAreaParam] = {k:[] for k in ImageAreaParamName}, show_check=False, thresh=THRESHOLD, bin_image:np.ndarray | None = None):
 		self.image = image
-		self._param_dict = param_dict
+		# self._param_dict = param_dict
 		self.show_check = show_check
 		self.thresh = thresh
 		self.bin_image = bin_image
 		dct: dict[ImageAreaParamName, ImageAreaParam] = {}
 		for name in ImageAreaParamName:
 			try:
-				value = self._param_dict[name]
+				value = param_dict[name]
 			except KeyError:
 				continue
-			if not isinstance(value, Sequence):
+			if isinstance(value, ImageAreaParam):
 				dct[name] = value
-			else:
+			elif isinstance(value, Sequence):
 				param = name.to_param_class()
 				dct[name] = param(*value)
+			else:
+				raise ValueError(f"Invalid value type: {type(value)}")
 		self._area_param_dict: dict[ImageAreaParamName, ImageAreaParam] = dct
 	
 	@property
@@ -44,22 +46,10 @@ class OCRFilter:
 	def y_margin(self, value: int):
 		self._y_margin = value
 
+	@property
 	def param_dict(self) -> dict[ImageAreaParamName, ImageAreaParam]:
-		if self._area_param_dict is not None:
-			return self._area_param_dict
-		dct: dict[ImageAreaParamName, ImageAreaParam] = {}
-		for name in ImageAreaParamName:
-			try:
-				value = self._param_dict[name]
-			except KeyError:
-				continue
-			if isinstance(value, ImageAreaParam):
-				param = value
-			else:
-				param = name.value
-				dct[name] = param(*value)
-		self._area_param_dict = dct
-		return dct
+		return self._area_param_dict
+
 
 	@classmethod
 	def convert_border_offset_ranges_to_ratio_list(cls, borders: list[range]) -> list[float]:

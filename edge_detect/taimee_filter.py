@@ -364,6 +364,10 @@ class TaimeeFilter(OCRFilter):
 		if show_check:
 			cv2.destroyAllWindows()
 		
+	@property
+	def param_dict(self):
+		return self.area_param_dict
+
 	def extract_heading(self, params: dict[ImageDictKey, tuple[int, int]] | None = None, seek_button_shape: bool = False, button_text: Optional[list[str]] = None) -> ImageAreaParam|tuple[ImageAreaParam, str]:
 		'''Return: (ypos, height, x_start)
 		Use with self.y_offset like image[self.y_offset: self.y_offset + height, x_start:]'''
