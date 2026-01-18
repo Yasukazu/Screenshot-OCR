@@ -2,6 +2,7 @@ from pathlib import Path
 from datetime import datetime as Datetime
 from sys import path as sys_path
 from sys import exit as sys_exit
+from os import environ
 from typing import Sequence
 from dotenv import load_dotenv
 
@@ -11,13 +12,12 @@ from set_logger import set_logger
 logger = set_logger(__name__)
 from edge_detect.image_filter import APP_NAME, ImageAreaParamName
 
-try:
+'''try:
 	with (cwd / "ocr-filter.env").open() as envf:
 		load_dotenv(stream=envf)
 except FileNotFoundError as e:
 	logger.error(f"Failed to load environment variables: {e}")
 	sys_exit(1)
-from os import environ
 try:
 	# OCR_FILTER_DATA_YEAR = int(environ["OCR_FILTER_DATA_YEAR"])
 	# OCR_FILTER_DATA_MONTH = int(environ["OCR_FILTER_DATA_MONTH"])
@@ -33,11 +33,11 @@ except (TypeError) as e:
 	sys_exit(4)
 
 if not OCR_FILTER_SQLITE_DB_PATH.exists():
-	logger.info("OCR_FILTER_SQLITE_DB_PATH does not exist. It will be created.")
+	logger.info("OCR_FILTER_SQLITE_DB_PATH does not exist. It will be created.")'''
 from datetime import date as Date
 from peewee import OperationalError, Model, SqliteDatabase, IntegerField, TextField, BlobField, BareField, CompositeKey, ForeignKeyField, DateField, DateTimeField
-
-database = SqliteDatabase(OCR_FILTER_SQLITE_DB_PATH, pragmas={'foreign_keys': 1})
+database_environ_str = 'OCR_FILTER_SQLITE_DB_PATH'
+database = SqliteDatabase(environ[database_environ_str], pragmas={'foreign_keys': 1})
 
 class UnknownField(object):
 	def __init__(self, *_, **__): pass
@@ -66,7 +66,7 @@ class PaystubOCR(BaseModel):
 	root = ForeignKeyField(ImageRoot, backref='paystub_ocr')
 	file = TextField()
 	# image_file_name = TextField()
-	checksum = TextField(null=True, unique=True)
+	checksum = TextField(null=True)
 	title = TextField(null=True)
 	heading_text = TextField(null=True)
 	shift_text = TextField(null=True)
@@ -83,6 +83,16 @@ class PaystubOCR(BaseModel):
 		)'''
 		primary_key = CompositeKey('app', 'year', 'month', 'day')
 
+def init(db_path: str=environ['OCR_FILTER_SQLITE_DB_PATH']):
+	global database
+	database = SqliteDatabase(db_path, pragmas={'foreign_keys': 1})
+	database.connect()
+	App.create_table(safe=True)
+	ImageRoot.create_table(safe=True)
+	PaystubOCR.create_table(safe=True)
+
+# init()
+
 def insert_ocr_data(app: APP_NAME, year: int, month: int, day: int, data: dict[ImageAreaParamName, str], file: Path, hours:Sequence[str]|None=None):
 	if not database.is_connection_usable():
 		database.connect()
@@ -98,7 +108,7 @@ def insert_ocr_data(app: APP_NAME, year: int, month: int, day: int, data: dict[I
 		logger.info("Created root: %s as root_obj: %s", resolved_root, root_obj)
 	# except ImageRoot.DoesNotExist: root_model = ImageRoot.create(root=resolved_root)
 	old_item = PaystubOCR.get_or_none(app==app_obj, year==year, month==month, day==day)
-	if old_item is not None: # if not old_item:
+	if old_item is None: # if not old_item:
 		checksum = get_file_checksum_md5(file)
 		new_item = PaystubOCR.create(
 			app=app_obj,

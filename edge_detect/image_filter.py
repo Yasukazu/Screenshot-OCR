@@ -1623,9 +1623,8 @@ def main(
 				line = textline(r)
 				df_list.append(line)  # '\n'.join(line))
 			ocr_text_lines = [" ".join(df["text"]) for df in df_list]
-			if area_name == ImageAreaParamName.SHIFT:
-				from tool_pyocr import MDateError
-
+			if args.ocr_filter_sqlite_db_name and area_name == ImageAreaParamName.SHIFT:
+				# from tool_pyocr import MDateError
 				month_day_hours = (
 					app_filter_class.extract_month_day_and_hours_from_shift_area_text(
 						ocr_text_lines
@@ -1633,6 +1632,8 @@ def main(
 				)
 				if is_successful(month_day_hours):
 					month_day, hours = month_day_hours.unwrap()
+				else:
+					month_day = None
 			print(f"{col_str}={ocr_text_lines}")
 			col_list.append(ocr_text_lines)
 			doc_dict[area_name] = "\n".join(["\t".join(col) for col in col_list])
@@ -1641,14 +1642,14 @@ def main(
 			for p, col in enumerate(col_list):
 				# col_str = f"p{p+1}"
 				area_dict[p] = '\n'.join(col) """
-	if month_day is not None:
-		from ocr_filter_model import insert_ocr_data
-
+	if args.ocr_filter_sqlite_db_name and month_day is not None:
 		try:
+			db_fullpath = Path(args.image_dir).expanduser() / args.ocr_filter_sqlite_db_name if args.image_dir else Path(args.ocr_filter_sqlite_db_name).expanduser()
+			# database = make_sqlite_db(file=str(db_fullpath.name), folder=str(db_fullpath.parent))
 			month: int = month_day.month
 			day: int = month_day.day
 			year: int = get_data_year(month)
-			inserted_item = insert_ocr_data(
+			inserted_item = insert_ocr_data(str(db_fullpath),
 				args.app, year, month, day, doc_dict, image_file
 			)
 		except TypeError as e:
@@ -1657,7 +1658,7 @@ def main(
 			logger.error("Database operation failed: %s", e)
 		else:
 			if inserted_item is not None:
-				logger.info("Inserted OCR data into database: %s", inserted_item)
+				logger.info("Inserted OCR data [%s] into database: %s", inserted_item, db_fullpath)
 		# else: doc_dict[area_name] = '\n'.join(col_list[0])
 		# doc.add(area_tbl)
 	if args.save:
@@ -1726,7 +1727,53 @@ HeadingAreaParam = [0, 111, 196, -1]
 ShiftAreaParam = [219, 267, 345, 373]
 BreaktimeAreaParam = [488, 224, 0, 720]
 PaystubAreaParam = [714, -1, 0, -1]"""
-
+database_environ_str = 'OCR_FILTER_SQLITE_DB_PATH'
+def insert_ocr_data(database_path:str, app: APP_NAME, year: int, month: int, day: int, data: dict[ImageAreaParamName, str], file: Path, hours:Sequence[str]|None=None):
+	from os import environ
+	environ[database_environ_str] = database_path
+	from ocr_filter_model import database
+	if not database.is_connection_usable():
+		database.connect()
+	from ocr_filter_model import App, ImageRoot, PaystubOCR
+	App.create_table(safe=True)
+	ImageRoot.create_table(safe=True)
+	PaystubOCR.create_table(safe=True)
+	app_obj, created = App.get_or_create(name=app)
+	if created:
+		logger.info("Created app: %s as app_obj: %s", app, app_obj)
+	resolved_root = str(file.parent.resolve()) 
+	root_obj, created= ImageRoot.get_or_create(root=resolved_root)
+	if created:
+		logger.info("Created root: %s as root_obj: %s", resolved_root, root_obj)
+	# except ImageRoot.DoesNotExist: root_model = ImageRoot.create(root=resolved_root)
+	old_item = PaystubOCR.get_or_none(app==app_obj, year==year, month==month, day==day)
+	if old_item is None: # if not old_item:
+		from ocr_filter_model import get_file_checksum_md5
+		checksum = get_file_checksum_md5(file)
+		from datetime import datetime as Datetime
+		new_item, created = PaystubOCR.get_or_create(
+			app=app_obj,
+			year=year,
+			month=month,
+			day=day,
+			defaults = {
+			'modified_at':Datetime.now(),
+			'heading_text':data.get(ImageAreaParamName.HEADING),
+			'shift_text':data.get(ImageAreaParamName.SHIFT),
+			'breaktime_text':data.get(ImageAreaParamName.BREAKTIME),
+			'paystub_text':data.get(ImageAreaParamName.PAYSTUB),
+			'salary_text':data.get(ImageAreaParamName.SALARY),
+			'root':root_obj,
+			'file':file.name,
+			'checksum':checksum,
+			}
+		)
+		if created:
+			logger.info("New record is created:%s", new_item)
+		else:
+			logger.info("Old record is updated:%s", new_item)
+		database.commit()
+		return new_item
 if __name__ == "__main__":
 	try:
 		main()
