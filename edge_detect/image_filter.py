@@ -1141,8 +1141,22 @@ def main(
 		default=False,
 		help="Show every area before commit OCR",
 	)
-
+	parser.add_argument(
+		"--exclude_area_param_set",
+		help=f"Exclude a set of image area parameter names : { {f'{n}' for n in list(ImageAreaParamName)} }",
+		nargs='*',
+		env_var="IMAGE_FILTER_AREA_PARAM_NAME_EXCLUDE_SET",
+	)
 	args = parser.parse_args()
+
+	if args.exclude_area_param_set:
+		try:
+			args.exclude_area_param_set = set(ImageAreaParamName(p) for p in args.exclude_area_param_set)
+		except ValueError:
+			logger.error("Invalid exclude_area_param_set: %s", args.exclude_area_param_set)
+			raise ConfigError("Invalid exclude_area_param_set: %s" % args.exclude_area_param_set)
+	else:
+		args.exclude_area_param_set = set()
 
 	def get_data_year(month: int = 0):
 		if args.data_year == 0:
@@ -1384,29 +1398,31 @@ def main(
 	# filter_config_doc: TOMLDocument | None = None
 
 
-
-	def select_area_param_dict(
+	# TODO: param image_area_param_name_set
+	def fill_area_param_dict(
 		area_param_dict: dict[ImageAreaParamName, ImageAreaParam] = {},
 		image: np.ndarray | None = None,
+		exclude_set: set[ImageAreaParamName] = set()
 	) -> dict[ImageAreaParamName, ImageAreaParam]:
-		for area_name in ImageAreaParamName:
+		for area_name in set(ImageAreaParamName) - exclude_set:
 			if area_name not in area_param_dict:
-				if image is not None:
-					logger.info("Try to get area params from image: %s", image.shape)
-					from mouse_event import get_area, QuitKeyException
-
-					try:
-						TL, BR = get_area(area_name.name, image)
-					except QuitKeyException:
-						logger.warning(
-							"Failed to get area from image for %s", area_name.name
-						)
-						continue
-					else:
-						param_obj = ImageAreaParam(
-							TL[1], BR[1] - TL[1], TL[0], BR[0] - TL[0]
-						)
-						area_param_dict[area_name] = param_obj
+				if not image or image.size == 0:
+					logger.error("Image is None or size 0")
+					raise ValueError("Image is None or size 0")
+				logger.info("Try to get area params from image: %s", image.shape)
+				from mouse_event import get_area, QuitKeyException
+				try:
+					TL, BR = get_area(area_name.name, image)
+				except QuitKeyException:
+					logger.warning(
+						"Failed to get area from image for %s", area_name.name
+					)
+					continue
+				else:
+					param_obj = ImageAreaParam(
+						TL[1], BR[1] - TL[1], TL[0], BR[0] - TL[0]
+					)
+					area_param_dict[area_name] = param_obj
 		return area_param_dict
 
 	is_file_list_loaded = False
@@ -1451,7 +1467,7 @@ def main(
 
 	try:
 		_file = get_args_files()[args.nth - 1]
-		image_file = image_path_dir / _file if image_path_dir else Path(_file)
+		image_file = image_path_dir / _file if image_path_dir else Path(_file).expanduser()
 	except IndexError:
 		# image_file = file_list[0]
 		sys.exit(f"Index out of range for file_list by {args.nth=}")
@@ -1497,29 +1513,26 @@ def main(
 		app_filter_class = APP_NAME_TO_FILTER_CLASS[args.app]
 	except KeyError:
 		from ocr_filter import OCRFilter
-
 		app_filter_class = OCRFilter
 		# specific_filter_for_app = False
 	# else: specific_filter_for_app = True
 
-	param_dict = None
+	param_dict: dict[ImageAreaParamName, ImageAreaParam] = {}
 	section = None
 	param_config = None
 	# try:
 	area_params_section = get_image_area_params_section()
 	if is_successful(area_params_section):
 		param_str_dict = area_params_section.unwrap()
-		try:
-			param_dict = {
-				ImageAreaParamName(k): ImageAreaParam.from_str(v)
-				for k, v in param_str_dict.items()
-			}  # get_image_area_param_dict(area_params)
-		except ValueError as e:
-			logger.error("Failed to get filter parameters: %s", e)
-		else:
-			if param_dict:
-				logger.info("Filter parameters are read: %s", param_dict)
-
+		for k, v in param_str_dict.items():
+			try:
+					param = ImageAreaParam.from_str(v)
+					param_dict[
+				ImageAreaParamName(k)] = param
+			except ValueError as e:
+				logger.error("Failed to genarate an image area param '%s' obj from filter parameter [%s]: %s", k, v, e)
+			else:
+				logger.info("Filter parameter for %s is read as: %s", k, param)
 	else:
 		exception = area_params_section.failure()  # case ConfigKeyException():
 		if isinstance(exception, ConfigKeyException):
@@ -1530,32 +1543,33 @@ def main(
 			assert isinstance(exception.config, ConfigParser)
 			param_config = exception.config
 			logger.warning(
-				"Going to get filter parameters manually due to config error for , 112, 199, 508%s",
+				"Going to get filter parameters manually due to config error for %s",
 				args.app.name.lower(),
 			)
 		else:
 			logger.error("Failed to get filter parameters: %s", exception)
 
-	if not param_dict:
-		param_dict = select_area_param_dict(image=image)
-		section = ".".join([args.image_area_param_section_stem + "." + args.app])
-		area_param_config = param_config if param_config is not None else ConfigParser()
-		area_param_config[section] = {k: f"{v.param}" for k, v in param_dict.items()}
+	# if not param_dict:
+	param_dict = fill_area_param_dict(param_dict, image=image, exclude_set=args.exclude_area_param_set)
+	section = ".".join([args.image_area_param_section_stem + "." + args.app])
+	area_param_config = param_config if param_config is not None else ConfigParser()
+	area_param_config[section] = {k: f"{v.param}" for k, v in param_dict.items()}
 
-		# make a function to save the param_config to a config file
-		def save_param_dict_atexit():
-			try:
-				with open(args.area_param_file, "w", encoding="utf8") as wf:
-					area_param_config.write(wf)
-			except Exception as e:
-				logger.warning("Failed to write area parameter file: %s", e)
-			else:
-				logger.info(
-					"Saved `param_config` generated from user input as a file: %s",
-					args.area_param_file,
-				)
+	# make a function to save the param_config to a config file
+	def save_param_dict_atexit():
+		try:
+			with open(args.area_param_file, "w", encoding="utf8") as wf:
+				area_param_config.write(wf)
+		except Exception as e:
+			logger.warning("Failed to write area parameter file: %s", e)
+		else:
+			logger.info(
+				"Saved `param_config` generated from user input as a file: %s",
+				args.area_param_file,
+			)
 
-		atexit.register(save_param_dict_atexit)
+	atexit.register(save_param_dict_atexit)
+
 	app_filter = app_filter_class(
 		image=image, param_dict=param_dict, show_check=args.show, bin_image=bin_image
 	)  # if not args.no_ocr else None
@@ -1574,6 +1588,7 @@ def main(
 		try:
 			area_param = app_filter.param_dict[area_name]
 		except KeyError:
+			continue
 
 		ocr_area_name = f"ocr-{area_name.name}"
 		# area_tbl = table() area_tbl.add(comment(area_name)) area_tbl.add(nl())
