@@ -1,3 +1,5 @@
+from os import getcwd
+from os import path as os_path
 from configparser import ConfigParser
 from itertools import groupby
 from typing import Type, TypedDict
@@ -986,7 +988,7 @@ from configparser import ConfigParser, NoSectionError, SectionProxy
 from configargparse import ArgParser, CompositeConfigParser, TomlConfigParser, IniConfigParser, ConfigparserConfigFileParser
 from os.path import join as os_path_join
 from typing import Any
-from dotenv import load_dotenv
+from dotenv import dotenv_values, find_dotenv
 
 class ConfigFileExt(StrEnum):	
 	TOML = auto()
@@ -998,16 +1000,40 @@ class NoAppNameError(ConfigError):
 	"""No application name specified"""
 	pass
 
-
-
+COMMON_ENV_FILE_NAME = ".env"
+ENV_FILE_NAME = "image-filter.env"
+CONFIG_FILE_STEM = "image-filter"
 IMAGE_AREA_PARAM_STR = "image_area_param"
 def main(
-	config_dir = abspath(dirname(__file__)), config_file_stem = "image-filter", config_file_ext_enum = ConfigFileExt, image_area_param_file_stem = IMAGE_AREA_PARAM_STR.replace('_', '-'),
-	env_file = "image-filter.env",
-):
-	load_dotenv(f"{config_dir}/{env_file}")
-	from taimee_filter import TaimeeFilter
+	config_dir = '', config_file_stem = CONFIG_FILE_STEM, config_file_ext_enum = ConfigFileExt, image_area_param_file_stem = IMAGE_AREA_PARAM_STR.replace('_', '-'),
+	env_file = ENV_FILE_NAME,
+	usecwd: bool = True,
+): #abspath(dirname(__file__)) "image-filter.env"
+	try:
+		config_dir = Path(config_dir) if config_dir else Path(get_current_path(usecwd))
+		if str(config_dir)[0] == '~':
+			config_dir = config_dir.expanduser()
+	except ValueError:
+		raise ValueError("Invalid config_dir")
+	if not config_dir.is_dir():
+		raise ValueError("Invalid config_dir")
+	try:
+		dotenv_path = find_dotenv(
+			filename = env_file,
+			raise_error_if_not_found = True,
+			usecwd = usecwd,
+			)
+		with open(dotenv_path) as rf:
+			env_values = dotenv_values(stream=rf) #, override=True) # f"{config_dir}/{env_file}")
+			from os import environ
+			clean_env_values = {str(k): str(v) for k, v in env_values.items() if v is not None} # Convert all keys and values to strings explicitly
+			if clean_env_values:
+				environ.update(clean_env_values)
+				logger.info("Environment values updated from '%s' as: %s", env_file, clean_env_values)
+	except IOError:
+		logger.warning("Failed to load environment values from environment file '%s': Using default environment values.", env_file)
 
+	from taimee_filter import TaimeeFilter
 	APP_NAME_TO_FILTER_CLASS = {APP_NAME.TAIMEE: TaimeeFilter}
 	OCR_FILTER = "ocr-filter"
 	config_sections = [
@@ -1015,7 +1041,7 @@ def main(
 		"common",
 	]  # [ IMAGE_AREA_PARAM_STR + '.' + app.value for app in APP_NAME]
 	default_config_paths = [
-		Path(config_dir) / f"{stem}.{ext.lower()}"
+		config_dir / f"{stem}.{ext.lower()}"
 		for ext in config_file_ext_enum
 		for stem in [config_file_stem]
 	]  # image_area_param_file_stem]]# if f.exists()]
@@ -1643,6 +1669,7 @@ def main(
 				# col_str = f"p{p+1}"
 				area_dict[p] = '\n'.join(col) """
 	if args.ocr_filter_sqlite_db_name and month_day is not None:
+		from ocr_filter_model import insert_ocr_data
 		try:
 			db_fullpath = Path(args.image_dir).expanduser() / args.ocr_filter_sqlite_db_name if args.image_dir else Path(args.ocr_filter_sqlite_db_name).expanduser()
 			# database = make_sqlite_db(file=str(db_fullpath.name), folder=str(db_fullpath.parent))
@@ -1727,53 +1754,34 @@ HeadingAreaParam = [0, 111, 196, -1]
 ShiftAreaParam = [219, 267, 345, 373]
 BreaktimeAreaParam = [488, 224, 0, 720]
 PaystubAreaParam = [714, -1, 0, -1]"""
-database_environ_str = 'OCR_FILTER_SQLITE_DB_PATH'
-def insert_ocr_data(database_path:str, app: APP_NAME, year: int, month: int, day: int, data: dict[ImageAreaParamName, str], file: Path, hours:Sequence[str]|None=None):
-	from os import environ
-	environ[database_environ_str] = database_path
-	from ocr_filter_model import database
-	if not database.is_connection_usable():
-		database.connect()
-	from ocr_filter_model import App, ImageRoot, PaystubOCR
-	App.create_table(safe=True)
-	ImageRoot.create_table(safe=True)
-	PaystubOCR.create_table(safe=True)
-	app_obj, created = App.get_or_create(name=app)
-	if created:
-		logger.info("Created app: %s as app_obj: %s", app, app_obj)
-	resolved_root = str(file.parent.resolve()) 
-	root_obj, created= ImageRoot.get_or_create(root=resolved_root)
-	if created:
-		logger.info("Created root: %s as root_obj: %s", resolved_root, root_obj)
-	# except ImageRoot.DoesNotExist: root_model = ImageRoot.create(root=resolved_root)
-	old_item = PaystubOCR.get_or_none(app==app_obj, year==year, month==month, day==day)
-	if old_item is None: # if not old_item:
-		from ocr_filter_model import get_file_checksum_md5
-		checksum = get_file_checksum_md5(file)
-		from datetime import datetime as Datetime
-		new_item, created = PaystubOCR.get_or_create(
-			app=app_obj,
-			year=year,
-			month=month,
-			day=day,
-			defaults = {
-			'modified_at':Datetime.now(),
-			'heading_text':data.get(ImageAreaParamName.HEADING),
-			'shift_text':data.get(ImageAreaParamName.SHIFT),
-			'breaktime_text':data.get(ImageAreaParamName.BREAKTIME),
-			'paystub_text':data.get(ImageAreaParamName.PAYSTUB),
-			'salary_text':data.get(ImageAreaParamName.SALARY),
-			'root':root_obj,
-			'file':file.name,
-			'checksum':checksum,
-			}
-		)
-		if created:
-			logger.info("New record is created:%s", new_item)
-		else:
-			logger.info("Old record is updated:%s", new_item)
-		database.commit()
-		return new_item
+
+def _is_interactive():
+	"""Decide whether this is running in a REPL or IPython notebook"""
+	try:
+		main = __import__("__main__", None, None, fromlist=["__file__"])
+	except ModuleNotFoundError:
+		return False
+	return not hasattr(main, "__file__")
+
+def _is_debugger():
+	return sys.gettrace() is not None
+def get_current_path(usecwd: bool = True) -> str:
+	if usecwd or _is_interactive() or _is_debugger() or getattr(sys, "frozen", False):
+		# Should work without __file__, e.g. in REPL or IPython notebook.
+		return getcwd()
+	else:
+		# will work for .py files
+		frame = sys._getframe()
+		current_file = __file__
+
+		while frame.f_code.co_filename == current_file or not os_path.exists(
+			frame.f_code.co_filename
+		):
+			assert frame.f_back is not None
+			frame = frame.f_back
+		frame_filename = frame.f_code.co_filename
+		return os_path.dirname(os_path.abspath(frame_filename))
+
 if __name__ == "__main__":
 	try:
 		main()
