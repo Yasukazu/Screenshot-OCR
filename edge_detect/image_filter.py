@@ -1000,14 +1000,26 @@ class NoAppNameError(ConfigError):
 	"""No application name specified"""
 	pass
 
-COMMON_ENV_FILE_NAME = ".env"
-ENV_FILE_NAME = "image-filter.env"
+ENV_FILE_EXT = ".env"
+COMMON_ENV_FILE_STEM = ""
+COMMON_ENV_FILE_NAME = COMMON_ENV_FILE_STEM + ENV_FILE_EXT
+# ENV_FILE_NAME = "image-filter.env"
+ENV_FILE_STEMS = ["image-filter", "ocr-filter"]
+ENV_FILE_NAMES = [n + ENV_FILE_EXT for n in ENV_FILE_STEMS]
+ENV_PREFIXES = ["IMAGE_FILTER_", "OCR_FILTER_"]
+def startswith_prefixes(s, prefixes=ENV_PREFIXES):
+	for prefix in prefixes:
+		if s.startswith(prefix):
+			return True
+
 CONFIG_FILE_STEM = "image-filter"
 IMAGE_AREA_PARAM_STR = "image_area_param"
 def main(
 	config_dir = '', config_file_stem = CONFIG_FILE_STEM, config_file_ext_enum = ConfigFileExt, image_area_param_file_stem = IMAGE_AREA_PARAM_STR.replace('_', '-'),
-	env_file = ENV_FILE_NAME,
-	usecwd: bool = True,
+	env_files = ENV_FILE_NAMES,
+	common_env_file = COMMON_ENV_FILE_NAME,
+	env_prefixes = ENV_PREFIXES,
+	usecwd: bool = False,
 ): #abspath(dirname(__file__)) "image-filter.env"
 	try:
 		config_dir = Path(config_dir) if config_dir else Path(get_current_path(usecwd))
@@ -1017,22 +1029,36 @@ def main(
 		raise ValueError("Invalid config_dir")
 	if not config_dir.is_dir():
 		raise ValueError("Invalid config_dir")
-	try:
-		dotenv_path = find_dotenv(
-			filename = env_file,
-			raise_error_if_not_found = True,
-			usecwd = usecwd,
-			)
-		with open(dotenv_path) as rf:
-			env_values = dotenv_values(stream=rf) #, override=True) # f"{config_dir}/{env_file}")
-			from os import environ
-			clean_env_values = {str(k): str(v) for k, v in env_values.items() if v is not None} # Convert all keys and values to strings explicitly
-			if clean_env_values:
-				environ.update(clean_env_values)
-				logger.info("Environment values updated from '%s' as: %s", env_file, clean_env_values)
-	except IOError:
-		logger.warning("Failed to load environment values from environment file '%s': Using default environment values.", env_file)
-
+	dotenv_path = ''
+	# class NoCommonEnvFile(Exception): pass
+	used_env_files = []
+	clean_env_values = {}
+	env_values = {}
+	for env_file in env_files:
+		if (dotenv_path := find_dotenv( filename = env_file, usecwd = usecwd)):
+			try:
+				with open(dotenv_path) as rf:
+					_env_values = dotenv_values(stream=rf) #, override=True) # f"{config_dir}/{env_file}")
+					clean_env_values = {str(k): str(v) for k, v in _env_values.items() if v is not None}
+					if clean_env_values:
+						env_values |= clean_env_values
+						used_env_files.append(env_file)
+			except IOError:
+				logger.warning("Failed to load environment values from environment file '%s': Using default environment values.", dotenv_path)
+	if (dotenv_path := find_dotenv( filename = common_env_file, usecwd = usecwd)):
+		try:
+			with open(dotenv_path) as rf:
+				_env_values = dotenv_values(stream=rf) #, override=True) # f"{config_dir}/{env_file}")
+				clean_env_values2 = {str(k): str(v) for k, v in _env_values.items() if startswith_prefixes(k) and k not in clean_env_values and v is not None} # Convert all keys and values to strings explicitly
+				if clean_env_values2:
+					env_values |= clean_env_values2
+					used_env_files.append(common_env_file)
+		except IOError:
+			logger.warning("Failed to load environment values from environment file '%s': Using default environment values.", dotenv_path)
+	if used_env_files:
+		from os import environ as os_environ
+		os_environ.update(env_values)
+		logger.info("Environment values updated from %s as: %s", used_env_files, env_values)
 	from taimee_filter import TaimeeFilter
 	APP_NAME_TO_FILTER_CLASS = {APP_NAME.TAIMEE: TaimeeFilter}
 	OCR_FILTER = "ocr-filter"
