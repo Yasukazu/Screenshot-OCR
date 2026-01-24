@@ -29,9 +29,12 @@ dependencies = [
     "pytesseract>=0.3.13",
     "python-dotenv>=1.1.0",
     "pyyaml>=6.0.3",
+    "remi>=2022.7.27",
     "returns>=0.23.0",
     "tomli-w>=1.2.0",
     "tomlkit>=0.13.3",
+    "typed-argument-parser>=1.11.0",
+    "typedal>=4.3.5",
 ]
 
 [dependency-groups]
@@ -52,6 +55,9 @@ dev = [
     "duckdb>=1.4.3",
     "peewee>=3.19.0",
     "pydal>=20260110.1",
+    "sqlacodegen>=3.2.0",
+    "config-argument-parser>=1.5.3",
+    "typed-argument-parser>=1.11.0",
 ]
 
 [build-system]
