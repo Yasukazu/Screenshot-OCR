@@ -96,7 +96,7 @@ def get_area(window: str, image: np.ndarray,
 ) -> list[tuple[int, int]]:
 	''' returns TL_BR(Top-Left, Bottom-Right) tuple list.
 	Quit key set(['Q', 'q', 17]) raises QuitKeyException '''
-	usage = "Drag mouse to select a rectangle area from top-left to bottom-right, (Right click to reset the area), then hit Space/Enter/S key to choose, Esc/Q key to quit"	
+	usage = "Drag mouse to select a rectangle area from top-left to bottom-right, (Right click to reset the area), then hit Space key to add a bottom-right position, Esc key to unset last position, finally hit Enter key to submit"	
 	print(usage)
 	copy_image = image.copy()
 	cv2.imshow(window, image)
@@ -109,13 +109,27 @@ def get_area(window: str, image: np.ndarray,
 	is_reset = False
 	TLpos: tuple[int, int] = (0, 0) # top left
 	BRpos: tuple[int, int] = (0, 0) # bottom right
+	pos_list: list[tuple[int, int]] = [] # additional bottom right
+	def redraw():
+		nonlocal image
+		image = copy_image.copy()
+		if len(pos_list) < 2:
+			return
+		for p in range(len(pos_list)-1):
+			tl = pos_list[p]
+			br = pos_list[p + 1]
+			cv2.rectangle(image, tl, br, 0, 1)
+			logger.info("Redraw rectangle:%s, %s", tl, br)
+		cv2.imshow(window, image)
 	try:
 		while not is_reset:
 			key = cv2.waitKey(50)
-			if key in [ord("q"), ord("Q"), 17]: # Esc
+			if key in [8, 127]: # BS or Del
+				pos_list.pop()
+				redraw()
+			if key in [17]: # Esc
 				raise QuitKeyException()
-			elif key in [ord("s"), ord("S"), ord(" "), ord("\n"), ord("\r")]:
-
+			elif key in [ord("\n"), ord("\r")]:
 				is_reset = True
 				break
 			# show if left click
