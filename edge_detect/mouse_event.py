@@ -31,6 +31,9 @@ class MouseParam:
 		self._mouse_data: MouseData | None = None
 		# set callback
 		cv2.setMouseCallback(input_img_name, self.__CallBackFunc, None)
+	def wait(self):
+		while not self._mouse_data:
+			cv2.waitKey(20)
 	
 	def __CallBackFunc(self, eventType, x, y, flags, userdata):
 		
@@ -40,6 +43,9 @@ class MouseParam:
 		self.mouseEvent["event"] = eventType    
 		self.mouseEvent["flags"] = flags    
 
+	@property
+	def data_or_none(self) -> MouseData|None:
+		return self._mouse_data
 	@property
 	def data(self) -> MouseData:
 		if not self._mouse_data:
@@ -107,7 +113,7 @@ def get_area(window: str, image: np.ndarray,
 	Quit key set(['Q', 'q', 17]) raises QuitKeyException '''
 	usage = "Drag mouse to select a rectangle area from top-left to bottom-right, (Right click to reset the area), then hit Space key to add a bottom-right position, Esc key to unset last position, finally hit Enter key to submit"	
 	print(usage)
-	copy_image = image.copy()
+	org_image = image.copy()
 	cv2.imshow(window, image)
 
 	mouse_param = MouseParam(window) #call back func.
@@ -128,17 +134,27 @@ def get_area(window: str, image: np.ndarray,
 	# TLpos: tuple[int, int] | None = None #(0, 0) # top left
 	# BRpos: tuple[int, int] | None = None #(0, 0) # bottom right
 	pos_list: list[tuple[int, int]] = [] # additional bottom right
+	redraw_image = org_image
 	def redraw():
+		nonlocal redraw_image
 		nonlocal image
-		image = copy_image.copy()
-		if len(pos_list) < 2:
+		pos_step, odd = divmod(len(pos_list), 2)
+		if not pos_step and not odd: #len(pos_list) < 2:
 			return
-		for p in range(len(pos_list)-1):
-			tl = pos_list[p]
-			br = pos_list[p + 1]
-			cv2.rectangle(image, tl, br, 0, 1)
+		image = org_image.copy()
+		for p in range(pos_step):#len(pos_list)-1):
+			tl = pos_list[2 * p]
+			br = pos_list[2 * p + 1]
+			cv2.rectangle(image, tl, br, 0, 2)
 			logger.info("Redraw rectangle:%s, %s", tl, br)
+		redraw_image = image.copy()
+		if odd:
+			br = tl_br.BR
+			assert br is not None
+			tl = pos_list[-1]
+			cv2.rectangle(image, tl, br, 0, 1)
 		cv2.imshow(window, image)
+
 	def rm_last():
 		status.first_click = False
 		tl_br.TL = None
@@ -149,6 +165,7 @@ def get_area(window: str, image: np.ndarray,
 			pos_list.pop()
 			redraw()
 	try:
+		mouse_param.wait()
 		last_data: MouseData = mouse_param.data
 		while not is_reset:
 			mdata: MouseData = mouse_param.data # refer this var in every loop
@@ -169,48 +186,52 @@ def get_area(window: str, image: np.ndarray,
 					case cv2.EVENT_LBUTTONUP:
 						if is_l_button_down:
 							# pos = data.pos # mouseData.getPos()
-							tl_br.BR = mdata.x, mdata.y # [0] = pos[0]
-							if tl_br.TL: #is_rect:
+							pos_list.append(mdata.pos)
+							redraw()
+							# tl_br.BR = mdata.x, mdata.y # [0] = pos[0]
+							'''if tl_br.TL: #is_rect:
 								image = copy_image.copy()
 								cv2.rectangle(image, (tl_br.TL[0], tl_br.TL[1]), (tl_br.BR[0], tl_br.BR[1]), 0, 1)
 								# second_click = True
 								# is_rect = True
 								cv2.imshow(window, image)
-								logger.info("Redraw rectangle: %s, %s", tl_br.TL, tl_br.BR)
-								is_l_button_down = False
-								tl_br.TL = tl_br.BR = None # TLpos = BRpos = None 
+								logger.info("Redraw rectangle: %s, %s", tl_br.TL, tl_br.BR)'''
+							is_l_button_down = False
+							tl_br.TL = tl_br.BR = None # TLpos = BRpos = None 
 					case cv2.EVENT_LBUTTONDOWN:
 						is_l_button_down = True
 						pos = mdata.pos # mouse_param.getPos()
-						if not first_click:
+						if not tl_br.TL # first_click:
 							tl_br.TL = mdata.pos # x, mdata.y # [0] = pos[0]
 							pos_list.append(mdata.pos)
 							# TLpos[0] = pos[0] TLpos[1] = pos[1]
-							first_click = True
+							# first_click = True
 							logger.info("tl_br.TL:%s", tl_br.TL)
 					case cv2.EVENT_MOUSEMOVE:
-						if not first_click: # show XY axis cursor
-							image = copy_image.copy()
+						if not tl_br.TL: #first_click: # show XY axis cursor
+							image = redraw_image.copy()
 							pos = mouse_param.getPos()
 							image[pos[1], :] = 127
 							image[:, pos[0]] = 127
 							cv2.imshow(window, image)
 							continue
-						elif is_l_button_down:
+						else: #if is_l_button_down:
 							# pos = mouse_param.getPos()
-							tl_br.BR = mdata.pos # mdata.y # [0] = pos[0]
-							if tl_br.TL: #is_rect:
-								image = copy_image.copy()
-								cv2.rectangle(image, (tl_br.TL[0], tl_br.TL[1]), (tl_br.BR[0], tl_br.BR[1]), 0, 1)
-								# is_rect = True
-								cv2.imshow(window, image)
-								logger.info("Redraw rectangle:%s, %s", tl_br.TL, tl_br.BR)
+							if len(pos_list) == 1:
+								tl_br.BR = mdata.pos # mdata.y # [0] = pos[0]
+							# if tl_br.TL: #is_rect:
+							redraw()
+							'''image = copy_image.copy()
+							cv2.rectangle(image, (tl_br.TL[0], tl_br.TL[1]), (tl_br.BR[0], tl_br.BR[1]), 0, 1)
+							# is_rect = True
+							cv2.imshow(window, image)
+							logger.info("Redraw rectangle:%s, %s", tl_br.TL, tl_br.BR)'''
 						# image[TLpos[1]:BRpos[1], TLpos[0]:BRpos[0]] &= (255-7)
 
 					# right click makes to reset
 					case cv2.EVENT_RBUTTONUP:
 						if not is_reset:
-							first_click = False
+							# first_click = False
 							tl_br.TL = tl_br.BR = None # (0, 0)
 							# for p in [TLpos, BRpos]: p[0] = p[1] = 0
 							logger.info("Reset")
@@ -228,7 +249,7 @@ if __name__ == "__main__":
 	from sys import argv
 	#入力画像
 	image = cv2.imread(argv[1], cv2.IMREAD_GRAYSCALE)
-	if not image:
+	if image is None:
 		raise ValueError("Image not found")
 	
 	#表示するWindow名
