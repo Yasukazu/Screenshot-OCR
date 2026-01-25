@@ -146,7 +146,7 @@ def get_area(window: str, image: np.ndarray,
 			self.data.append(item)
 	rect_pos_list: RectPosList = RectPosList() # additional bottom right
 	redraw_image = org_image
-	def redraw(point: tuple[int, int]|None=None):
+	def redraw(rect_pos: RectPos|None=None):
 		nonlocal redraw_image
 		# pos_step, odd = divmod(len(rect_pos_list), 2)
 		if not rect_pos_list: # pos_step and not odd: #len(pos_list) < 2:
@@ -159,10 +159,10 @@ def get_area(window: str, image: np.ndarray,
 			assert br is not None
 			cv2.rectangle(redraw_image, tl, br, 0, 2)
 			logger.info("Redraw rectangle:%s, %s", tl, br)
-		if point and rect_pos.LT is not RectPos.RESET:
+		if rect_pos and rect_pos.LT is not RectPos.RESET and rect_pos.RB is not RectPos.RESET:
 			tl = rect_pos.LT
 			copy_redraw_image = redraw_image.copy()
-			cv2.rectangle(copy_redraw_image, tl, point, 0, 1)
+			cv2.rectangle(copy_redraw_image, tl, rect_pos.RB, 0, 1)
 			cv2.imshow(window, copy_redraw_image)
 		else:
 			cv2.imshow(window, redraw_image)
@@ -181,7 +181,7 @@ def get_area(window: str, image: np.ndarray,
 		# last_data: MouseData = mouse_param.data
 		while not is_reset:
 			mdata: MouseData = mouse_param.data # refer this var in every loop
-			key = cv2.waitKey(20)
+			key = cv2.waitKey(5)
 			if key in [8, 127]: # BS or Del
 				rm_last()
 			#elif key in [ord(" ")]: # Space rect_pos_list.append(mdata.pos) redraw()'''
@@ -224,9 +224,7 @@ def get_area(window: str, image: np.ndarray,
 						# rect_pos_list = [i for i in rect_pos_list if i is not None and i.RB is not None and i.LT is not None]
 
 						# Create a new RectPosList and extend it with the filtered items:
-						filtered = RectPosList()
-						filtered.extend([i for i in rect_pos_list if i is not None and i.RB is not (-1, -1) and i.LT is not (-1, -1)])
-						rect_pos_list = filtered
+						#filtered = RectPosList() filtered.extend([i for i in rect_pos_list if i is not None and i.RB is not (-1, -1) and i.LT is not (-1, -1)]) rect_pos_list = filtered
 						if len(rect_pos_list) == 0:
 							rect_pos.LT = xpos, ypos # x, mdata.y # [0] = pos[0]
 							logger.info("rect_pos.LT is updated as mouse pos:%s", rect_pos.LT)
@@ -251,7 +249,7 @@ def get_area(window: str, image: np.ndarray,
 								# mdata.y # [0] = pos[0]
 						if rect_pos.LT != RectPos.RESET: #is_rect:
 							rect_pos.RB = mdata.pos
-							redraw(rect_pos.RB)
+							redraw(rect_pos)
 						'''image = copy_image.copy()
 							cv2.rectangle(image, (tl_br.TL[0], tl_br.TL[1]), (tl_br.BR[0], tl_br.BR[1]), 0, 1)
 							# is_rect = True
