@@ -103,8 +103,8 @@ class MouseParam:
 
 @dataclass
 class RectPos:
-	TL: tuple[int, int]|None
-	BR: tuple[int, int]|None	
+	LT: tuple[int, int]|None
+	RB: tuple[int, int]|None	
 
 def get_area(window: str, image: np.ndarray,
 	TL_BR_list = [] # TLpos = [0, 0], BRpos = [0, 0]
@@ -137,8 +137,8 @@ def get_area(window: str, image: np.ndarray,
 	class RectPosList(UserList):
 		def append(self, item):
 			assert isinstance(item, RectPos)
-			assert item.TL is not None
-			assert item.BR is not None
+			assert item.LT is not None
+			assert item.RB is not None
 			super().append(item)
 	rect_pos_list: RectPosList = RectPosList() # additional bottom right
 	redraw_image = org_image
@@ -157,8 +157,8 @@ def get_area(window: str, image: np.ndarray,
 			cv2.rectangle(image, tl, br, 0, 2)
 			logger.info("Redraw rectangle:%s, %s", tl, br)
 			redraw_image = image.copy()
-		if point and rect_pos.TL:
-			tl = rect_pos.TL
+		if point and rect_pos.LT:
+			tl = rect_pos.LT
 			copy_redraw_image = redraw_image.copy()
 			cv2.rectangle(copy_redraw_image, tl, point, 0, 1)
 			cv2.imshow(window, copy_redraw_image)
@@ -167,8 +167,8 @@ def get_area(window: str, image: np.ndarray,
 
 	def rm_last():
 		status.first_click = False
-		rect_pos.TL = None
-		rect_pos.BR = None
+		rect_pos.LT = None
+		rect_pos.RB = None
 		logger.info("Reset")
 		status.is_reset = True
 		if rect_pos_list:
@@ -191,11 +191,11 @@ def get_area(window: str, image: np.ndarray,
 		# show if left click
 			match mdata.event:
 				case cv2.EVENT_LBUTTONUP:
-					if rect_pos.TL is not None:
+					if rect_pos.LT is not None:
 						assert is_l_button_down
 						# pos = data.pos # mouseData.getPos()
 						assert mdata.pos is not None
-						rect_pos.BR = mdata.pos
+						rect_pos.RB = mdata.pos
 						rect_pos_list.append(rect_pos)
 						redraw()
 						# tl_br.BR = mdata.x, mdata.y # [0] = pos[0]
@@ -207,21 +207,21 @@ def get_area(window: str, image: np.ndarray,
 							cv2.imshow(window, image)
 							logger.info("Redraw rectangle: %s, %s", tl_br.TL, tl_br.BR)'''
 						is_l_button_down = False
-						rect_pos.TL = rect_pos.BR = None # TLpos = BRpos = None 
+						rect_pos.LT = rect_pos.RB = None # TLpos = BRpos = None 
 				case cv2.EVENT_LBUTTONDOWN:
 					is_l_button_down = True
 					xpos, ypos = mdata.pos # mouse_param.getPos()
-					if not rect_pos.TL: # first_click:
+					if not rect_pos.LT: # first_click:
 						if len(rect_pos_list) == 0:
-							rect_pos.TL = xpos, ypos # x, mdata.y # [0] = pos[0]
+							rect_pos.LT = xpos, ypos # x, mdata.y # [0] = pos[0]
 						else:
-							rect_pos.BR = rect_pos_list[0].BR # y is aligned with the first click pos
+							rect_pos.LT = xpos, rect_pos_list[0].LT[1] # y is aligned with the first click pos
 						# rect_pos_list.append(rect_pos)
 						# TLpos[0] = pos[0] TLpos[1] = pos[1]
 						# first_click = True
-						logger.info("tl_br.TL:%s", rect_pos.TL)
+						logger.info("tl_br.TL:%s", rect_pos.LT)
 				case cv2.EVENT_MOUSEMOVE:
-					if not rect_pos.TL: #first_click: # show XY axis cursor
+					if not rect_pos.LT: #first_click: # show XY axis cursor
 						image = redraw_image.copy()
 						xpos, ypos = mdata.pos # mouse_param.getPos()
 						if len(rect_pos_list) > 0:
@@ -235,8 +235,8 @@ def get_area(window: str, image: np.ndarray,
 						# if len(pos_list) == 1:
 								# mdata.y # [0] = pos[0]
 						# if tl_br.TL: #is_rect:
-						rect_pos.BR = mdata.pos
-						redraw(rect_pos.BR)
+						rect_pos.RB = mdata.pos
+						redraw(rect_pos.RB)
 						'''image = copy_image.copy()
 							cv2.rectangle(image, (tl_br.TL[0], tl_br.TL[1]), (tl_br.BR[0], tl_br.BR[1]), 0, 1)
 							# is_rect = True
@@ -247,7 +247,7 @@ def get_area(window: str, image: np.ndarray,
 				case cv2.EVENT_RBUTTONUP:
 					if not is_reset:
 						# first_click = False
-						rect_pos.TL = rect_pos.BR = None # (0, 0)
+						rect_pos.LT = rect_pos.RB = None # (0, 0)
 						# for p in [TLpos, BRpos]: p[0] = p[1] = 0
 						logger.info("Reset")
 						is_reset = True
