@@ -229,12 +229,13 @@ def get_area(window: str, image: np.ndarray,
 						rect_pos_list = filtered
 						if len(rect_pos_list) == 0:
 							rect_pos.LT = xpos, ypos # x, mdata.y # [0] = pos[0]
+							logger.info("rect_pos.LT is updated as mouse pos:%s", rect_pos.LT)
 						else:
 							rect_pos.LT = xpos, rect_pos_list[0].LT[1] # y is aligned with the first click pos
+							logger.info("rect_pos.LT is updated as mouse xpos only:%s", rect_pos.LT)
 						# rect_pos_list.append(rect_pos)
 						# TLpos[0] = pos[0] TLpos[1] = pos[1]
 						# first_click = True
-						logger.info("tl_br.TL:%s", rect_pos.LT)
 				case cv2.EVENT_MOUSEMOVE:
 					if rect_pos.LT == RectPos.RESET and not len(rect_pos_list): #first_click: # show XY axis cursor
 						image = org_image.copy()
