@@ -102,13 +102,13 @@ class MouseParam:
 		return (self.mouseEvent["x"], self.mouseEvent["y"])
 
 @dataclass
-class TLBRpos:
+class RectPos:
 	TL: tuple[int, int]|None
 	BR: tuple[int, int]|None	
 
 def get_area(window: str, image: np.ndarray,
 	TL_BR_list = [] # TLpos = [0, 0], BRpos = [0, 0]
-) -> list[tuple[int, int]]:
+) -> list[RectPos]:#tuple[int, int]]:
 	''' returns TL_BR(Top-Left, Bottom-Right) tuple list.
 	Quit key set(['Q', 'q', 17]) raises QuitKeyException '''
 	usage = "Drag mouse to select a rectangle area from top-left to bottom-right, (Right click to reset the area), then hit Space key to add a bottom-right position, Esc key to unset last position, finally hit Enter key to submit"	
@@ -125,125 +125,139 @@ def get_area(window: str, image: np.ndarray,
 		is_l_button_down: bool
 		is_reset: bool	
 	status = Status(False, False, False, False)
-	first_click = False
-	is_rect = False
+	# first_click = False
+	# is_rect = False
 	is_l_button_down = False
 	is_reset = False
 
-	tl_br = TLBRpos(None, None)
+	rect_pos = RectPos(None, None)
 	# TLpos: tuple[int, int] | None = None #(0, 0) # top left
 	# BRpos: tuple[int, int] | None = None #(0, 0) # bottom right
-	pos_list: list[tuple[int, int]] = [] # additional bottom right
+	from collections import UserList
+	class RectPosList(UserList):
+		def append(self, item):
+			assert isinstance(item, RectPos)
+			assert item.TL is not None
+			assert item.BR is not None
+			super().append(item)
+	rect_pos_list: RectPosList = RectPosList() # additional bottom right
 	redraw_image = org_image
-	def redraw():
+	def redraw(point: tuple[int, int]|None=None):
 		nonlocal redraw_image
 		nonlocal image
-		pos_step, odd = divmod(len(pos_list), 2)
-		if not pos_step and not odd: #len(pos_list) < 2:
+		# pos_step, odd = divmod(len(rect_pos_list), 2)
+		if not rect_pos_list: # pos_step and not odd: #len(pos_list) < 2:
 			return
 		image = org_image.copy()
-		for p in range(pos_step):#len(pos_list)-1):
-			tl = pos_list[2 * p]
-			br = pos_list[2 * p + 1]
+		for p in range(len(rect_pos_list)):#pos_step):#len(pos_list)-1):
+			tl = rect_pos_list[p].TL #2 * p]
+			br = rect_pos_list[p].BR #2 * p + 1]
+			assert tl is not None
+			assert br is not None
 			cv2.rectangle(image, tl, br, 0, 2)
 			logger.info("Redraw rectangle:%s, %s", tl, br)
-		redraw_image = image.copy()
-		if odd:
-			br = tl_br.BR
-			assert br is not None
-			tl = pos_list[-1]
-			cv2.rectangle(image, tl, br, 0, 1)
-		cv2.imshow(window, image)
+			redraw_image = image.copy()
+		if point and rect_pos.TL:
+			tl = rect_pos.TL
+			copy_redraw_image = redraw_image.copy()
+			cv2.rectangle(copy_redraw_image, tl, point, 0, 1)
+			cv2.imshow(window, copy_redraw_image)
+		else:
+			cv2.imshow(window, redraw_image)
 
 	def rm_last():
 		status.first_click = False
-		tl_br.TL = None
-		tl_br.BR = None
+		rect_pos.TL = None
+		rect_pos.BR = None
 		logger.info("Reset")
 		status.is_reset = True
-		if pos_list:
-			pos_list.pop()
+		if rect_pos_list:
+			rect_pos_list.pop()
 			redraw()
 	try:
 		mouse_param.wait()
-		last_data: MouseData = mouse_param.data
+		# last_data: MouseData = mouse_param.data
 		while not is_reset:
 			mdata: MouseData = mouse_param.data # refer this var in every loop
 			key = cv2.waitKey(20)
 			if key in [8, 127]: # BS or Del
 				rm_last()
-			elif key in [ord(" ")]: # Space
-				pos_list.append(mdata.pos) 
-				redraw()
+			#elif key in [ord(" ")]: # Space rect_pos_list.append(mdata.pos) redraw()'''
 			elif key in [17]: # Esc
 				raise QuitKeyException()
 			elif key in [ord("\n"), ord("\r")]: # Enter
 				is_reset = True
 				break
-			# show if left click
-			try:
-				match mdata.event:
-					case cv2.EVENT_LBUTTONUP:
-						if is_l_button_down:
-							# pos = data.pos # mouseData.getPos()
-							pos_list.append(mdata.pos)
-							redraw()
-							# tl_br.BR = mdata.x, mdata.y # [0] = pos[0]
-							'''if tl_br.TL: #is_rect:
-								image = copy_image.copy()
-								cv2.rectangle(image, (tl_br.TL[0], tl_br.TL[1]), (tl_br.BR[0], tl_br.BR[1]), 0, 1)
-								# second_click = True
-								# is_rect = True
-								cv2.imshow(window, image)
-								logger.info("Redraw rectangle: %s, %s", tl_br.TL, tl_br.BR)'''
-							is_l_button_down = False
-							tl_br.TL = tl_br.BR = None # TLpos = BRpos = None 
-					case cv2.EVENT_LBUTTONDOWN:
-						is_l_button_down = True
-						pos = mdata.pos # mouse_param.getPos()
-						if not tl_br.TL # first_click:
-							tl_br.TL = mdata.pos # x, mdata.y # [0] = pos[0]
-							pos_list.append(mdata.pos)
-							# TLpos[0] = pos[0] TLpos[1] = pos[1]
-							# first_click = True
-							logger.info("tl_br.TL:%s", tl_br.TL)
-					case cv2.EVENT_MOUSEMOVE:
-						if not tl_br.TL: #first_click: # show XY axis cursor
-							image = redraw_image.copy()
-							pos = mouse_param.getPos()
-							image[pos[1], :] = 127
-							image[:, pos[0]] = 127
+		# show if left click
+			match mdata.event:
+				case cv2.EVENT_LBUTTONUP:
+					if rect_pos.TL is not None:
+						assert is_l_button_down
+						# pos = data.pos # mouseData.getPos()
+						assert mdata.pos is not None
+						rect_pos.BR = mdata.pos
+						rect_pos_list.append(rect_pos)
+						redraw()
+						# tl_br.BR = mdata.x, mdata.y # [0] = pos[0]
+						'''if tl_br.TL: #is_rect:
+							image = copy_image.copy()
+							cv2.rectangle(image, (tl_br.TL[0], tl_br.TL[1]), (tl_br.BR[0], tl_br.BR[1]), 0, 1)
+							# second_click = True
+							# is_rect = True
 							cv2.imshow(window, image)
-							continue
-						else: #if is_l_button_down:
-							# pos = mouse_param.getPos()
-							if len(pos_list) == 1:
-								tl_br.BR = mdata.pos # mdata.y # [0] = pos[0]
-							# if tl_br.TL: #is_rect:
-							redraw()
-							'''image = copy_image.copy()
+							logger.info("Redraw rectangle: %s, %s", tl_br.TL, tl_br.BR)'''
+						is_l_button_down = False
+						rect_pos.TL = rect_pos.BR = None # TLpos = BRpos = None 
+				case cv2.EVENT_LBUTTONDOWN:
+					is_l_button_down = True
+					xpos, ypos = mdata.pos # mouse_param.getPos()
+					if not rect_pos.TL: # first_click:
+						if len(rect_pos_list) == 0:
+							rect_pos.TL = xpos, ypos # x, mdata.y # [0] = pos[0]
+						else:
+							rect_pos.BR = rect_pos_list[0].BR # y is aligned with the first click pos
+						# rect_pos_list.append(rect_pos)
+						# TLpos[0] = pos[0] TLpos[1] = pos[1]
+						# first_click = True
+						logger.info("tl_br.TL:%s", rect_pos.TL)
+				case cv2.EVENT_MOUSEMOVE:
+					if not rect_pos.TL: #first_click: # show XY axis cursor
+						image = redraw_image.copy()
+						xpos, ypos = mdata.pos # mouse_param.getPos()
+						if len(rect_pos_list) > 0:
+							ypos = rect_pos_list[0].TL
+						image[ypos, :] = 127
+						image[:, xpos] = 127
+						cv2.imshow(window, image)
+						continue
+					else: #if is_l_button_down:
+						# pos = mouse_param.getPos()
+						# if len(pos_list) == 1:
+								# mdata.y # [0] = pos[0]
+						# if tl_br.TL: #is_rect:
+						rect_pos.BR = mdata.pos
+						redraw(rect_pos.BR)
+						'''image = copy_image.copy()
 							cv2.rectangle(image, (tl_br.TL[0], tl_br.TL[1]), (tl_br.BR[0], tl_br.BR[1]), 0, 1)
 							# is_rect = True
 							cv2.imshow(window, image)
 							logger.info("Redraw rectangle:%s, %s", tl_br.TL, tl_br.BR)'''
 						# image[TLpos[1]:BRpos[1], TLpos[0]:BRpos[0]] &= (255-7)
+				# right click makes to reset
+				case cv2.EVENT_RBUTTONUP:
+					if not is_reset:
+						# first_click = False
+						rect_pos.TL = rect_pos.BR = None # (0, 0)
+						# for p in [TLpos, BRpos]: p[0] = p[1] = 0
+						logger.info("Reset")
+						is_reset = True
+					continue
+	except NoMouseEvent:
+		pass
 
-					# right click makes to reset
-					case cv2.EVENT_RBUTTONUP:
-						if not is_reset:
-							# first_click = False
-							tl_br.TL = tl_br.BR = None # (0, 0)
-							# for p in [TLpos, BRpos]: p[0] = p[1] = 0
-							logger.info("Reset")
-							is_reset = True
-						continue
-			except NoMouseEvent:
-				pass
-			else:
-				last_data = mdata
 	finally:
 		cv2.destroyWindow(window)
-	return [tl_br.TL or (0, 0), tl_br.BR or (0, 0)]
+	return rect_pos_list # [rect_pos.TL or (0, 0), rect_pos.BR or (0, 0)]
 
 if __name__ == "__main__":
 	from sys import argv
@@ -257,8 +271,9 @@ if __name__ == "__main__":
 	
 	#画像の表示
 	#TLpos = [0, 0] BRpos = [0, 0]
-	tl_br = TLBRpos(*get_area(window_name, image)) #, TLpos, BRpos)
-	print(f"TLpos: {tl_br.TL}, BRpos: {tl_br.BR}")
+	rect_list = get_area(window_name, image) #, TLpos, BRpos)
+	from pprint import pprint
+	pprint(rect_list)#f"TLpos: {tl_br.TL}, BRpos: {tl_br.BR}")
 
 '''マウスイベントの種類は以下の通りです．
 
