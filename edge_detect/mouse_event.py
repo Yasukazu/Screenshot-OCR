@@ -94,7 +94,12 @@ class MouseParam:
 	def getPos(self) -> tuple[int, int]:
 		''' mouse (X, Y) co-od. '''
 		return (self.mouseEvent["x"], self.mouseEvent["y"])
-		
+
+@dataclass
+class TLBRpos:
+	TL: tuple[int, int]|None
+	BR: tuple[int, int]|None	
+
 def get_area(window: str, image: np.ndarray,
 	TL_BR_list = [] # TLpos = [0, 0], BRpos = [0, 0]
 ) -> list[tuple[int, int]]:
@@ -118,10 +123,7 @@ def get_area(window: str, image: np.ndarray,
 	is_rect = False
 	is_l_button_down = False
 	is_reset = False
-	@dataclass
-	class TLBRpos:
-		TL: tuple[int, int]|None
-		BR: tuple[int, int]|None
+
 	tl_br = TLBRpos(None, None)
 	# TLpos: tuple[int, int] | None = None #(0, 0) # top left
 	# BRpos: tuple[int, int] | None = None #(0, 0) # bottom right
@@ -226,18 +228,17 @@ if __name__ == "__main__":
 	from sys import argv
 	#入力画像
 	image = cv2.imread(argv[1], cv2.IMREAD_GRAYSCALE)
+	if not image:
+		raise ValueError("Image not found")
 	
 	#表示するWindow名
 	window_name = "HEAD" + ":Left click to set TOp Left point, then keep pressing it(i.e. 'drag'), move mouse to set Bottom Right point, then unpress the left button, then type 's' to save, type 'q' to exit"
 	
 	#画像の表示
-	TLpos = [0, 0]
-	BRpos = [0, 0]
-	get_area(window_name, image, TLpos, BRpos)
-	print(f"TLpos: {TLpos}, BRpos: {BRpos}")
-			
+	#TLpos = [0, 0] BRpos = [0, 0]
+	tl_br = TLBRpos(*get_area(window_name, image)) #, TLpos, BRpos)
+	print(f"TLpos: {tl_br.TL}, BRpos: {tl_br.BR}")
 
-	print(f"Got area rectangle: {TLpos=},{BRpos=}")
 '''マウスイベントの種類は以下の通りです．
 
 EVENT_MOUSEMOVE
