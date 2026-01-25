@@ -103,8 +103,12 @@ class MouseParam:
 
 @dataclass
 class RectPos:
-	LT: tuple[int, int]|None
-	RB: tuple[int, int]|None	
+	RESET = (-1, -1)
+	LT: tuple[int, int]
+	RB: tuple[int, int]
+	def reset(self):
+		self.LT = self.RESET
+		self.RB = self.RESET
 
 def get_area(window: str, image: np.ndarray,
 	TL_BR_list = [] # TLpos = [0, 0], BRpos = [0, 0]
@@ -127,19 +131,19 @@ def get_area(window: str, image: np.ndarray,
 	status = Status(False, False, False, False)
 	# first_click = False
 	# is_rect = False
-	is_l_button_down = False
+	l_button_clicked = False
 	is_reset = False
 
-	rect_pos = RectPos(None, None)
+	rect_pos = RectPos((-1, -1), (-1, -1))
 	# TLpos: tuple[int, int] | None = None #(0, 0) # top left
 	# BRpos: tuple[int, int] | None = None #(0, 0) # bottom right
 	from collections import UserList
 	class RectPosList(UserList):
 		def append(self, item):
 			assert isinstance(item, RectPos)
-			assert item.LT is not None
-			assert item.RB is not None
-			super().append(item)
+			assert item.LT is not (-1, -1)
+			assert item.RB is not (-1, -1)
+			self.data.append(item)
 	rect_pos_list: RectPosList = RectPosList() # additional bottom right
 	redraw_image = org_image
 	def redraw(point: tuple[int, int]|None=None):
@@ -150,8 +154,8 @@ def get_area(window: str, image: np.ndarray,
 			return
 		image = org_image.copy()
 		for p in range(len(rect_pos_list)):#pos_step):#len(pos_list)-1):
-			tl = rect_pos_list[p].TL #2 * p]
-			br = rect_pos_list[p].BR #2 * p + 1]
+			tl = rect_pos_list[p].LT #2 * p]
+			br = rect_pos_list[p].RB #2 * p + 1]
 			assert tl is not None
 			assert br is not None
 			cv2.rectangle(image, tl, br, 0, 2)
@@ -167,8 +171,8 @@ def get_area(window: str, image: np.ndarray,
 
 	def rm_last():
 		status.first_click = False
-		rect_pos.LT = None
-		rect_pos.RB = None
+		rect_pos.LT = (-1, -1)
+		rect_pos.RB = (-1, -1)
 		logger.info("Reset")
 		status.is_reset = True
 		if rect_pos_list:
@@ -191,12 +195,18 @@ def get_area(window: str, image: np.ndarray,
 		# show if left click
 			match mdata.event:
 				case cv2.EVENT_LBUTTONUP:
-					if rect_pos.LT is not None:
-						assert is_l_button_down
+					if l_button_clicked:
+						assert rect_pos.LT is not (-1, -1) 
 						# pos = data.pos # mouseData.getPos()
 						assert mdata.pos is not None
-						rect_pos.RB = mdata.pos
+						if len(rect_pos_list) == 0:
+							rect_pos.RB = mdata.pos
+						else:
+							rect_pos.RB = (mdata.x, rect_pos_list[0].RB[1])
+						assert rect_pos.RB is not (-1, -1)
+						assert rect_pos.LT is not (-1, -1)
 						rect_pos_list.append(rect_pos)
+						logger.info("Rect pos is appended: %s", rect_pos)
 						redraw()
 						# tl_br.BR = mdata.x, mdata.y # [0] = pos[0]
 						'''if tl_br.TL: #is_rect:
@@ -206,12 +216,19 @@ def get_area(window: str, image: np.ndarray,
 							# is_rect = True
 							cv2.imshow(window, image)
 							logger.info("Redraw rectangle: %s, %s", tl_br.TL, tl_br.BR)'''
-						is_l_button_down = False
-						rect_pos.LT = rect_pos.RB = None # TLpos = BRpos = None 
+						l_button_clicked = False
+						rect_pos.LT = rect_pos.RB = (-1, -1) # TLpos = BRpos = None 
 				case cv2.EVENT_LBUTTONDOWN:
-					is_l_button_down = True
+					l_button_clicked = True
 					xpos, ypos = mdata.pos # mouse_param.getPos()
-					if not rect_pos.LT: # first_click:
+					if rect_pos.LT == RectPos.RESET: # first_click:
+						# Instead of:
+						# rect_pos_list = [i for i in rect_pos_list if i is not None and i.RB is not None and i.LT is not None]
+
+						# Create a new RectPosList and extend it with the filtered items:
+						filtered = RectPosList()
+						filtered.extend([i for i in rect_pos_list if i is not None and i.RB is not (-1, -1) and i.LT is not (-1, -1)])
+						rect_pos_list = filtered
 						if len(rect_pos_list) == 0:
 							rect_pos.LT = xpos, ypos # x, mdata.y # [0] = pos[0]
 						else:
@@ -221,11 +238,10 @@ def get_area(window: str, image: np.ndarray,
 						# first_click = True
 						logger.info("tl_br.TL:%s", rect_pos.LT)
 				case cv2.EVENT_MOUSEMOVE:
-					if not rect_pos.LT: #first_click: # show XY axis cursor
-						image = redraw_image.copy()
+					if rect_pos.LT == RectPos.RESET and not len(rect_pos_list): #first_click: # show XY axis cursor
+						image = org_image.copy()
 						xpos, ypos = mdata.pos # mouse_param.getPos()
-						if len(rect_pos_list) > 0:
-							ypos = rect_pos_list[0].TL
+						#if len(rect_pos_list) > 0: ypos = rect_pos_list[0].LT[1]
 						image[ypos, :] = 127
 						image[:, xpos] = 127
 						cv2.imshow(window, image)
@@ -234,9 +250,9 @@ def get_area(window: str, image: np.ndarray,
 						# pos = mouse_param.getPos()
 						# if len(pos_list) == 1:
 								# mdata.y # [0] = pos[0]
-						# if tl_br.TL: #is_rect:
-						rect_pos.RB = mdata.pos
-						redraw(rect_pos.RB)
+						if rect_pos.LT != RectPos.RESET: #is_rect:
+							rect_pos.RB = mdata.pos
+							redraw(rect_pos.RB)
 						'''image = copy_image.copy()
 							cv2.rectangle(image, (tl_br.TL[0], tl_br.TL[1]), (tl_br.BR[0], tl_br.BR[1]), 0, 1)
 							# is_rect = True
@@ -247,7 +263,7 @@ def get_area(window: str, image: np.ndarray,
 				case cv2.EVENT_RBUTTONUP:
 					if not is_reset:
 						# first_click = False
-						rect_pos.LT = rect_pos.RB = None # (0, 0)
+						rect_pos.LT = rect_pos.RB = (-1, -1) # (0, 0)
 						# for p in [TLpos, BRpos]: p[0] = p[1] = 0
 						logger.info("Reset")
 						is_reset = True
