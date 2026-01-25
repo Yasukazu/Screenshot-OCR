@@ -148,20 +148,18 @@ def get_area(window: str, image: np.ndarray,
 	redraw_image = org_image
 	def redraw(point: tuple[int, int]|None=None):
 		nonlocal redraw_image
-		nonlocal image
 		# pos_step, odd = divmod(len(rect_pos_list), 2)
 		if not rect_pos_list: # pos_step and not odd: #len(pos_list) < 2:
 			return
-		image = org_image.copy()
+		redraw_image = org_image.copy()
 		for p in range(len(rect_pos_list)):#pos_step):#len(pos_list)-1):
 			tl = rect_pos_list[p].LT #2 * p]
 			br = rect_pos_list[p].RB #2 * p + 1]
 			assert tl is not None
 			assert br is not None
-			cv2.rectangle(image, tl, br, 0, 2)
+			cv2.rectangle(redraw_image, tl, br, 0, 2)
 			logger.info("Redraw rectangle:%s, %s", tl, br)
-			redraw_image = image.copy()
-		if point and rect_pos.LT:
+		if point and rect_pos.LT is not RectPos.RESET:
 			tl = rect_pos.LT
 			copy_redraw_image = redraw_image.copy()
 			cv2.rectangle(copy_redraw_image, tl, point, 0, 1)
