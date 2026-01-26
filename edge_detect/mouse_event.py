@@ -3,10 +3,11 @@ import sys
 from dataclasses import dataclass # from typing import NamedTuple
 import cv2
 import numpy as np
+import logging
 cwd = Path(__file__).resolve().parent
 sys.path.append(str(cwd.parent))
 from set_logger import set_logger
-logger = set_logger()
+logger = set_logger(debug=True)
 from typing import NamedTuple
 
 class Point(NamedTuple):
@@ -91,6 +92,9 @@ class RectPos:
 			raise ValueError("LT/RB must not be None!")
 		if self.LT.x < 0 or self.LT.y < 0:
 			raise ValueError("LT must not be negative values!")
+	@property
+	def is_half(self):
+		return True if self.RB == Point(*Point.RESET) else False
 	''' def reset(self):
 		self.LT = self.RESET
 		self.RB = self.RESET '''
@@ -100,7 +104,7 @@ def get_area(window: str, image: np.ndarray
 ) -> deque[RectPos]:#tuple[int, int]]:
 	''' returns TL_BR(Top-Left, Bottom-Right) tuple list.
 	Quit key set(['Q', 'q', 17]) raises QuitKeyException '''
-	usage = "Drag mouse to select a rectangle area from top-left to bottom-right, (Right click to reset the area), then hit BS/Del key to unset last position, finally hit Enter key to submit"	
+	usage = "select a rectangle area from top-left to bottom-right, dragging mouse to draw rectangle (Right click to reset the area), then hit BS/Del key to unset last position, finally hit Enter key to submit"	
 	print(usage)
 	org_image = image.copy()
 	cv2.imshow(window, image)
@@ -122,7 +126,7 @@ def get_area(window: str, image: np.ndarray
 	rect_pos: RectPos | None = None 
 	rect_pos_list: deque[RectPos] = deque()
 	redraw_image = org_image
-	def redraw(rect_pos: RectPos|None=None):
+	def redraw(option_pt: Point|None=None):
 		nonlocal redraw_image
 		# pos_step, odd = divmod(len(rect_pos_list), 2)
 		if not rect_pos_list: # pos_step and not odd: #len(pos_list) < 2:
@@ -134,11 +138,11 @@ def get_area(window: str, image: np.ndarray
 			assert tl is not None
 			assert br is not None
 			cv2.rectangle(redraw_image, tl, br, 0, 2)
-			logger.info("Redraw rectangle:%s, %s", tl, br)
+			logger.debug("Listed rectangle:%s, %s", tl, br)
 		if rect_pos:
-			tl = rect_pos.LT
 			copy_redraw_image = redraw_image.copy()
-			cv2.rectangle(copy_redraw_image, tl, rect_pos.RB, 0, 1)
+			cv2.rectangle(copy_redraw_image, rect_pos.LT, option_pt, 0, 1)
+			logger.debug("Optional rectangle:%s, %s", rect_pos.LT, option_pt)
 			cv2.imshow(window, copy_redraw_image)
 		else:
 			cv2.imshow(window, redraw_image)
@@ -147,14 +151,14 @@ def get_area(window: str, image: np.ndarray
 		nonlocal rect_pos
 		status.first_click = False
 		rect_pos = None
-		logger.info("Reset")
+		logger.debug("Reset")
 		status.is_reset = True
 		if rect_pos_list:
 			rect_pos_list.pop()
 			redraw()
 	try:
 		mouse_param.wait()
-		# last_data: MouseData = mouse_param.data
+		last_data: MouseData = mouse_param.data
 		while not is_reset:
 			mdata: MouseData = mouse_param.data # refer this var in every loop
 			key = cv2.waitKey(5)
@@ -178,7 +182,7 @@ def get_area(window: str, image: np.ndarray
 						else:
 							rect_pos = RectPos(LT=rect_pos.LT, RB = Point(mdata.x, rect_pos_list[0].RB[1]))
 						rect_pos_list.append(rect_pos)
-						logger.info("Rect pos is appended: %s", rect_pos)
+						logger.debug("Rect pos is appended: %s", rect_pos)
 						redraw()
 						# tl_br.BR = mdata.x, mdata.y # [0] = pos[0]
 						'''if tl_br.TL: #is_rect:
@@ -196,22 +200,23 @@ def get_area(window: str, image: np.ndarray
 					if rect_pos is None: # first_click:
 						if len(rect_pos_list) == 0:
 							rect_pos = RectPos(LT=Point(xpos, ypos)) # x, mdata.y # [0] = pos[0]
-							logger.info("rect_pos.LT is updated as mouse pos:%s", rect_pos.LT)
+							logger.debug("rect_pos.LT is updated as mouse pos:%s", rect_pos.LT)
 						else:
 							rect_pos = RectPos(LT=Point(xpos, rect_pos_list[0].LT[1])) # y is aligned with the first click pos
-							logger.info("rect_pos.LT is updated as mouse xpos only:%s", rect_pos.LT)
+							logger.debug("rect_pos.LT is updated as mouse xpos only:%s", rect_pos.LT)
 				case cv2.EVENT_MOUSEMOVE:
-					if rect_pos is None: # and len(rect_pos_list) == 0: #first_click: # show XY axis cursor
-						image = redraw_image.copy()
-						xpos, ypos = mdata.pos # mouse_param.getPos()
-						#if len(rect_pos_list) > 0: ypos = rect_pos_list[0].LT[1]
-						image[ypos, :] = 127
-						image[:, xpos] = 127
-						cv2.imshow(window, image)
-						continue
-					else: 
-						rect_pos = RectPos(LT=rect_pos.LT, RB = mdata.pos)
-						redraw(rect_pos)
+					if dist(mdata.pos, last_data.pos) > 2: 
+						if rect_pos is None or rect_pos.is_half: # and len(rect_pos_list) == 0: #first_click: # show XY axis cursor
+							image = redraw_image.copy()
+							xpos, ypos = mdata.pos # mouse_param.getPos()
+							#if len(rect_pos_list) > 0: ypos = rect_pos_list[0].LT[1]
+							image[ypos, :] = 0
+							image[:, xpos] = 0
+							cv2.imshow(window, image)
+							# logger.debug("Show XY axis cursor at %s, %s", xpos, ypos)
+						else: 
+							redraw(mdata.pos)
+			last_data = mdata
 
 	except NoMouseEvent:
 		pass
@@ -219,6 +224,9 @@ def get_area(window: str, image: np.ndarray
 	finally:
 		cv2.destroyWindow(window)
 	return rect_pos_list # [rect_pos.TL or (0, 0), rect_pos.BR or (0, 0)]
+
+def dist(p1, p2):
+	return ((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2) ** 0.5
 
 if __name__ == "__main__":
 	from sys import argv
