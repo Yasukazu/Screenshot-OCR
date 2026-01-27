@@ -7,7 +7,7 @@ from io import IOBase
 from pathlib import Path
 from datetime import date
 from typing import Iterator, Sequence, NamedTuple
-from dataclasses import dataclass, field
+from dataclasses import astuple, dataclass, field
 from enum import Enum, StrEnum, auto
 from datetime import date as Date
 import sys
@@ -162,10 +162,18 @@ class ImageAreaParam(TOMLDataclass):
 		from mouse_event import get_area, QuitKeyException
 
 		try:
-			TLpos, BRpos = get_area(f"{cls.__name__}", image)
-		except QuitKeyException as e:
+			point_list = get_area(f"{cls.__name__}", image) # TLpos, BRpos 
+			left = point_list.popleft()
+			TLpos, BRpos = astuple(left)
+			param = [TLpos[1], BRpos[1] - TLpos[1], BRpos[0]]
+			for rect in point_list:
+				TLpos, BRpos = astuple(rect)
+				param.append(TLpos[1])
+				param.append(BRpos[1] - TLpos[1])
+		except (QuitKeyException, IndexError) as e:
 			raise GetAreaParamException() from e
-		return cls(y_offset=TLpos[1], height = BRpos[1] - TLpos[1], x_offset=BRpos[0])#offset_range.start, height=offset_range.stop - offset_range.start)
+		return cls.from_param(param)
+		# return cls(y_offset=TLpos[1], height = BRpos[1] - TLpos[1], x_offset=BRpos[0])#offset_range.start, height=offset_range.stop - offset_range.start)
 
 	@property
 	def param(self)-> list[int]:

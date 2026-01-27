@@ -243,6 +243,11 @@ if __name__ == "__main__":
 	rect_list = get_area(window_name, image) #, TLpos, BRpos)
 	from pprint import pprint
 	pprint(rect_list)#f"TLpos: {tl_br.TL}, BRpos: {tl_br.BR}")
+	from image_filter import ImageAreaParam
+	from dataclasses import astuple
+	TLpos, BRpos = astuple(rect_list[0])
+	area_param = ImageAreaParam(y_offset=TLpos[1], height = BRpos[1] - TLpos[1], x_offset=BRpos[0])
+	print(f"{area_param=}")
 
 '''マウスイベントの種類は以下の通りです．
 
