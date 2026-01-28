@@ -162,14 +162,14 @@ class ImageAreaParam(TOMLDataclass):
 		from mouse_event import get_area, QuitKeyException
 
 		try:
-			point_list = get_area(f"{cls.__name__}", image) # TLpos, BRpos 
-			left = point_list.popleft()
+			rect_list = get_area(f"{cls.__name__}", image) # TLpos, BRpos 
+			left = rect_list.popleft()
 			TLpos, BRpos = astuple(left)
-			param = [TLpos[1], BRpos[1] - TLpos[1], BRpos[0]]
-			for rect in point_list:
+			param = [TLpos[1], BRpos[1] - TLpos[1], BRpos[0], BRpos[0] - TLpos[0]]
+			for rect in rect_list:
 				TLpos, BRpos = astuple(rect)
-				param.append(TLpos[1])
-				param.append(BRpos[1] - TLpos[1])
+				param.append(BRpos[0])
+				param.append(BRpos[0] - TLpos[0])
 		except (QuitKeyException, IndexError) as e:
 			raise GetAreaParamException() from e
 		return cls.from_param(param)

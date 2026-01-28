@@ -246,8 +246,14 @@ if __name__ == "__main__":
 	pprint(rect_list)#f"TLpos: {tl_br.TL}, BRpos: {tl_br.BR}")
 	from image_filter import ImageAreaParam
 	from dataclasses import astuple
-	TLpos, BRpos = astuple(rect_list[0])
-	area_param = ImageAreaParam(y_offset=TLpos[1], height = BRpos[1] - TLpos[1], x_offset=BRpos[0])
+	left = rect_list.popleft()
+	TLpos, BRpos = astuple(left)
+	param = [TLpos[1], BRpos[1] - TLpos[1], BRpos[0], BRpos[0] - TLpos[0]]
+	for rect in rect_list:
+		TLpos, BRpos = astuple(rect)
+		param.append(BRpos[0])
+		param.append(BRpos[0] - TLpos[0])
+	area_param = ImageAreaParam.from_param(param) # y_offset=TLpos[1], height = BRpos[1] - TLpos[1], x_offset=BRpos[0])
 	print(f"{area_param=}")
 
 '''マウスイベントの種類は以下の通りです．
