@@ -59,12 +59,14 @@ class OCRFilter:
 		for b in borders[1:]:
 			ratio_list.append(b.stop / base_len)
 		return ratio_list
-	
+	from cv2.typing import MatLike	
 	@classmethod
-	def get_borders(cls, image: np.ndarray | Path | str, thresh=237, min_bunch=1, max_bunch=10, check_image=False) -> tuple[int, list[range], np.ndarray]:
+	def get_borders(cls, image: MatLike | Path | str, thresh=237, min_bunch=1, max_bunch=10, check_image=False) -> tuple[int, list[range], np.ndarray]:
 		from image_filter import get_horizontal_border_bunches
-		image = image if isinstance(image, np.ndarray) else cv2.imread(str(image))
-		# if not image: raise ValueError("Failed to load image")
+		if isinstance(image, Path) or isinstance(image, str):
+			image = cv2.imread(str(image))
+		if image is None or image.size == 0:
+			raise ValueError("Failed to load image")
 		bin_image = cv2.threshold(image, thresh, 255, cv2.THRESH_BINARY)[1]
 		border_offset_list: Deque[tuple[int, int]] = deque()
 		# find borders as bunches

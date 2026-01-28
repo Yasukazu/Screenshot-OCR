@@ -196,22 +196,23 @@ def get_area(window: str, image: np.ndarray
 						rect_pos = None
 				case cv2.EVENT_LBUTTONDOWN:
 					l_button_clicked = True
-					xpos, ypos = mdata.pos # mouse_param.getPos()
+					x_pos, ypos = mdata.pos # mouse_param.getPos()
 					if rect_pos is None: # first_click:
 						if len(rect_pos_list) == 0:
-							rect_pos = RectPos(LT=Point(xpos, ypos)) # x, mdata.y # [0] = pos[0]
+							rect_pos = RectPos(LT=Point(x_pos, ypos)) # x, mdata.y # [0] = pos[0]
 							logger.debug("rect_pos.LT is updated as mouse pos:%s", rect_pos.LT)
 						else:
-							rect_pos = RectPos(LT=Point(xpos, rect_pos_list[0].LT[1])) # y is aligned with the first click pos
+							rect_pos = RectPos(LT=Point(x_pos, rect_pos_list[0].LT[1])) # y is aligned with the first click pos
 							logger.debug("rect_pos.LT is updated as mouse xpos only:%s", rect_pos.LT)
 				case cv2.EVENT_MOUSEMOVE:
 					if dist(mdata.pos, last_data.pos) > 2: 
 						if rect_pos is None or rect_pos.is_half: # and len(rect_pos_list) == 0: #first_click: # show XY axis cursor
 							image = redraw_image.copy()
-							xpos, ypos = mdata.pos # mouse_param.getPos()
-							#if len(rect_pos_list) > 0: ypos = rect_pos_list[0].LT[1]
-							image[ypos, :] = 0
-							image[:, xpos] = 0
+							x_pos, y_pos = mdata.pos # mouse_param.getPos()
+							if x_pos >= 0 and y_pos >= 0:
+								cv2.line(image, (x_pos, 0), (x_pos, image.shape[0]), 0, 1)
+								cv2.line(image, (0, y_pos), (image.shape[1], y_pos), 0, 1)
+							# image[ypos, :] = 0
 							cv2.imshow(window, image)
 							# logger.debug("Show XY axis cursor at %s, %s", xpos, ypos)
 						else: 

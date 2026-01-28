@@ -1166,6 +1166,9 @@ def main(
 		help='make a image area param config file from image in TOML format(i.e. this arg. makes not to use param configs in any config file;  specify image_area_param values like "--image_area_param heading:0,106,196,-1"',
 	)
 	parser.add_argument(
+		"--bin_image", action="store_true", default=False, help="Use binarized image for OCR"
+	)
+	parser.add_argument(
 		"--no-ocr", action="store_true", default=False, help="Do not execute OCR"
 	)
 	parser.add_argument(
@@ -1556,7 +1559,7 @@ def main(
 		)
 		# extract border ratio from app_border_ratio
 		is_image_border_ratio_OK = True
-		for ratio in args.app_border_ratio:
+		for ratio in args.app_border_ratio.split(' '):
 			area_name, v = ratio.split(":")
 			if area_name == args.app.name.lower():
 				config_border_ratios = [float(i) for i in v.split(",")]
@@ -1660,7 +1663,7 @@ def main(
 		col_list = []
 		print(f"[{ocr_area_name}]")
 		for col, ocr_area in enumerate(
-			area_param.crop_image(app_filter.image[app_filter.y_margin :, :], 0)#app_filter.y_margin)
+			area_param.crop_image(bin_image if args.bin_image else app_filter.image[app_filter.y_margin :, :], 0)#app_filter.y_margin)
 		):
 			if args.show_ocr_area:
 				_plot([ocr_area, app_filter.image[app_filter.y_margin :, :]])
