@@ -116,12 +116,19 @@ type Int4 = tuple[int, int, int, int]
 class GetAreaParamException(Exception):
 	pass
 
+# @dataclass
+class XOffsetWidth(NamedTuple):
+	x_offset: int
+	width: int | None = None
+
 @dataclass
 class ImageAreaParam(TOMLDataclass):
 	y_offset: int = 0
 	height: int | None = None
 	x_offset: int = 0
 	width: int | None = None
+	x_offset_width_list: list[XOffsetWidth] = field(default_factory=list)
+
 
 	# param: ItemAreaParam # NamedTuple:read only
 
@@ -140,11 +147,21 @@ class ImageAreaParam(TOMLDataclass):
 	@classmethod
 	def from_param(cls, param: Sequence[int]) -> "ImageAreaParam":
 		''' new from a sequence of int '''
-		match len(param):
+		x_offset_width_list = []
+		if not len(param):
+			raise ValueError("No parameter")
+		elif len(param) <= 4:
+			return cls(*list(param))
+		else: # len(param) > 4:
+			extra_param_pairs = (len(param) - 4) // 2
+			for p in range(extra_param_pairs):
+				x_offset_width_list.append(XOffsetWidth(param[4 + p * 2], param[4 + p * 2 + 1]))
+		return cls(param[0], param[1], param[2], param[3], x_offset_width_list)
+		''' match len(param):
 			case num if num in range(1, 4):
-				return cls(*(list(param) + [-1, 0, -1][:num - 4]))
+				
 			case _:
-				return cls(*param)
+				return cls(*param) '''
 
 	def __post_init__(self):
 		if self.height is not None:
@@ -177,6 +194,10 @@ class ImageAreaParam(TOMLDataclass):
 
 	@property
 	def param(self)-> list[int]:
+		# if len(self.x_offset_width_list) > 0:
+		x_offset_width_chain = [i if i else -1 for x in self.x_offset_width_list for i in x]
+		if x_offset_width_chain:
+			return [self.y_offset, self.height or -1, self.x_offset, self.width or -1, *x_offset_width_chain]
 		return [self.y_offset, self.height or -1, self.x_offset, self.width or -1]
 
 
@@ -279,7 +300,9 @@ def get_center_run_length(line: Sequence[int]) -> int | None:
 @dataclass
 class ShiftAreaParam(ImageAreaParam):
 	''' adding to super, x_offset2 for shift end '''
-	x_offset2: int = 0
+	@property
+	def x_offset2(self) -> int:
+		return self.x_offset_width_list[0][0]
 
 	@property
 	def param(self)-> list[int]:
@@ -332,8 +355,9 @@ class ShiftAreaParam(ImageAreaParam):
 
 	@classmethod
 	def from_image(cls, image: np.ndarray, offset_range: range, image_check:bool=False) -> "ShiftAreaParam":
+		from .image_area_param import XOffsetWidth
 		left, right = cls.check_image(image=image[offset_range.start:offset_range.stop, :], image_check=image_check)
-		return cls(y_offset=offset_range.start, height=offset_range.stop - offset_range.start, x_offset=0, width=left, x_offset2=right)
+		return cls(y_offset=offset_range.start, height=offset_range.stop - offset_range.start, x_offset=0, width=left, x_offset_width_list=[XOffsetWidth(right, -1)])
 
 
 	@property
