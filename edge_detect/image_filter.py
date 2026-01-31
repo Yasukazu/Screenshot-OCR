@@ -1039,6 +1039,7 @@ COMMON_ENV_FILE_NAME = COMMON_ENV_FILE_STEM + ENV_FILE_EXT
 ENV_FILE_STEMS = ["image-filter", "ocr-filter"]
 ENV_FILE_NAMES = [n + ENV_FILE_EXT for n in ENV_FILE_STEMS]
 ENV_PREFIXES = ["IMAGE_FILTER_", "OCR_FILTER_"]
+ENV_PREFIX = ENV_PREFIXES[0]
 def startswith_prefixes(s, prefixes=ENV_PREFIXES):
 	for prefix in prefixes:
 		if s.startswith(prefix):
@@ -1046,7 +1047,16 @@ def startswith_prefixes(s, prefixes=ENV_PREFIXES):
 
 CONFIG_FILE_STEM = "image-filter"
 IMAGE_AREA_PARAM_STR = "image_area_param"
-def main(
+
+import typed_settings as tst
+@tst.settings
+class MainSettings:
+	image_ext: str = tst.option(help='Image file extension', default='.png')
+	image_dir: str = tst.option(help='Directory of image files', default='~/github/screen/DATA/')
+	app_name_to_stem_end: dict[str, str] = tst.option(help='Dictionary of app name to stem end', default={'taimee': '_jp.co.taimee', 'mercari': '_jp.mercari.work.android'})
+
+# @tst.cli(MainSettings, "image_filter")
+def main(#settings: MainSettings,
 	config_dir = '', config_file_stem = CONFIG_FILE_STEM, config_file_ext_enum = ConfigFileExt, image_area_param_file_stem = IMAGE_AREA_PARAM_STR.replace('_', '-'),
 	env_files = ENV_FILE_NAMES,
 	common_env_file = COMMON_ENV_FILE_NAME,
@@ -1091,6 +1101,15 @@ def main(
 		from os import environ as os_environ
 		os_environ.update(env_values)
 		logger.info("Environment values updated from %s as: %s", used_env_files, env_values)
+	
+	settings_files = ["image_filter.toml"]
+	if usecwd:
+		from os import getcwd
+		settings_dir = Path(getcwd())
+	else:
+		settings_dir = Path(__file__).parent
+	settings_files = [f"!{settings_dir / f}" for f in settings_files]
+	settings = tst.load(MainSettings, "image_filter", settings_files)
 	from taimee_filter import TaimeeFilter
 	APP_NAME_TO_FILTER_CLASS = {APP_NAME.TAIMEE: TaimeeFilter}
 	OCR_FILTER = "ocr-filter"
@@ -1114,7 +1133,7 @@ def main(
 		),
 	)
 	parser.add_argument(
-		"--image_ext", nargs="+", default=[".png"], env_var="IMAGE_FILTER_IMAGE_EXT"
+		"--image_ext", nargs="+", default=[".png"], env_var=ENV_PREFIX + "IMAGE_EXT"
 	)
 	parser.add_argument(
 		"--image_dir",
@@ -1736,7 +1755,7 @@ def main(
 			# database = make_sqlite_db(file=str(db_fullpath.name), folder=str(db_fullpath.parent))
 			month: int = month_day.month
 			day: int = month_day.day
-			year: int = get_data_year(month)
+			year: int = get_data_yearmain()(month)
 			inserted_item = insert_ocr_data(str(db_fullpath),
 				args.app, year, month, day, doc_dict, image_file
 			)
