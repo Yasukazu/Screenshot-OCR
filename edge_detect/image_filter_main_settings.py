@@ -1,8 +1,8 @@
 import typed_settings as tst
 @tst.settings
 class MainSettings:
-	image_ext: str = tst.option(help='Image file extension', default='.png')
-	image_dir: str = tst.option(help='Directory of image files', default='~/github/screen/DATA/')
+	# image_ext: str = tst.option(help='Image file extension', default='.png')
+	# image_dir: str = tst.option(help='Directory of image files', default='~/github/screen/DATA/')
 	app_name_to_stem_end: dict[str, str] = tst.option(help='Dictionary of app name to stem end', default={'taimee': '_jp.co.taimee', 'mercari': '_jp.mercari.work.android'})
 	image_ext: list[str] = tst.option( nargs="+", default=[".png"], env_var=ENV_PREFIX + "IMAGE_EXT"
 	)
@@ -17,8 +17,7 @@ class MainSettings:
 		env_var="IMAGE_FILTER_SHOT_MONTH",
 		help='Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD]) included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like "[1,2,..]" )',
 	)
-	parser.add_argument(
-		"files",
+	files: list[str] = tst.option(
 		nargs="*",
 		help="Image file fullpaths to commit OCR or to get parameters.",
 	)
