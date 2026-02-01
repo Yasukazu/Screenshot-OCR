@@ -1,4 +1,3 @@
-import typed_settings as tst
 def image_area_param_names():
 	from image_filter import ImageAreaParamName
 	return list(ImageAreaParamName)
@@ -6,6 +5,7 @@ def app_names():
 	from image_filter import APP_NAME
 	return [n.name.lower() for n in APP_NAME]
 
+import typed_settings as tst
 @tst.settings
 class MainSettings:
 	"""
