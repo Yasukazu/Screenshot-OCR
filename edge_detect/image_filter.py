@@ -1104,29 +1104,28 @@ def main(
 		for stem in [config_file_stem]
 	]  # image_area_param_file_stem]]# if f.exists()]
 	default_config_files = [p for p in default_config_paths if p.exists()]
-	parser = ArgParser(
-		default_config_files=default_config_files,
+	from simple_parsing import ArgumentParser
+	parser = ArgumentParser()
+		'''default_config_files=default_config_files,
 		config_file_parser_class=CompositeConfigParser(
 			[
 				TomlConfigParser(config_sections),
 				IniConfigParser(config_sections, split_ml_text_to_list=True),
 			]
 		),
-	)
+	)'''
 	parser.add_argument(
-		"--image_ext", nargs="+", default=[".png"], env_var="IMAGE_FILTER_IMAGE_EXT"
+		"--image_ext", nargs="+", default=[".png"]
 	)
 	parser.add_argument(
 		"--image_dir",
 		default="~/Documents/screenshots",
-		env_var="IMAGE_FILTER_IMAGE_DIR",
 		type=Path,
 	)
 	parser.add_argument(
 		"--shot_month",
 		action="append",
 		type=int,
-		env_var="IMAGE_FILTER_SHOT_MONTH",
 		help='Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD]) included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like "[1,2,..]" )',
 	)
 	parser.add_argument(
@@ -1136,18 +1135,16 @@ def main(
 	)
 	parser.add_argument(
 		"--app_stem_end",
-		env_var="IMAGE_FILTER_APP_STEM_END",
 		default="taimee:_jp.co.taimee mercari:_jp.mercari.work.android",
 		help='Screenshot image file name pattern of the screenshot to execute OCR:(specified in format as "<app_name1>:<stem_end1>,<stem_end2> ..." )',
 	)
 	parser.add_argument(
 		"--image_area_param_section_stem",
-		env_var="IMAGE_AREA_PARAM_SECTION_STEM ",
+		#env_var="IMAGE_AREA_PARAM_SECTION_STEM ",
 		default="image_area_param",
 	)
 	parser.add_argument(
 		"--app_border_ratio",
-		env_var="IMAGE_FILTER_APP_BORDER_RATIO",
 		default="taimee:2.2,3.2",
 		nargs="*",
 		help='Screenshot image file horizontal border ratio list of the app to execute OCR:(specified in format as "<app_name1>:<ratio1>,<ratio2> ..." )',
@@ -1163,7 +1160,6 @@ def main(
 	parser.add_argument(
 		"--app",
 		choices=[n.name.lower() for n in APP_NAME],
-		env_var="IMAGE_FILTER_APP_NAME",
 		help=f"Application name of the screenshot to execute OCR: choices={', '.join(n.name.lower() for n in APP_NAME)}",
 	)  #
 	# parser.add_argument('--toml', help=f'Configuration toml file name like {OCR_FILTER}')
@@ -1203,18 +1199,15 @@ def main(
 		"--area_param_dir",
 		help="Screenshot image area parameter config file directory",
 		type=Path,
-		env_var="IMAGE_FILTER_AREA_PARAM_DIR",
 	)
 	parser.add_argument(
 		"--area_param_file",
 		help='Screenshot image area parameter config file: format as INI or TOML(".ini" or ".toml" extention respectively): in [image_area_param.<app>] section, items as "<area_name>=[<p1>,<p2>,<p3>,<p4>]" (e.g. "heading=[0,106,196,-1]")',
 		type=Path,
-		env_var="IMAGE_FILTER_AREA_PARAM_FILE",
 		default="image-area-param.ini",
 	)
 	parser.add_argument(
 		"--ocr_filter_sqlite_db_name",
-		env_var="OCR_FILTER_SQLITE_DB_NAME",
 		default="ocr-filter.db",
 		help="SQLite DB file is created under `image_dir`/{yyyy} directory(yyyy is like 2025)",
 	)
