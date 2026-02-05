@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 # import typed_settings as tst
 def image_area_param_names():
 	from image_filter import ImageAreaParamName
@@ -16,13 +16,16 @@ class MainSettings:
 	# image_ext: str = help='Image file extension', default='.png')
 	# image_dir: str = help='Directory of image files', default='~/github/screen/DATA/')
 
+	app_names: list[str] = field(default_factory=app_names) 
+	"""Application names of the screenshot to execute OCR"""
+	#.format(','.join(app_names()))
 	app: str = 'nil' #: choices={', '.join(app_names())} 
 	"""Application name of the screenshot to execute OCR"""
 
 	app_name_to_stem_end: dict[str, str] = field(default_factory=lambda: {'taimee': '_jp.co.taimee', 'mercari': '_jp.mercari.work.android'})
 	"""Dictionary of 'app name' to 'stem end': 'stem' means the part of the filename before the extension"""
 
-	image_ext_set: set[str] = field(default_factory=lambda:set("png"))
+	image_ext_set: set[str] = field(default_factory=lambda:set([".png"]))
 	"""Image file extension set, every extention starts with dot (default is {'.png'})"""
 	image_dir: str = "~/Documents/screenshots"
 	"""Image file root directory"""
@@ -35,7 +38,7 @@ class MainSettings:
 	image_area_param_section_stem: str = "image_area_param"
 	app_border_ratio: dict[str, list[float]] = field( default_factory=lambda:{"taimee":[2.2,3.2]})
 	"""Screenshot image file horizontal border ratio list of the app to execute OCR:(specified in format as "<app_name1>:<ratio1>,<ratio2> ..." )"""
-	app_suffix: bool = True
+	app_suffix: bool = False
 	"""Screenshot image file name has suffix(sub extention) of the same as app name i.e. "<stem>.<suffix>.<ext>" (default: True)"""
 	save: str = ''
 	"""Output path to save OCR text of the image file as TOML format into the image file name extention as '.ocr-<app_name>.toml' """
@@ -65,10 +68,14 @@ class MainSettings:
 	"""Month of data (like -1, 0, 1, 2, ...). 0 means current month, negative value is difference from current month (like -1 means last month), positive value means month number (1: Jan, 2: Feb, ...);If this value is larger than current month, data's date is treated as the last year."""
 	show_ocr_area: bool = False
 	"""Show every area before commit OCR"""
-	exclude_area_param_set: list[str] = field(default_factory=list) # { {f'{n}' for n in image_area_param_names()} }
+	exclude_area_param_set: set[str] = field(default_factory=set) # { {f'{n}' for n in image_area_param_names()} }
 	"""Exclude a set of image area parameter names"""
 
+from typing import Callable
+def append_doc(fd):
+	return f"{fd}:{fd.default_factory()}"
+MainSettings.__doc__ = MainSettings.__doc__ or '' + "\n".join([append_doc(fd) for fd in fields(MainSettings) if callable(fd.default_factory)])
 if __name__ == '__main__':
 	from dataclass_binder import Binder
-	for line in Binder(MainSettings).format_toml_template():
+	for line in Binder(MainSettings()).format_toml_template(): # Need to generate an instance to get default values of default factory
 		print(line)
