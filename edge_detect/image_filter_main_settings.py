@@ -8,9 +8,10 @@ def app_names():
 	return ['NIL', 'TAIMEE', 'MERCARI']#[n.name.lower() for n in APP_NAME]
 def area_param_names():
 	return ['HEADING', 'SHIFT', 'BREAKTIME', 'PAYSTUB', 'SALARY']
+def default_factories():
+	return [app_names, area_param_names]
 @dataclass
 class MainSettings:
-	from image_filter import APP_NAME
 	"""
 	Extract/OCR paystub text from an image file: Needs to specify the image file for OCR by 'files' option with app-name-suffix in wildcard(like '--files *.<APP_NAME>*.png') or by 'shot-month' option (like '--shot_month -1' for last month, 0 for current month, other positive value for month number: Jan. is 1, Dec. is 12, ...) and 'app' option (like '--app taim')
 	"""
