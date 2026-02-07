@@ -4,22 +4,24 @@ def image_area_param_names():
 	from image_filter import ImageAreaParamName
 	return list(ImageAreaParamName)
 def app_names():
-	from image_filter import APP_NAME
-	return [n.name.lower() for n in APP_NAME]
-
+	#from image_filter import APP_NAME
+	return ['NIL', 'TAIMEE', 'MERCARI']#[n.name.lower() for n in APP_NAME]
+def area_param_names():
+	return ['HEADING', 'SHIFT', 'BREAKTIME', 'PAYSTUB', 'SALARY']
 @dataclass
 class MainSettings:
 	from image_filter import APP_NAME
 	"""
-	Extract/OCR paystub text from an image file: Needs to specify the image file for OCR by files option (like '--files *.APP_NAME.png') or by shot_month option (like '--shot_month 1 2 3')
+	Extract/OCR paystub text from an image file: Needs to specify the image file for OCR by 'files' option with app-name-suffix in wildcard(like '--files *.<APP_NAME>*.png') or by 'shot-month' option (like '--shot_month -1' for last month, 0 for current month, other positive value for month number: Jan. is 1, Dec. is 12, ...) and 'app' option (like '--app taim')
 	"""
 	# image_ext: str = help='Image file extension', default='.png')
 	# image_dir: str = help='Directory of image files', default='~/github/screen/DATA/')
 
-	app_names: list[str] = field(default_factory=app_names) 
-	"""Application names of the screenshot to execute OCR"""
-	#.format(','.join(app_names()))
-	app: str = 'nil' #: choices={', '.join(app_names())} 
+	app_name_to_suffix: dict[str, str] = field(default_factory=lambda: {"taimee":{"co", "taimee"}, "mercari":{"mercari", "work"}})
+	"""Screenshot image file suffix set: suffix is the part of filename before extention, delimiter is dot (.)"""
+	app_names: list[str] = field(default_factory=app_names)
+	"""Application name list"""
+	app: str|None = None #: choices={', '.join(app_names())} 
 	"""Application name of the screenshot to execute OCR"""
 
 	app_name_to_stem_end: dict[str, str] = field(default_factory=lambda: {'taimee': '_jp.co.taimee', 'mercari': '_jp.mercari.work.android'})
@@ -33,8 +35,7 @@ class MainSettings:
 	"""Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD]) included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like "[1,2,..]"""
 	glob_pattern: str = "*.png"
 	"""Image file name pattern as glob pattern to commit OCR or to get parameters."""
-	app_name_to_suffix_set: dict[str, set[str]] = field(default_factory=lambda: {"taimee":{"co", "taimee"}, "mercari":{"mercari", "work"}})
-	"""Screenshot image file name endswith of the sclass APP_NAME(StrEnum): (specified in format as "<app_name1>:<stem_end1>,<stem_end2> ..." )"""
+
 	image_area_param_section_stem: str = "image_area_param"
 	app_border_ratio: dict[str, list[float]] = field( default_factory=lambda:{"taimee":[2.2,3.2]})
 	"""Screenshot image file horizontal border ratio list of the app to execute OCR:(specified in format as "<app_name1>:<ratio1>,<ratio2> ..." )"""
@@ -60,6 +61,8 @@ class MainSettings:
 	"""PSM value for Tesseract"""
 	area_param_dir: str = ''
 	"""Screenshot image area parameter config file directory"""
+	area_param_name_list: list[str] = field(default_factory=area_param_names)
+	"""Screenshot image area parameter name list"""
 	area_param_file: str = "image-area-param.ini"
 	"""Screenshot image area parameter config file: format as INI or TOML(".ini" or ".toml" extention respectively): in [image_area_param.<app>] section, items as "<area_name>=[<p1>,<p2>,<p3>,<p4>]" (e.g. "heading=[0,106,196,-1]") """
 	ocr_filter_sqlite_db_name: str = "ocr-filter.db"
@@ -75,7 +78,11 @@ from typing import Callable
 def append_doc(fd):
 	return f"{fd}:{fd.default_factory()}"
 MainSettings.__doc__ = MainSettings.__doc__ or '' + "\n".join([append_doc(fd) for fd in fields(MainSettings) if callable(fd.default_factory)])
-if __name__ == '__main__':
+def main():
 	from dataclass_binder import Binder
 	for line in Binder(MainSettings()).format_toml_template(): # Need to generate an instance to get default values of default factory
-		print(line)
+		yield(line)
+
+if __name__ == '__main__':
+	#print(MainSettings.__doc__)
+	print('\n'.join(main()))
