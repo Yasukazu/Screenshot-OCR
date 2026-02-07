@@ -275,9 +275,19 @@ values which override defaults.
 ## Dynamic enum
 `dev-dataclass-binder` branch
 
-`dyn_enum/app_name.py`
-
 - `image_filter_main_settings.py`: `MainSettings` dataclass
+
 ```Python
-config = Binder(MainSettings).parse_toml(config_file)
+from dataclass_binder import Binder
+# Generate a TOML template
+with open("config.toml", "wb") as f:
+  for line in Binder(MainSettings()).format_toml_template(): # Need to generate an instance to get default values of default factory
+      f.write(line)
+# Bind(Load as a dictionary and generate a dataclass instance) a TOML file
+with open("config.toml", "rb") as f:
+    config = tomllib.load(f)
+main_settings = Binder(MainSettings).bind(config["main-settings"])
 ```
+
+### Test of dynamic enum
+`dyn_enum/get_enum.py`
