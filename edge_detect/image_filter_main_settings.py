@@ -10,15 +10,13 @@ def area_param_names():
 	return ['HEADING', 'SHIFT', 'BREAKTIME', 'PAYSTUB', 'SALARY']
 def default_factories():
 	return [app_names, area_param_names]
-@dataclass
+@dataclass(kw_only=True)
 class MainSettings:
 	"""
-	Extract/OCR paystub text from an image file: Needs to specify the image file for OCR by 'files' option with app-name-suffix in wildcard(like '--files *.<APP_NAME>*.png') or by 'shot-month' option (like '--shot_month -1' for last month, 0 for current month, other positive value for month number: Jan. is 1, Dec. is 12, ...) and 'app' option (like '--app taim')
+	Extract/OCR paystub text from an image file: Files for OCR by 'files' option may be specified with app-name-suffix in wildcard(glob pattern matching like '--files *.<APP_NAME>*.png') or by 'shot-month' option (like '--shot_month -1' for last month, 0 for current month, other positive value for month number: Jan. is 1, Dec. is 12, ...) and 'app' option (like '--app taimee')
 	"""
-	# image_ext: str = help='Image file extension', default='.png')
-	# image_dir: str = help='Directory of image files', default='~/github/screen/DATA/')
 
-	app_name_to_suffix: dict[str, str] = field(default_factory=lambda: {"taimee":{"co", "taimee"}, "mercari":{"mercari", "work"}})
+	app_name_to_suffix: dict[str, set[str]] = field(default_factory=lambda: {"taimee":{"co", "taimee"}, "mercari":{"mercari", "work"}})
 	"""Screenshot image file suffix set: suffix is the part of filename before extention, delimiter is dot (.)"""
 	app_names: list[str] = field(default_factory=app_names)
 	"""Application name list"""
