@@ -34,14 +34,20 @@ cwd = Path(__file__).resolve().parent
 sys.path.insert(0, str(cwd.parent))
 from set_logger import set_logger
 logger = set_logger(__name__)
-
-class APP_NAME(Enum):
-	''' name of app: value is stem end '''
+from image_filter_main_settings import load_main_settings
+try:
+	MAIN_SETTINGS = load_main_settings()
+except Exception as e:
+	logger.error(f"Failed to load main settings: {e}")
+	raise
+APP_NAME = Enum('APP_NAME', MAIN_SETTINGS.app_names)
+'''class APP_NAME(Enum):
+	""" name of app: value is stem end """
 	TAIMEE = auto()
 	MERCARI = auto()
 
 	def __str__(self):
-		return self.name.lower()
+		return self.name.lower() '''
 
 class AppNameToEnum(TypedDict):
 	key: str
