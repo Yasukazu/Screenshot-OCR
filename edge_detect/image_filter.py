@@ -1364,7 +1364,7 @@ def main(#settings: MainSettings,
 
 		ocr_area_name = f"ocr-{area_name.name}"
 		# area_tbl = table() area_tbl.add(comment(area_name)) area_tbl.add(nl())
-		area_dict = {}
+		# area_dict = {}
 		col_list = []
 		print(f"[{ocr_area_name}]")
 		for col, ocr_area in enumerate(
@@ -1410,6 +1410,19 @@ def main(#settings: MainSettings,
 			for p, col in enumerate(col_list):
 				# col_str = f"p{p+1}"
 				area_dict[p] = '\n'.join(col) """
+	def get_data_year(month: int = 0):
+		if args.data_year == 0:
+			cur_month = Date.today().month
+			if month <= 0:
+				month = cur_month + month
+			if not(1 <= month <= 12):
+				raise ValueError("month must be in range(1, 13) or 0 or less than 0")
+			cur_year = Date.today().year
+			if month <= cur_month:
+				return cur_year
+			else:
+				return cur_year - 1
+		return args.data_year
 	if args.ocr_filter_sqlite_db_name and month_day is not None:
 		from ocr_filter_model import insert_ocr_data
 		try:
@@ -1446,56 +1459,6 @@ def main(#settings: MainSettings,
 			wf.write(toml_text)
 		logger.info("Saved toml file into: %s\n%s", save_path, toml_text)
 
-	if args.make:
-		make_path = (
-			Path(args.make + ".toml")
-			if not args.make.endswith(".toml")
-			else Path(args.make)
-		)  # Path(args.toml)
-
-		from tomlkit.toml_file import TOMLFile
-		from tomlkit import table
-
-		config_file: TOMLFile | None = None
-		if make_path.exists():
-			try:
-				config_file = TOMLFile(make_path)  # get_filter_config()
-				org_config = config_file.read()
-			except Exception as e:
-				logger.error("Failed to load existing TOML file %s: %s", make_path, e)
-				raise MakeError(
-					f"Failed to load existing TOML file {make_path}: {e}"
-				) from e
-			else:
-				logger.info("config is loaded from: %s", make_path)
-		else:
-			org_config = TOMLDocument()
-			logger.info("config is created")
-		# from io import StringIO
-		# sio = StringIO()
-		# with make_path.open('w') as wf: # dump(doc, wf)
-		# label = f"[ocr-filter.{str(app_name)}]"
-		# print(label, file=wf)
-		# print(f"[ocr-filter.{label}]", file=wf)
-		from tomlkit import container as TKContainer
-
-		ocr_filter_table = (
-			org_config.get(OCR_FILTER)
-			or org_config.add(OCR_FILTER, table())[OCR_FILTER]
-		)
-		org_area_dict: dict = ocr_filter_table[args.app] if ocr_filter_table else {}
-		for key, param in app_filter.param_dict.items():
-			different = False
-			area_name = key.name.lower()
-		# logger.info("Image area parameters are saved into %s\nas: %s", make_path, sio.read())
-		# print("[ocr-filter.taimee]")
-		# print(sio.read())
-	# --toml ocr-filter
-	"""[ocr-filter.taimee]
-HeadingAreaParam = [0, 111, 196, -1]
-ShiftAreaParam = [219, 267, 345, 373]
-BreaktimeAreaParam = [488, 224, 0, 720]
-PaystubAreaParam = [714, -1, 0, -1]"""
 
 def _is_interactive():
 	"""Decide whether this is running in a REPL or IPython notebook"""

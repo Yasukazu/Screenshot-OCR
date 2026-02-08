@@ -50,7 +50,8 @@ class MainSettings:
 	files: list[str] = field(default_factory=list)
 	"""Image file name list to commit OCR or to get parameters. Every file name's pattern is: <prefix>_<date>_<suffix>.<ext>"""
 
-	image_area_param_section_stem: str = "image_area_param"
+	image_area_param_section_stem: str = "image-area-param"
+	"""Image area parameter section/table in image-area-param.ini"""
 	app_border_ratio: dict[str, list[float]] = field( default_factory=lambda:{"taimee":[2.2,3.2]})
 	"""Screenshot image file horizontal border ratio list of the app to execute OCR:(specified in format as "<app_name1>:<ratio1>,<ratio2> ..." )"""
 	app_suffix: bool = False
@@ -63,8 +64,7 @@ class MainSettings:
 	"""Pick up file max as pattern found in TOML"""
 	show: bool = False
 	"""Show images to check"""
-	make: bool = False
-	"""make a image area param config file from image in TOML format(i.e. this arg. makes not to use param configs in any config file;  specify image_area_param values like "--image_area_param heading:0,106,196,-1"""
+
 	bin_image: bool = False
 	"""Use binarized image for OCR"""
 	no_ocr: bool = False
@@ -81,6 +81,8 @@ class MainSettings:
 	"""Screenshot image area parameter config file: format as INI or TOML(".ini" or ".toml" extention respectively): in [image_area_param.<app>] section, items as "<area_name>=[<p1>,<p2>,<p3>,<p4>]" (e.g. "heading=[0,106,196,-1]") """
 	ocr_filter_sqlite_db_name: str = "ocr-filter.db"
 	"""SQLite DB file is created under `image_dir`/{yyyy} directory(yyyy is like 2025)"""
+	data_year: int = 0
+	"""Year of data (like -1, 0, 2025, ...). 0 means current year, negative value is difference from current year (like -1 means last year), positive value means a.d. year number (like 2025);If this value is larger than current year, an exception might be raised."""
 	data_month: int = 0
 	"""Month of data (like -1, 0, 1, 2, ...). 0 means current month, negative value is difference from current month (like -1 means last month), positive value means month number (1: Jan, 2: Feb, ...);If this value is larger than current month, data's date is treated as the last year."""
 	show_ocr_area: bool = False
