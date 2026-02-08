@@ -203,7 +203,7 @@ class ImageAreaParam(TOMLDataclass):
 	@property
 	def param(self)-> list[int]:
 		# if len(self.x_offset_width_list) > 0:
-		x_offset_width_chain = [i if i else -1 for x in self.x_offset_width_list for i in x]
+		x_offset_width_chain = [i if i else -1 for x in list(self.x_offset_width_list) for i in astuple(x)]
 		if x_offset_width_chain:
 			return [self.y_offset, self.height or -1, self.x_offset, self.width or -1, *x_offset_width_chain]
 		return [self.y_offset, self.height or -1, self.x_offset, self.width or -1]
@@ -1183,6 +1183,7 @@ def main(#settings: MainSettings,
 	bin_image = None
 	# check ratios
 	
+	y_margin = 0
 	if args.app == APP_NAME.TAIMEE:
 		from ocr_filter import OCRFilter
 
@@ -1308,21 +1309,27 @@ def main(#settings: MainSettings,
 				logger.info("Try to get area params from image: %s", image.shape)
 				from mouse_event import get_area, QuitKeyException
 				try:
-					TL, BR = get_area(area_name.name, image)
+					areas = get_area(area_name.name, image)
 				except QuitKeyException:
 					logger.warning(
 						"Failed to get area from image for %s", area_name.name
 					)
 					continue
 				else:
+					TL, BR = astuple(areas.popleft())
+					#if len(areas) > 1: offset_width_list = areas[1:]
 					param_obj = ImageAreaParam(
-						TL[1] + y_margin, BR[1] - TL[1], TL[0], BR[0] - TL[0]
+						TL[1] + y_margin,
+						BR[1] - TL[1],
+						TL[0],
+						BR[0] - TL[0],
+						areas
 					)
 					area_param_dict[area_name] = param_obj
 		return area_param_dict
 
 	# if not param_dict:
-	param_dict = fill_area_param_dict(param_dict, image=bin_image[y_margin:, :], exclude_set=args.exclude_area_param_set) #, y_margin=y_margin)
+	param_dict = fill_area_param_dict(param_dict, image=image[y_margin:, :], exclude_set=args.exclude_area_param_set) #, y_margin=y_margin)
 	section = ".".join([args.image_area_param_section_stem + "." + args.app])
 	area_param_config = param_config if param_config is not None else ConfigParser()
 	area_param_config[section] = {k: f"{v.param}" for k, v in param_dict.items()}
