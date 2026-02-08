@@ -1,3 +1,4 @@
+""" MainSettings by DataclassBinder"""
 from pathlib import Path
 import tomllib
 from typing import Any, Callable, Iterator
@@ -44,6 +45,10 @@ class MainSettings:
 	"""Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD]) included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like "[1,2,..]"""
 	glob_pattern: str = "*.png"
 	"""Image file name pattern as glob pattern to commit OCR or to get parameters."""
+	glob_recursive: bool = True
+	"""Recursive glob pattern matching"""
+	files: list[str] = field(default_factory=list)
+	"""Image file name list to commit OCR or to get parameters. Every file name's pattern is: <prefix>_<date>_<suffix>.<ext>"""
 
 	image_area_param_section_stem: str = "image_area_param"
 	app_border_ratio: dict[str, list[float]] = field( default_factory=lambda:{"taimee":[2.2,3.2]})
