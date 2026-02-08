@@ -40,6 +40,8 @@ try:
 except Exception as e:
 	logger.error(f"Failed to load main settings: {e}")
 	raise
+else:
+	logger.info(f"Loaded main settings: {MAIN_SETTINGS}")
 APP_NAME = Enum('APP_NAME', MAIN_SETTINGS.app_names)
 '''class APP_NAME(Enum):
 	""" name of app: value is stem end """
@@ -1060,7 +1062,7 @@ def get_args(settings_files):
 	return args
 #import typed_settings as tst
 #@tst.settings
-
+from configargparse import ArgParser
 from os import environ as os_environ
 # @tst.cli(MainSettings, "image_filter")
 def main(#settings: MainSettings,
@@ -1115,13 +1117,34 @@ def main(#settings: MainSettings,
 	else:
 		settings_dir = Path(__file__).parent
 	settings_file = settings_dir / settings_file
-	args = get_args([settings_file])
+	parser = ArgParser(default_config_files=[settings_file])
+	parser.add_argument('--files', type=str, nargs='*')
+	opts, unknown_args = parser.parse_known_args()
+	args = MAIN_SETTINGS #get_args([settings_file])
 	from taimee_filter import TaimeeFilter
 	APP_NAME_TO_FILTER_CLASS = {APP_NAME.TAIMEE: TaimeeFilter}
 	OCR_FILTER = "ocr-filter"
 
 	image_path_dir: Path | None = None
-
+	if not args.files and args.image_dir and args.glob_pattern:
+		args.image_dir = Path(args.image_dir).expanduser()
+		args.files = [str(p) for p in (Path(args.image_dir).rglob(args.glob_pattern) if args.glob_recursive else Path(args.image_dir).glob(args.glob_pattern))]
+	if opts.files:
+		for file in opts.files:
+			args.files.append(file)
+	if not args.files:
+		logger.info("No files selected")
+		raise ValueError("No files selected")
+	def is_screenshot_file(file: Path)-> bool:
+		if not file.is_file() or not file.exists():
+			return False
+		if file.suffix not in args.image_ext_set:
+			return False
+		if set([s.strip('.') for s in file.suffixes[:-1]]) & set([n.name.lower() for n in APP_NAME]):
+			return True
+		return False
+	args.files = [f for f in args.files if is_screenshot_file(Path(f))]
+	args.files.sort(key=lambda x: Path(x).stat().st_mtime, reverse=True)
 	try:
 		_file = args.files[args.nth - 1]
 		image_file = image_path_dir / _file if image_path_dir else Path(_file).expanduser()
