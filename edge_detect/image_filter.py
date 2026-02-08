@@ -1292,6 +1292,34 @@ def main(#settings: MainSettings,
 			)
 		else:
 			logger.error("Failed to get filter parameters: %s", exception)
+	def fill_area_param_dict(
+		area_param_dict: dict[ImageAreaParamName, ImageAreaParam] = {},
+		image: np.ndarray | None = None,
+		exclude_set: set[ImageAreaParamName] = set(),
+		y_margin: int = 0
+	) -> dict[ImageAreaParamName, ImageAreaParam]:
+		for key in exclude_set:
+			area_param_dict.pop(key, None)
+		for area_name in set(ImageAreaParamName):
+			if area_name not in area_param_dict:
+				if image is None or image.size == 0:
+					logger.error("Image is None or size 0")
+					raise ValueError("Image is None or size 0")
+				logger.info("Try to get area params from image: %s", image.shape)
+				from mouse_event import get_area, QuitKeyException
+				try:
+					TL, BR = get_area(area_name.name, image)
+				except QuitKeyException:
+					logger.warning(
+						"Failed to get area from image for %s", area_name.name
+					)
+					continue
+				else:
+					param_obj = ImageAreaParam(
+						TL[1] + y_margin, BR[1] - TL[1], TL[0], BR[0] - TL[0]
+					)
+					area_param_dict[area_name] = param_obj
+		return area_param_dict
 
 	# if not param_dict:
 	param_dict = fill_area_param_dict(param_dict, image=bin_image[y_margin:, :], exclude_set=args.exclude_area_param_set) #, y_margin=y_margin)
