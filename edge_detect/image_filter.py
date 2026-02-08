@@ -1399,16 +1399,12 @@ def main(#settings: MainSettings,
 				df_list.append(line)  # '\n'.join(line))
 			ocr_text_lines = [" ".join(df["text"]) for df in df_list]
 			if args.ocr_filter_sqlite_db_name and area_name == ImageAreaParamName.SHIFT:
-				# from tool_pyocr import MDateError
-				month_day_hours = (
-					app_filter_class.extract_month_day_and_hours_from_shift_area_text(
-						ocr_text_lines
-					)
-				)
-				if is_successful(month_day_hours):
-					month_day, hours = month_day_hours.unwrap()
-				else:
+				from tool_pyocr import MDateError
+				try:
+					month_day, hours = app_filter_class.extract_month_day_and_hours_from_shift_area_text( ocr_text_lines)
+				except (MDateError, AttributeError):
 					month_day = None
+					hours = None
 			print(f"{col_str}={ocr_text_lines}")
 			col_list.append(ocr_text_lines)
 			doc_dict[area_name] = "\n".join(["\t".join(col) for col in col_list])
