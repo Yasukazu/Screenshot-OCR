@@ -1211,6 +1211,50 @@ def main(#settings: MainSettings,
 	param_dict: dict[ImageAreaParamName, ImageAreaParam] = {}
 	section = None
 	param_config = None
+	@safe
+	def get_image_area_params_section(
+		app=args.app,
+		section_stem=args.image_area_param_section_stem,
+		area_param_file=args.area_param_file,
+	) -> SectionProxy:
+		"""Get image area parameters' section of ConfigParser"""
+		nonlocal _image_area_params
+		if _image_area_params is not None:
+			return _image_area_params
+		area_param_config = ConfigParser()
+		section = f"{section_stem}.{app}"
+		try:
+			with open(area_param_file, encoding="utf8") as rf:
+				area_param_config.read_file(rf)
+				try:
+					_image_area_params = area_param_config[section]
+				except KeyError as e:
+					logger.warning(
+						"Failed to read area parameter file %s: %s", area_param_file, e
+					)
+					raise ConfigKeyException(
+						"Failed to read area parameter section",
+						key=section,
+						config=area_param_config,
+					) from e
+		except (TypeError, FileNotFoundError) as e:
+			logger.error(
+				"Area parameter file is %s: %s",
+				"None" if isinstance(e, TypeError) else "not found",
+				area_param_file,
+			)
+			raise ConfigError(
+				"Area parameter file is %s: %s"
+				% ("None" if isinstance(e, TypeError) else "not found", area_param_file)
+			) from e
+
+		except NoSectionError:
+			logger.warning("Failed to read area parameter file %s", area_param_file)
+			raise  # ConfigError("Failed to read area parameter file %s" % args.area_param_file) from e
+		else:
+			return _image_area_params
+
+
 	# try:
 	area_params_section = get_image_area_params_section()
 	if is_successful(area_params_section):
