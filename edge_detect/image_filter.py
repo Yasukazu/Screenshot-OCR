@@ -1119,6 +1119,7 @@ def main(#settings: MainSettings,
 	settings_file = settings_dir / settings_file
 	parser = ArgParser(default_config_files=[settings_file])
 	parser.add_argument('--files', type=str, nargs='*')
+	parser.add_argument('--app', type=str, choices=[n.name.lower() for n in APP_NAME])
 	opts, unknown_args = parser.parse_known_args()
 	args = MAIN_SETTINGS #get_args([settings_file])
 	from taimee_filter import TaimeeFilter
@@ -1135,15 +1136,20 @@ def main(#settings: MainSettings,
 	if not args.files:
 		logger.info("No files selected")
 		raise ValueError("No files selected")
-	def is_screenshot_file(file: Path)-> bool:
+	def is_screenshot_file(file: Path, app: str)-> bool:
 		if not file.is_file() or not file.exists():
 			return False
 		if file.suffix not in args.image_ext_set:
 			return False
+		if app:
+			if app in [s.strip('.') for s in file.suffixes[:-1]]:
+				return True
+			else:
+				return False
 		if set([s.strip('.') for s in file.suffixes[:-1]]) & set([n.name.lower() for n in APP_NAME]):
 			return True
 		return False
-	args.files = [f for f in args.files if is_screenshot_file(Path(f))]
+	args.files = [f for f in args.files if is_screenshot_file(Path(f), opts.app)]
 	args.files.sort(key=lambda x: Path(x).stat().st_mtime, reverse=True)
 	try:
 		_file = args.files[args.nth - 1]
