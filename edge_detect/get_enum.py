@@ -9,10 +9,12 @@ IMAGE_FILTER_MAIN_SETTINGS_FILE = 'IMAGE_FILTER_MAIN_SETTINGS_FILE'
 def get_enum(enum_name: str, key_name: str, config_file: str = IMAGE_FILTER_MAIN_SETTINGS_FILE) -> Enum:
 	try:
 		main_config_file = dotenv_values()[config_file]
+		if not main_config_file:
+			raise ValueError(f"Environment variable {config_file} is not set or empty")
 		with open(main_config_file, 'rb') as f:
 			main_config = load_toml(f)
 		return Enum(enum_name, main_config[key_name])
-	except (TypeError, KeyError) as e:
+	except (KeyError) as e:
 		print(f"Not set {IMAGE_FILTER_MAIN_SETTINGS_FILE}: {e}", file=stderr)
 		raise ValueError(f"Not set {IMAGE_FILTER_MAIN_SETTINGS_FILE}: {e}") from e
 	except FileNotFoundError as e:

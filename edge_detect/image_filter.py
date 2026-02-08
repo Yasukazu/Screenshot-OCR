@@ -8,7 +8,7 @@ from pathlib import Path
 from datetime import date
 from typing import Iterator, Sequence, NamedTuple
 from dataclasses import astuple, dataclass, field
-from enum import Enum, StrEnum, auto
+from enum import Enum, auto
 from datetime import date as Date
 import sys
 import atexit
@@ -35,9 +35,8 @@ sys.path.insert(0, str(cwd.parent))
 from set_logger import set_logger
 logger = set_logger(__name__)
 
-class APP_NAME(StrEnum):
+class APP_NAME(Enum):
 	''' name of app: value is stem end '''
-	NIL = ''
 	TAIMEE = auto()
 	MERCARI = auto()
 
@@ -430,8 +429,8 @@ class ImageFilterAreas:
 	paystub: PaystubAreaParam # meisai
 	salary: SalaryAreaParam # kyuuyo
 	y_offset: int = 0
-
-class ImageAreaParamName(StrEnum):
+from enum import IntEnum
+class ImageAreaParamName(IntEnum):
 	HEADING = auto() # HeadingAreaParam
 	SHIFT = auto() # ShiftAreaParam
 	BREAKTIME = auto() # BreaktimeAreaParam
@@ -1023,7 +1022,7 @@ from os.path import join as os_path_join
 from typing import Any
 from dotenv import dotenv_values, find_dotenv
 
-class ConfigFileExt(StrEnum):	
+class ConfigFileExt(Enum):	
 	TOML = auto()
 	INI = auto()
 	CFG = auto()

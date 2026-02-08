@@ -8,15 +8,19 @@ readme = "README.md"
 dependencies = [
     "camel-converter>=5.0.0",
     "classopt>=0.2.1",
+    "click>=8.2.1",
     "config-argument-parser>=1.5.1",
     "configargparse>=1.7.1",
     "console-menu>=0.8.0",
+    "dataclass-binder>=0.3.5",
     "dataset>=1.5.2",
     "fancy-dataclass>=0.10.1",
+    "flet[all]>=0.80.4",
     "img2pdf>=0.5.1,<0.6.0",
     "jsonargparse>=4.45.0",
     "logbook>=1.8.2",
     "matplotlib>=3.9.4",
+    "nicegui>=3.6.1",
     "numpy>=2.0.2",
     "opencv-python>=4.12.0.88",
     "pandas>=2.2.3",
@@ -31,9 +35,13 @@ dependencies = [
     "pyyaml>=6.0.3",
     "remi>=2022.7.27",
     "returns>=0.23.0",
+    "simple-parsing>=0.1.8",
+    "streamlit>=1.53.1",
+    "streamlit-drawable-canvas>=0.9.3",
     "tomli-w>=1.2.0",
     "tomlkit>=0.13.3",
     "typed-argument-parser>=1.11.0",
+    "typed-settings>=25.3.0",
     "typedal>=4.3.5",
 ]
 
@@ -58,6 +66,8 @@ dev = [
     "sqlacodegen>=3.2.0",
     "config-argument-parser>=1.5.3",
     "typed-argument-parser>=1.11.0",
+    "flet[all]>=0.80.4",
+    "tkeasygui>=1.0.36",
 ]
 
 [build-system]

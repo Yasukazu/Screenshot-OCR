@@ -99,7 +99,7 @@ def init_database(db_path: str, pragmas={'foreign_keys': 1}) -> DatabaseProxy:
 def insert_ocr_data(db_path: str, app: APP_NAME, year: int, month: int, day: int, data: dict[ImageAreaParamName, str], file: Path, hours:Sequence[str]|None=None) -> DatabaseProxy | None:
 	database_proxy = init_database(db_path)
 
-	app_obj, created = App.get_or_create(name=app)
+	app_obj, created = App.get_or_create(name=app.name.lower())
 	if created:
 		logger.info("Created app: %s as app_obj: %s", app, app_obj)
 	resolved_root = str(file.parent.resolve()) 

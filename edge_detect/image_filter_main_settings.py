@@ -1,11 +1,16 @@
+from pathlib import Path
+import tomllib
+from typing import Any, Callable, Iterator
 from dataclasses import dataclass, field, fields
+from enum import Enum
+from dataclass_binder import Binder
 # import typed_settings as tst
 def image_area_param_names():
 	from image_filter import ImageAreaParamName
 	return list(ImageAreaParamName)
 def app_names():
 	#from image_filter import APP_NAME
-	return ['NIL', 'TAIMEE', 'MERCARI']#[n.name.lower() for n in APP_NAME]
+	return ['TAIMEE', 'MERCARI']#[n.name.lower() for n in APP_NAME]
 def area_param_names():
 	return ['HEADING', 'SHIFT', 'BREAKTIME', 'PAYSTUB', 'SALARY']
 def default_factories():
@@ -16,12 +21,17 @@ class MainSettings:
 	Extract/OCR paystub text from an image file: Files for OCR by 'files' option may be specified with app-name-suffix in wildcard(glob pattern matching like '--files *.<APP_NAME>*.png') or by 'shot-month' option (like '--shot_month -1' for last month, 0 for current month, other positive value for month number: Jan. is 1, Dec. is 12, ...) and 'app' option (like '--app taimee')
 	"""
 
+	@classmethod
+	def from_dict(cls, toml_dict: dict[str, Any]) -> 'MainSettings':
+		return Binder(MainSettings).bind(toml_dict)
 	app_name_to_suffix: dict[str, set[str]] = field(default_factory=lambda: {"taimee":{"co", "taimee"}, "mercari":{"mercari", "work"}})
 	"""Screenshot image file suffix set: suffix is the part of filename before extention, delimiter is dot (.)"""
-	app_names: list[str] = field(default_factory=app_names)
+	app_names: list[str] = field(default_factory=lambda: ['TAIMEE', 'MERCARI'])
 	"""Application name list"""
 	app: str|None = None #: choices={', '.join(app_names())} 
 	"""Application name of the screenshot to execute OCR"""
+	def app_name_enum(self, module)-> type[Enum]:
+		return Enum('APP_NAME', self.app_names, module=module)
 
 	app_name_to_stem_end: dict[str, str] = field(default_factory=lambda: {'taimee': '_jp.co.taimee', 'mercari': '_jp.mercari.work.android'})
 	"""Dictionary of 'app name' to 'stem end': 'stem' means the part of the filename before the extension"""
@@ -69,19 +79,31 @@ class MainSettings:
 	data_month: int = 0
 	"""Month of data (like -1, 0, 1, 2, ...). 0 means current month, negative value is difference from current month (like -1 means last month), positive value means month number (1: Jan, 2: Feb, ...);If this value is larger than current month, data's date is treated as the last year."""
 	show_ocr_area: bool = False
-	"""Show every area before commit OCR"""
+	"""Show every area before to commit OCR"""
 	exclude_area_param_set: set[str] = field(default_factory=set) # { {f'{n}' for n in image_area_param_names()} }
 	"""Exclude a set of image area parameter names"""
 
-from typing import Callable
 def append_doc(fd):
 	return f"{fd}:{fd.default_factory()}"
 MainSettings.__doc__ = MainSettings.__doc__ or '' + "\n".join([append_doc(fd) for fd in fields(MainSettings) if callable(fd.default_factory)])
-def main():
+def main_settings_from_dict(toml_dict: dict[str, Any]) -> MainSettings:
+	return Binder(MainSettings).bind(toml_dict)
+def toml_lines()-> Iterator[str]:
 	from dataclass_binder import Binder
 	for line in Binder(MainSettings()).format_toml_template(): # Need to generate an instance to get default values of default factory
 		yield(line)
-
+def load_main_settings(filename: str = "", table: str = "")-> MainSettings:
+	if not filename:
+		filename = str(get_toml_path())
+	with open(filename, "rb") as f:
+		config = tomllib.load(f)
+	main_settings = Binder(MainSettings).bind(config[table] if table else config)
+	return main_settings
+def get_toml_path()-> Path:
+	"""Get the default TOML filename"""
+	node = Path(__file__)
+	toml = node.parent / (node.stem.replace('_', '-') + '.toml')
+	return toml
 if __name__ == '__main__':
 	#print(MainSettings.__doc__)
-	print('\n'.join(main()))
+	print('\n'.join(toml_lines()))
