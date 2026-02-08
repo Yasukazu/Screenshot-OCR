@@ -1133,16 +1133,25 @@ def main(#settings: MainSettings,
 	if opts.files:
 		for file in opts.files:
 			args.files.append(file)
+	if opts.app:
+		try:
+			app = opts.app
+			opts.app = APP_NAME[opts.app.upper()]
+		except KeyError:
+			opts.app = None
+		else:
+			args.app = app
+
 	if not args.files:
 		logger.info("No files selected")
 		raise ValueError("No files selected")
-	def is_screenshot_file(file: Path, app: str)-> bool:
+	def is_screenshot_file(file: Path, app: APP_NAME|None)-> bool:
 		if not file.is_file() or not file.exists():
 			return False
 		if file.suffix not in args.image_ext_set:
 			return False
 		if app:
-			if app in [s.strip('.') for s in file.suffixes[:-1]]:
+			if app.name.lower() in [s.strip('.') for s in file.suffixes[:-1]]:
 				return True
 			else:
 				return False
@@ -1183,21 +1192,19 @@ def main(#settings: MainSettings,
 		)
 		# extract border ratio from app_border_ratio
 		is_image_border_ratio_OK = True
-		for ratio in args.app_border_ratio.split(' '):
-			area_name, v = ratio.split(":")
-			if area_name == args.app.name.lower():
-				config_border_ratios = [float(i) for i in v.split(",")]
+		for area_name, v in args.app_border_ratio.items():
+			if area_name == args.app:
+				config_border_ratios = [float(i) for i in v]
 				for n, r in enumerate(config_border_ratios):
 					if abs(1 - r / image_border_ratios[n]) > 0.1:
 						logger.warning(
 							"Warning: image_border_ratio differs significantly from config_border_ratio %s",
 							r,
 						)
-						is_image_border_ratio_OK = False
-						# filter_area_param_dict = {}
+						is_image_border_ratio_OK = False # TODO: not used this variable
 						logger.info(
 							"No use of default filter parameters due to border ratio mismatch for %s",
-							args.app.name.lower(),
+							args.app
 						)
 
 	try:
@@ -1211,6 +1218,8 @@ def main(#settings: MainSettings,
 	param_dict: dict[ImageAreaParamName, ImageAreaParam] = {}
 	section = None
 	param_config = None
+	_image_area_params: SectionProxy | None = None
+
 	@safe
 	def get_image_area_params_section(
 		app=args.app,
@@ -1279,7 +1288,7 @@ def main(#settings: MainSettings,
 			param_config = exception.config
 			logger.warning(
 				"Going to get filter parameters manually due to config error for %s",
-				args.app.name.lower(),
+				args.app
 			)
 		else:
 			logger.error("Failed to get filter parameters: %s", exception)
@@ -1380,7 +1389,7 @@ def main(#settings: MainSettings,
 			# database = make_sqlite_db(file=str(db_fullpath.name), folder=str(db_fullpath.parent))
 			month: int = month_day.month
 			day: int = month_day.day
-			year: int = get_data_yearmain()(month)
+			year: int = get_data_year(month)
 			inserted_item = insert_ocr_data(str(db_fullpath),
 				args.app, year, month, day, doc_dict, image_file
 			)
