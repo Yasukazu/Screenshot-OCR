@@ -203,7 +203,7 @@ class ImageAreaParam(TOMLDataclass):
 	@property
 	def param(self)-> list[int]:
 		# if len(self.x_offset_width_list) > 0:
-		x_offset_width_chain = [i if i else -1 for x in list(self.x_offset_width_list) for i in astuple(x)]
+		x_offset_width_chain = [i if i else -1 for x in list(self.x_offset_width_list) for i in (x.x_offset, x.width)] # astuple
 		if x_offset_width_chain:
 			return [self.y_offset, self.height or -1, self.x_offset, self.width or -1, *x_offset_width_chain]
 		return [self.y_offset, self.height or -1, self.x_offset, self.width or -1]
@@ -1120,6 +1120,7 @@ def main(#settings: MainSettings,
 	parser = ArgParser(default_config_files=[settings_file])
 	parser.add_argument('--files', type=str, nargs='*')
 	parser.add_argument('--app', type=str, choices=[n.name.lower() for n in APP_NAME])
+	parser.add_argument('--nth', type=int, default=1)
 	opts, unknown_args = parser.parse_known_args()
 	args = MAIN_SETTINGS #get_args([settings_file])
 	from taimee_filter import TaimeeFilter
@@ -1141,6 +1142,8 @@ def main(#settings: MainSettings,
 			opts.app = None
 		else:
 			args.app = app
+	if opts.nth:
+		args.nth = opts.nth
 
 	if not args.files:
 		logger.info("No files selected")
@@ -1271,9 +1274,9 @@ def main(#settings: MainSettings,
 		param_str_dict = area_params_section.unwrap()
 		for k, v in param_str_dict.items():
 			try:
-					param = ImageAreaParam.from_str(v)
-					param_dict[
-				ImageAreaParamName(k)] = param
+				param = ImageAreaParam.from_str(v)
+				param_dict[
+				ImageAreaParamName[k.upper()]] = param
 			except ValueError as e:
 				logger.error("Failed to genarate an image area param '%s' obj from filter parameter [%s]: %s", k, v, e)
 			else:
@@ -1316,14 +1319,14 @@ def main(#settings: MainSettings,
 					)
 					continue
 				else:
-					TL, BR = astuple(areas.popleft())
+					rp = areas.popleft() # RectPos
 					#if len(areas) > 1: offset_width_list = areas[1:]
 					param_obj = ImageAreaParam(
-						TL[1] + y_margin,
-						BR[1] - TL[1],
-						TL[0],
-						BR[0] - TL[0],
-						areas
+						rp.origin.y + y_margin, #LT[1]: y_offset
+						rp.height, #rp.RB[1] - rp.LT[1]
+						rp.origin.x, #rp.LT[0], : x_offset
+						rp.width, #rp.RB[0] - rp.LT[0]
+						[XOffsetWidth(a.origin.x, a.width) for a in areas] # x_offset_width_list
 					)
 					area_param_dict[area_name] = param_obj
 		return area_param_dict
