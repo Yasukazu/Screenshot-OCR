@@ -82,9 +82,9 @@ class MainSettings:
 	ocr_filter_sqlite_db_name: str = "ocr-filter.db"
 	"""SQLite DB file is created under `image_dir`/{yyyy} directory(yyyy is like 2025)"""
 	data_year: int = 0
-	"""Year of data (like -1, 0, 2025, ...). 0 means current year, negative value is difference from current year (like -1 means last year), positive value means a.d. year number (like 2025);If this value is larger than current year, an exception might be raised."""
+	"""Year of data (like -1, 0, 2025, ...). 0 means current year, negative value is difference from current year (like -1 means last year), positive value means a.d. year number (like 2025). If this value is larger than current year, an exception might be raised."""
 	data_month: int = 0
-	"""Month of data (like -1, 0, 1, 2, ...). 0 means current month, negative value is difference from current month (like -1 means last month), positive value means month number (1: Jan, 2: Feb, ...);If this value is larger than current month, data's date is treated as the last year."""
+	"""Month of data (like -1, 0, 1, 2, ...). 0 means current month, negative value is difference from current month (like -1 means last month), positive value means month number (1: Jan, 2: Feb, ...). If this value is larger than current month, data's date is treated as the last year."""
 	show_ocr_area: bool = False
 	"""Show every area before to commit OCR"""
 	exclude_area_param_set: set[str] = field(default_factory=set) # { {f'{n}' for n in image_area_param_names()} }
@@ -95,22 +95,23 @@ def append_doc(fd):
 MainSettings.__doc__ = MainSettings.__doc__ or '' + "\n".join([append_doc(fd) for fd in fields(MainSettings) if callable(fd.default_factory)])
 def main_settings_from_dict(toml_dict: dict[str, Any]) -> MainSettings:
 	return Binder(MainSettings).bind(toml_dict)
-def toml_lines()-> Iterator[str]:
+def main_settings_toml_lines()-> Iterator[str]:
 	from dataclass_binder import Binder
 	for line in Binder(MainSettings()).format_toml_template(): # Need to generate an instance to get default values of default factory
 		yield(line)
-def load_main_settings(filename: str = "", table: str = "")-> MainSettings:
-	if not filename:
-		filename = str(get_toml_path())
-	with open(filename, "rb") as f:
-		config = tomllib.load(f)
-	main_settings = Binder(MainSettings).bind(config[table] if table else config)
-	return main_settings
 def get_toml_path()-> Path:
 	"""Get the default TOML filename"""
 	node = Path(__file__)
 	toml = node.parent / (node.stem.replace('_', '-') + '.toml')
 	return toml
+def load_main_settings(filename: str|Callable = get_toml_path, table: str = "")-> MainSettings:
+	if callable(filename):
+		filename = filename()
+	with open(filename, "rb") as f:
+		config = tomllib.load(f)
+	main_settings = Binder(MainSettings).bind(config[table] if table else config)
+	return main_settings
+
 if __name__ == '__main__':
 	#print(MainSettings.__doc__)
-	print('\n'.join(toml_lines()))
+	print('\n'.join(main_settings_toml_lines()))

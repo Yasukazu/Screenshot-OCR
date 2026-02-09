@@ -1025,7 +1025,7 @@ class Settings(BaseSettings):
 		return self.image_ext
 
 from configparser import ConfigParser, NoSectionError, SectionProxy
-from configargparse import ArgParser, CompositeConfigParser, TomlConfigParser, IniConfigParser, ConfigparserConfigFileParser
+from configargparse import ArgParser, CompositeConfigParser, RawTextHelpFormatter, TomlConfigParser, IniConfigParser, ConfigparserConfigFileParser
 from os.path import join as os_path_join
 from typing import Any
 from dotenv import dotenv_values, find_dotenv
@@ -1122,7 +1122,8 @@ def main(#settings: MainSettings,
 	command_config_files = [settings_file]
 	parser = ArgParser(default_config_files=command_config_files,
 		description='OCR Image filter PAYSTUB',
-		epilog=f"Example: python image_filter.py --files image1.png image2.png --app taimee --nth 1\nMain config file:{get_toml_path()}\nCommand config files:{command_config_files}\nMain config file template:\n{'\n'.join(list(main_settings_toml_lines()))}")
+		epilog=f"Example: python image_filter.py --files image1.png image2.png --app taimee --nth 1\nMain config file:{get_toml_path()}\nCommand config files:{command_config_files}\nMain config file template:\n{'\n'.join(list(main_settings_toml_lines()))}",
+		formatter_class=RawTextHelpFormatter)
 	parser.add_argument('--files', type=str, nargs='*')
 	parser.add_argument('--app', type=str, choices=[n.name.lower() for n in APP_NAME])
 	parser.add_argument('--nth', type=int, default=1)
