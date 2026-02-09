@@ -34,9 +34,9 @@ cwd = Path(__file__).resolve().parent
 sys.path.insert(0, str(cwd.parent))
 from set_logger import set_logger
 logger = set_logger(__name__)
-from image_filter_main_settings import load_main_settings
+from image_filter_main_settings import load_main_settings, get_toml_path, main_settings_toml_lines
 try:
-	MAIN_SETTINGS = load_main_settings()
+	MAIN_SETTINGS = load_main_settings(get_toml_path)
 except Exception as e:
 	logger.error(f"Failed to load main settings: {e}")
 	raise
@@ -1117,12 +1117,16 @@ def main(#settings: MainSettings,
 	else:
 		settings_dir = Path(__file__).parent
 	settings_file = settings_dir / settings_file
-	parser = ArgParser(default_config_files=[settings_file])
+
+	args = MAIN_SETTINGS #get_args([settings_file])
+	command_config_files = [settings_file]
+	parser = ArgParser(default_config_files=command_config_files,
+		description='OCR Image filter PAYSTUB',
+		epilog=f"Example: python image_filter.py --files image1.png image2.png --app taimee --nth 1\nMain config file:{get_toml_path()}\nCommand config files:{command_config_files}\nMain config file template:\n{'\n'.join(list(main_settings_toml_lines()))}")
 	parser.add_argument('--files', type=str, nargs='*')
 	parser.add_argument('--app', type=str, choices=[n.name.lower() for n in APP_NAME])
 	parser.add_argument('--nth', type=int, default=1)
 	opts, unknown_args = parser.parse_known_args()
-	args = MAIN_SETTINGS #get_args([settings_file])
 	from taimee_filter import TaimeeFilter
 	APP_NAME_TO_FILTER_CLASS = {APP_NAME.TAIMEE: TaimeeFilter}
 	OCR_FILTER = "ocr-filter"
@@ -1285,7 +1289,7 @@ def main(#settings: MainSettings,
 		exception = area_params_section.failure()  # case ConfigKeyException():
 		if isinstance(exception, ConfigKeyException):
 			assert (
-				".".join([args.image_area_param_section_stem + "." + args.app])
+				".".join([e for e in (args.image_area_param_section_stem, args.app) if e is not None])
 				== exception.key
 			)
 			assert isinstance(exception.config, ConfigParser)
