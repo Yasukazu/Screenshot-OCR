@@ -1332,7 +1332,7 @@ def main(#settings: MainSettings,
 	param_dict = fill_area_param_dict(param_dict, image=image[y_margin:, :], exclude_set=args.exclude_area_param_set) #, y_margin=y_margin)
 	section = ".".join([args.image_area_param_section_stem + "." + args.app])
 	area_param_config = param_config if param_config is not None else ConfigParser()
-	area_param_config[section] = {k: f"{v.param}" for k, v in param_dict.items()}
+	area_param_config[section] = {k.name.lower(): f"{v.param}" for k, v in param_dict.items()}
 
 	# make a function to save the param_config to a config file
 	def save_param_dict_atexit():
