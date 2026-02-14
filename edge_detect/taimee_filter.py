@@ -217,7 +217,6 @@ class TaimeeFilter(OCRFilter):
 
 	from returns.result import safe
 	@classmethod
-	@safe
 	def extract_month_day_and_hours_from_shift_area_text(cls, txt_lines: Sequence[str], year: int = Date.today().year) -> tuple[MonthDay, list[Match]]:
 		''' return[0]: MonthDay as (month:int, day:int), return[1]: list[Match] as "hh:mm" '''
 		'''day_of_week = None

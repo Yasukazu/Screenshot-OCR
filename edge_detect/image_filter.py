@@ -381,7 +381,7 @@ class ShiftAreaParam(ImageAreaParam):
 
 	@classmethod
 	def from_image(cls, image: np.ndarray, offset_range: range, image_check:bool=False) -> "ShiftAreaParam":
-		from .image_area_param import XOffsetWidth
+		#from .image_area_param import XOffsetWidth
 		left, right = cls.check_image(image=image[offset_range.start:offset_range.stop, :], image_check=image_check)
 		return cls(y_offset=offset_range.start, height=offset_range.stop - offset_range.start, x_offset=0, width=left, x_offset_width_list=[XOffsetWidth(right, -1)])
 
