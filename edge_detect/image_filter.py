@@ -29,19 +29,34 @@ import matplotlib.pyplot as plt
 from inspect import isclass
 from peewee import OperationalError
 from fancy_dataclass import TOMLDataclass
+import tomllib
 
 cwd = Path(__file__).resolve().parent
 sys.path.insert(0, str(cwd.parent))
 from set_logger import set_logger
 logger = set_logger(__name__)
 from image_filter_main_settings import load_main_settings, get_toml_path, main_settings_toml_lines
-try:
-	MAIN_SETTINGS = load_main_settings(get_toml_path)
-except Exception as e:
-	logger.error(f"Failed to load main settings: {e}")
-	raise
-else:
-	logger.info(f"Loaded main settings: {MAIN_SETTINGS}")
+def load_main_settings_safely():
+	"""Load main settings(with comprehensive exception handling) from a TOML file, the name is replaced the filename of the script as underscore(_) to hypen(-)."""
+	try:
+		toml_path = get_toml_path(__file__)
+		MAIN_SETTINGS = load_main_settings(toml_path)
+	except FileNotFoundError as e:
+		logger.error("TOML configuration file not found: %s", e)
+		raise
+	except OSError as e:
+		logger.error("File system error accessing TOML configuration: %s", e)
+		raise
+	except tomllib.TOMLDecodeError as e:
+		logger.error("TOML configuration file is malformed or contains invalid syntax: %s", e)
+		raise
+	except (ConfigKeyException, KeyException) as e:
+		logger.error("Configuration error in main settings: %s", e)
+		raise
+	return MAIN_SETTINGS
+
+MAIN_SETTINGS = load_main_settings_safely()
+logger.info("Loaded main settings: %s", MAIN_SETTINGS)
 APP_NAME = Enum('APP_NAME', MAIN_SETTINGS.app_names)
 '''class APP_NAME(Enum):
 	""" name of app: value is stem end """
@@ -962,7 +977,6 @@ def do_show_check(msg, param, img):
 
 from argparse import ArgumentParser
 # from dotenv import dotenv_values
-import tomllib
 from fnmatch import fnmatch
 
 

@@ -5,6 +5,9 @@ from typing import Any, Callable, Iterator
 from dataclasses import dataclass, field, fields
 from enum import Enum
 from dataclass_binder import Binder
+from set_logger import set_logger
+
+logger = set_logger(__name__)
 # import typed_settings as tst
 def image_area_param_names():
 	from image_filter import ImageAreaParamName
@@ -99,15 +102,24 @@ def main_settings_toml_lines()-> Iterator[str]:
 	from dataclass_binder import Binder
 	for line in Binder(MainSettings()).format_toml_template(): # Need to generate an instance to get default values of default factory
 		yield(line)
-def get_toml_path()-> Path:
-	"""Get the default TOML filename"""
-	node = Path(__file__)
-	toml = node.parent / (node.stem.replace('_', '-') + '.toml')
+def get_toml_path(fullpath: str, replacement_chars: str | None = "_-")-> Path:
+	"""Get the default TOML filename from the given filename(as fullpath: <dir>/<stem>.<ext>). 
+	If replacement_chars is provided as a sequence of 2 characters, replaces the 1st char with the 2nd char; 
+	if replacement_chars is empty or None, no replacement happens."""
+	node = Path(fullpath)
+	if not replacement_chars:
+		toml = node.parent / (node.stem + '.toml')
+	elif len(replacement_chars) >= 2:
+		toml = node.parent / (node.stem.replace(replacement_chars[0], replacement_chars[1]) + '.toml')
+	else:
+		raise ValueError("Not enough replacement characters")
+	if not toml.exists():
+		logger.error("No proper TOML configuration file found at: %s", toml)
+		raise FileNotFoundError(f"No proper TOML configuration file found at: {toml}")
 	return toml
-def load_main_settings(filename: str|Callable = get_toml_path, table: str = "")-> MainSettings:
-	if callable(filename):
-		filename = filename()
-	with open(filename, "rb") as f:
+def load_main_settings(fullpath: Path, table: str = "")-> MainSettings:
+	"""Load the TOML file and return the MainSettings instance of Binder"""
+	with fullpath.open("rb") as f:
 		config = tomllib.load(f)
 	main_settings = Binder(MainSettings).bind(config[table] if table else config)
 	return main_settings
