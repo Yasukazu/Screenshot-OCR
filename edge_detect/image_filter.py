@@ -50,14 +50,14 @@ def load_main_settings_safely(file: str = __file__):
 	except tomllib.TOMLDecodeError as e:
 		logger.error("TOML configuration file is malformed or contains invalid syntax: %s", e)
 		raise
-	except (ConfigKeyException, KeyException) as e:
+	except (KeyError, ValueError) as e:
 		logger.error("Configuration error in main settings: %s", e)
 		raise
 	else:
 		logger.info("Loaded main settings: %s", MAIN_SETTINGS)
 	return MAIN_SETTINGS, toml_path
 
-MAIN_SETTINGS, MAIN_SETTINGS_TOML_PATH = load_main_settings_safely(__file__)
+MAIN_SETTINGS, MAIN_SETTINGS_TOML_PATH = load_main_settings_safely(None)
 
 APP_NAME = Enum('APP_NAME', MAIN_SETTINGS.app_names, module=__name__)
 """ APP_NAME = Enum('APP_NAME', MAIN_SETTINGS.app_names, module="image_filter") """
@@ -1079,7 +1079,6 @@ def get_args(settings_files):
 	return args
 #import typed_settings as tst
 #@tst.settings
-from configargparse import ArgParser
 from os import environ as os_environ
 # @tst.cli(MainSettings, "image_filter")
 def main(#settings: MainSettings,
@@ -1137,35 +1136,37 @@ def main(#settings: MainSettings,
 
 	args = MAIN_SETTINGS #get_args([settings_file])
 	command_config_files = [MAIN_SETTINGS_TOML_PATH]
-	parser = ArgParser(default_config_files=command_config_files,
+	parser = ArgParser( default_config_files=command_config_files,
 		description='OCR Image filter for PAYSTUB screenshots',
 		epilog=f"Example: python image_filter.py --files image1.png image2.png --app <APP_NAME> --nth 1\nConfig file: {MAIN_SETTINGS_TOML_PATH}\nConfig file template:\n{'\n'.join(list(main_settings_toml_lines()))}",
 		formatter_class=RawTextHelpFormatter)
 	parser.add_argument('--files', type=str, nargs='*')
 	parser.add_argument('--app', type=str, choices=[n.name.lower() for n in APP_NAME])
 	parser.add_argument('--nth', type=int, default=1)
-	opts, unknown_args = parser.parse_known_args()
+	from sys import argv
+	opts, other_args = parser.parse_known_args(argv[1:])
 	from taimee_filter import TaimeeFilter
 	APP_NAME_TO_FILTER_CLASS = {APP_NAME.TAIMEE: TaimeeFilter}
 	OCR_FILTER = "ocr-filter"
 
-	image_path_dir: Path | None = None
-	if not args.files and args.image_dir and args.glob_pattern:
-		args.image_dir = Path(args.image_dir).expanduser()
-		args.files = [str(p) for p in (Path(args.image_dir).rglob(args.glob_pattern) if args.glob_recursive else Path(args.image_dir).glob(args.glob_pattern))]
-	if opts.files:
-		for file in opts.files:
-			args.files.append(file)
 	if opts.app:
 		try:
-			app = opts.app
 			opts.app = APP_NAME[opts.app.upper()]
 		except KeyError:
 			opts.app = None
-		else:
-			args.app = app
+	args.app = opts.app
 	if opts.nth:
 		args.nth = opts.nth
+
+	if opts.files:
+		args.files = opts.files
+		'''for file in opts.files:
+			args.files.append(file)'''
+	else:
+		image_path_dir: Path | None = None
+		if not args.files and args.image_dir and args.glob_pattern:
+			args.image_dir = Path(args.image_dir).expanduser()
+			args.files = [str(p) for p in (Path(args.image_dir).rglob(args.glob_pattern) if args.glob_recursive else Path(args.image_dir).glob(args.glob_pattern))]
 
 	if not args.files:
 		logger.info("No files selected")
@@ -1248,7 +1249,7 @@ def main(#settings: MainSettings,
 
 	@safe
 	def get_image_area_params_section(
-		app=args.app,
+		app=args.app.name.lower(),
 		section_stem=args.image_area_param_section_stem,
 		area_param_file=args.area_param_file,
 	) -> SectionProxy:
@@ -1307,7 +1308,7 @@ def main(#settings: MainSettings,
 		exception = area_params_section.failure()  # case ConfigKeyException():
 		if isinstance(exception, ConfigKeyException):
 			assert (
-				".".join([e for e in (args.image_area_param_section_stem, args.app) if e is not None])
+				".".join([e for e in (args.image_area_param_section_stem, args.app.name.lower()) if e is not None])
 				== exception.key
 			)
 			assert isinstance(exception.config, ConfigParser)
@@ -1355,7 +1356,7 @@ def main(#settings: MainSettings,
 
 	# if not param_dict:
 	param_dict = fill_area_param_dict(param_dict, image=image[y_margin:, :], exclude_set=args.exclude_area_param_set) #, y_margin=y_margin)
-	section = ".".join([args.image_area_param_section_stem + "." + args.app])
+	section = ".".join([args.image_area_param_section_stem + "." + args.app.name.lower()])
 	area_param_config = param_config if param_config is not None else ConfigParser()
 	area_param_config[section] = {k.name.lower(): f"{v.param}" for k, v in param_dict.items()}
 
