@@ -36,10 +36,10 @@ sys.path.insert(0, str(cwd.parent))
 from set_logger import set_logger
 logger = set_logger(__name__)
 from image_filter_main_settings import load_main_settings, get_toml_path, main_settings_toml_lines
-def load_main_settings_safely():
+def load_main_settings_safely(file: str = __file__):
 	"""Load main settings(with comprehensive exception handling) from a TOML file, the name is replaced the filename of the script as underscore(_) to hypen(-)."""
 	try:
-		toml_path = get_toml_path(__file__)
+		toml_path = get_toml_path(file)
 		MAIN_SETTINGS = load_main_settings(toml_path)
 	except FileNotFoundError as e:
 		logger.error("TOML configuration file not found: %s", e)
@@ -53,11 +53,14 @@ def load_main_settings_safely():
 	except (ConfigKeyException, KeyException) as e:
 		logger.error("Configuration error in main settings: %s", e)
 		raise
-	return MAIN_SETTINGS
+	else:
+		logger.info("Loaded main settings: %s", MAIN_SETTINGS)
+	return MAIN_SETTINGS, toml_path
 
-MAIN_SETTINGS = load_main_settings_safely()
-logger.info("Loaded main settings: %s", MAIN_SETTINGS)
-APP_NAME = Enum('APP_NAME', MAIN_SETTINGS.app_names)
+MAIN_SETTINGS, MAIN_SETTINGS_TOML_PATH = load_main_settings_safely(__file__)
+
+APP_NAME = Enum('APP_NAME', MAIN_SETTINGS.app_names, module=__name__)
+""" APP_NAME = Enum('APP_NAME', MAIN_SETTINGS.app_names, module="image_filter") """
 '''class APP_NAME(Enum):
 	""" name of app: value is stem end """
 	TAIMEE = auto()
@@ -1124,19 +1127,19 @@ def main(#settings: MainSettings,
 		os_environ.update(env_values)
 		logger.info("Environment values updated from %s as: %s", used_env_files, env_values)
 	
-	settings_file = Path(os_environ["IMAGE_FILTER_SETTINGS"]).expanduser()
+	'''settings_file = Path(os_environ["IMAGE_FILTER_SETTINGS"]).expanduser()
 	if usecwd:
 		from os import getcwd
 		settings_dir = Path(getcwd())
 	else:
 		settings_dir = Path(__file__).parent
-	settings_file = settings_dir / settings_file
+	settings_file = settings_dir / settings_file'''
 
 	args = MAIN_SETTINGS #get_args([settings_file])
-	command_config_files = [settings_file]
+	command_config_files = [MAIN_SETTINGS_TOML_PATH]
 	parser = ArgParser(default_config_files=command_config_files,
-		description='OCR Image filter PAYSTUB',
-		epilog=f"Example: python image_filter.py --files image1.png image2.png --app taimee --nth 1\nMain config file:{get_toml_path()}\nCommand config files:{command_config_files}\nMain config file template:\n{'\n'.join(list(main_settings_toml_lines()))}",
+		description='OCR Image filter for PAYSTUB screenshots',
+		epilog=f"Example: python image_filter.py --files image1.png image2.png --app <APP_NAME> --nth 1\nConfig file: {MAIN_SETTINGS_TOML_PATH}\nConfig file template:\n{'\n'.join(list(main_settings_toml_lines()))}",
 		formatter_class=RawTextHelpFormatter)
 	parser.add_argument('--files', type=str, nargs='*')
 	parser.add_argument('--app', type=str, choices=[n.name.lower() for n in APP_NAME])
