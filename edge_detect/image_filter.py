@@ -35,11 +35,11 @@ cwd = Path(__file__).resolve().parent
 sys.path.insert(0, str(cwd.parent))
 from set_logger import set_logger
 logger = set_logger(__name__)
-from image_filter_main_settings import load_main_settings, get_toml_path, main_settings_toml_lines
 def load_main_settings_safely(file: str = __file__):
 	"""Load main settings(with comprehensive exception handling) from a TOML file, the name is replaced the filename of the script as underscore(_) to hypen(-)."""
+	from image_filter_main_settings import load_main_settings, main_settings_toml_lines, search_settings_file
 	try:
-		toml_path = get_toml_path(file)
+		toml_path = search_settings_file(file)
 		MAIN_SETTINGS = load_main_settings(toml_path)
 	except FileNotFoundError as e:
 		logger.error("TOML configuration file not found: %s", e)
@@ -57,7 +57,7 @@ def load_main_settings_safely(file: str = __file__):
 		logger.info("Loaded main settings: %s", MAIN_SETTINGS)
 	return MAIN_SETTINGS, toml_path
 
-MAIN_SETTINGS, MAIN_SETTINGS_TOML_PATH = load_main_settings_safely(None)
+MAIN_SETTINGS, MAIN_SETTINGS_TOML_PATH = load_main_settings_safely(__file__)
 
 APP_NAME = Enum('APP_NAME', MAIN_SETTINGS.app_names, module=__name__)
 """ APP_NAME = Enum('APP_NAME', MAIN_SETTINGS.app_names, module="image_filter") """
@@ -1072,32 +1072,29 @@ def startswith_prefixes(s, prefixes=ENV_PREFIXES):
 
 CONFIG_FILE_STEM = "image-filter"
 IMAGE_AREA_PARAM_STR = "image_area_param"
-def get_args(settings_files):
-	import typed_settings as tst
-	from image_filter_main_settings import MainSettings
-	args = tst.load(MainSettings, __name__, [str(f) for f in settings_files])
-	return args
-#import typed_settings as tst
-#@tst.settings
 from os import environ as os_environ
 # @tst.cli(MainSettings, "image_filter")
 def main(#settings: MainSettings,
-	config_dir = '', config_file_stem = CONFIG_FILE_STEM, config_file_ext_enum = ConfigFileExt, image_area_param_file_stem = IMAGE_AREA_PARAM_STR.replace('_', '-'),
+	config_file = __file__,
+	config_dir = '', 
 	env_files = ENV_FILE_NAMES,
 	common_env_file = COMMON_ENV_FILE_NAME,
-	env_prefixes = ENV_PREFIXES,
 	usecwd: bool = False,
 ): #abspath(dirname(__file__)) "image-filter.env"
+	from image_filter_main_settings import search_settings_file, load_merged_settings
 	try:
-		config_dir = Path(config_dir) if config_dir else Path.cwd() if usecwd else Path(__file__).parent
-		if str(config_dir)[0] == '~':
-			config_dir = config_dir.expanduser()
-	except ValueError:
-		raise ValueError("Invalid config_dir")
-	if not config_dir.is_dir():
+		main_settings_file = search_settings_file(config_file, replace=['_', '-'])
+		logger.info("main_settings_file: %s", main_settings_file)
+		args = load_merged_settings(main_settings_file)
+		# config_dir = Path(config_dir) if config_dir else Path.cwd() if usecwd else Path(__file__).parent
+		# if str(config_dir)[0] == '~':
+		#	config_dir = config_dir.expanduser()
+	except Exception as e:
+		logger.error("Failed to load main settings.", exc_info=True)
+		raise ValueError("Invalid config_dir") from e
+	'''if not config_dir.is_dir():
 		raise ValueError("Invalid config_dir")
 	dotenv_path = ''
-	# class NoCommonEnvFile(Exception): pass
 	used_env_files = []
 	clean_env_values = {}
 	env_values = {}
@@ -1125,14 +1122,6 @@ def main(#settings: MainSettings,
 	if used_env_files:
 		os_environ.update(env_values)
 		logger.info("Environment values updated from %s as: %s", used_env_files, env_values)
-	
-	'''settings_file = Path(os_environ["IMAGE_FILTER_SETTINGS"]).expanduser()
-	if usecwd:
-		from os import getcwd
-		settings_dir = Path(getcwd())
-	else:
-		settings_dir = Path(__file__).parent
-	settings_file = settings_dir / settings_file'''
 
 	args = MAIN_SETTINGS #get_args([settings_file])
 	command_config_files = [MAIN_SETTINGS_TOML_PATH]
@@ -1144,12 +1133,12 @@ def main(#settings: MainSettings,
 	parser.add_argument('--app', type=str, choices=[n.name.lower() for n in APP_NAME])
 	parser.add_argument('--nth', type=int, default=1)
 	from sys import argv
-	opts, other_args = parser.parse_known_args(argv[1:])
+	opts, other_args = parser.parse_known_args(argv[1:])'''
 	from taimee_filter import TaimeeFilter
 	APP_NAME_TO_FILTER_CLASS = {APP_NAME.TAIMEE: TaimeeFilter}
 	OCR_FILTER = "ocr-filter"
 
-	if opts.app:
+	'''if opts.app:
 		try:
 			opts.app = APP_NAME[opts.app.upper()]
 		except KeyError:
@@ -1160,13 +1149,12 @@ def main(#settings: MainSettings,
 
 	if opts.files:
 		args.files = opts.files
-		'''for file in opts.files:
+		for file in opts.files:
 			args.files.append(file)'''
-	else:
-		image_path_dir: Path | None = None
-		if not args.files and args.image_dir and args.glob_pattern:
-			args.image_dir = Path(args.image_dir).expanduser()
-			args.files = [str(p) for p in (Path(args.image_dir).rglob(args.glob_pattern) if args.glob_recursive else Path(args.image_dir).glob(args.glob_pattern))]
+	image_path_dir: Path | None = None
+	if not args.files and args.image_dir and args.glob_pattern:
+		args.image_dir = Path(args.image_dir).expanduser()
+		args.files = [str(p) for p in (Path(args.image_dir).rglob(args.glob_pattern) if args.glob_recursive else Path(args.image_dir).glob(args.glob_pattern))]
 
 	if not args.files:
 		logger.info("No files selected")

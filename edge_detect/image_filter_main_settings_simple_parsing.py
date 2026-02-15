@@ -96,6 +96,8 @@ class MainSettings:
 	"""Show every area before to commit OCR"""
 	exclude_area_param_set: set[str] = field(default_factory=set) # { {f'{n}' for n in image_area_param_names()} }
 	"""Exclude a set of image area parameter names"""
+	print_template: bool = False
+	"""Print template of settings file (as TOML format)"""
 
 def append_doc(fd):
 	return f"{fd}:{fd.default_factory()}"
