@@ -5,6 +5,10 @@ from typing import Any, Callable, Iterator
 from dataclasses import dataclass, field, fields
 from enum import Enum
 from dataclass_binder import Binder
+import sys
+parent_dir = str(Path(__file__).resolve().parent.parent)
+if parent_dir not in sys.path:
+	sys.path.insert(0, parent_dir) # Add to the beginning of the path
 from set_logger import set_logger
 import sys
 parent_dir = str(Path(__file__).resolve().parent.parent)
@@ -129,4 +133,17 @@ def load_main_settings(fullpath: Path, table: str = "")-> MainSettings:
 
 if __name__ == '__main__':
 	#print(MainSettings.__doc__)
+	print('-*-' * 20 + 'template'+ '-*-' * 20)
 	print('\n'.join(main_settings_toml_lines()))
+	print('-*-' * 20 + 'toml'+ '-*-' * 20)
+	main_settings_file = 'image-filer-main-settings.toml'
+	main_settings = load_main_settings(Path(main_settings_file))
+	print(f"{main_settings=}")
+	def get_args(settings_files=[main_settings_file]):
+		import typed_settings as tst
+		from image_filter_main_settings import MainSettings
+		args = tst.load(MainSettings, __name__, [str(f) for f in settings_files])
+		return args
+	print('--- Arguments ---')
+	args = get_args()
+	print(args)
