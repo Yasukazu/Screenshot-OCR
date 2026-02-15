@@ -1151,10 +1151,14 @@ def main(#settings: MainSettings,
 		args.files = opts.files
 		for file in opts.files:
 			args.files.append(file)'''
+	args.app = APP_NAME[args.app.upper()]
 	image_path_dir: Path | None = None
-	if not args.files and args.image_dir and args.glob_pattern:
-		args.image_dir = Path(args.image_dir).expanduser()
-		args.files = [str(p) for p in (Path(args.image_dir).rglob(args.glob_pattern) if args.glob_recursive else Path(args.image_dir).glob(args.glob_pattern))]
+	args.image_dir = Path(args.image_dir).expanduser()
+	if not args.files and args.image_dir:# and args.glob_pattern:
+		app = args.app.name.lower()
+		for ext in args.image_ext_set:
+			glob_pattern = f"*.{app}*.{ext.strip('.')}"
+			args.files += [str(p) for p in (Path(args.image_dir).rglob(glob_pattern) if args.glob_recursive else Path(args.image_dir).glob(glob_pattern))]
 
 	if not args.files:
 		logger.info("No files selected")
@@ -1172,7 +1176,7 @@ def main(#settings: MainSettings,
 		if set([s.strip('.') for s in file.suffixes[:-1]]) & set([n.name.lower() for n in APP_NAME]):
 			return True
 		return False
-	args.files = [f for f in args.files if is_screenshot_file(Path(f), opts.app)]
+	args.files = [f for f in args.files if is_screenshot_file(Path(f), args.app)]
 	args.files.sort(key=lambda x: Path(x).stat().st_mtime, reverse=True)
 	try:
 		_file = args.files[args.nth - 1]
