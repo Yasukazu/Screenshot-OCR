@@ -6,6 +6,8 @@ authors = [{ name = "Yasukazu ", email = "yasukazu@makyno.jp" }]
 requires-python = ">=3.12"
 readme = "README.md"
 dependencies = [
+    "argparse-dataclass>=2.0.0",
+    "argspec>=0.4.1",
     "camel-converter>=5.0.0",
     "classopt>=0.2.1",
     "click>=8.2.1",

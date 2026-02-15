@@ -102,11 +102,11 @@ def main_settings_toml_lines()-> Iterator[str]:
 	from dataclass_binder import Binder
 	for line in Binder(MainSettings()).format_toml_template(): # Need to generate an instance to get default values of default factory
 		yield(line)
-def get_toml_path(fullpath: str, replacement_chars: str | None = "_-")-> Path:
+def get_toml_path(fullpath: str|None, replacement_chars: str | None = "_-")-> Path:
 	"""Get the default TOML filename from the given filename(as fullpath: <dir>/<stem>.<ext>). 
 	If replacement_chars is provided as a sequence of 2 characters, replaces the 1st char with the 2nd char; 
 	if replacement_chars is empty or None, no replacement happens."""
-	node = Path(fullpath)
+	node = Path(fullpath) if fullpath else Path(__file__)
 	if not replacement_chars:
 		toml = node.parent / (node.stem + '.toml')
 	elif len(replacement_chars) >= 2:

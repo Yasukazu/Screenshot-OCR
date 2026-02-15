@@ -5,9 +5,9 @@ from re import Pattern
 import numpy as np
 import cv2
 from pathlib import Path
-import sys
-sys.path.insert(0, str(Path(__file__).parent))
-from image_filter import ImageAreaParamName, ImageAreaParam
+#import sys
+#sys.path.insert(0, str(Path(__file__).parent))
+from edge_detect.image_filter import ImageAreaParamName, ImageAreaParam
 class MonthDay(NamedTuple):
 	month: int
 	day: int
@@ -20,7 +20,7 @@ class OCRFilter:
 	THRESHOLD = 235
 	def __init__(self, image:np.ndarray, param_dict:dict[ImageAreaParamName, Sequence[int] | ImageAreaParam] = {k:[] for k in ImageAreaParamName}, show_check=False, thresh=THRESHOLD, bin_image:np.ndarray | None = None, y_offset:int = 0):
 		self.image = image
-		# self._param_dict = param_dict
+		self._y_margin = y_offset
 		self.show_check = show_check
 		self.thresh = thresh
 		self.bin_image = bin_image
@@ -30,15 +30,14 @@ class OCRFilter:
 				value = param_dict[name]
 			except KeyError:
 				continue
-			if isinstance(value, ImageAreaParam):
-				value.y_offset += y_offset
-				dct[name] = value
-			elif isinstance(value, Sequence):
+
+			if isinstance(value, Sequence):
 				param = name.to_param_class()
 				dct[name] = param(value[0] + y_offset, *value[1:])
 			else:
-				raise ValueError(f"Invalid value type: {type(value)}")
-		self._area_param_dict: dict[ImageAreaParamName, ImageAreaParam] = dct
+				value.y_offset += y_offset
+				dct[name] = value
+				self._area_param_dict: dict[ImageAreaParamName, ImageAreaParam] = dct
 	
 	@property
 	def y_margin(self):

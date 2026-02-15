@@ -16,20 +16,20 @@ from edge_detect.image_filter import APP_NAME, ImageAreaParamName
 	with (cwd / "ocr-filter.env").open() as envf:
 		load_dotenv(stream=envf)
 except FileNotFoundError as e:
-	logger.error(f"Failed to load environment variables: {e}")
+	logger.error("Failed to load environment variables: %s", e)
 	sys_exit(1)
 try:
 	# OCR_FILTER_DATA_YEAR = int(environ["OCR_FILTER_DATA_YEAR"])
 	# OCR_FILTER_DATA_MONTH = int(environ["OCR_FILTER_DATA_MONTH"])
 	OCR_FILTER_SQLITE_DB_PATH = Path(environ["OCR_FILTER_SQLITE_DB_DIR"]).expanduser() / environ["OCR_FILTER_SQLITE_DB_NAME"]
 except KeyError as e:
-	logger.error(f"Key error to load environment variables: {e}")
+	logger.error("Key error to load environment variables: %s", e)
 	sys_exit(2)
 except ValueError as e:
-	logger.error(f"Invalid value of environment variables: {e}")
+	logger.error("Invalid value of environment variables: %s", e)
 	sys_exit(3)
 except (TypeError) as e:
-	logger.error(f"Invalid type(like None) to set value from environment variables: {e}")
+	logger.error("Invalid type(like None) to set value from environment variables: %s", e)
 	sys_exit(4)
 
 if not OCR_FILTER_SQLITE_DB_PATH.exists():

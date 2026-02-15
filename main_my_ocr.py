@@ -112,7 +112,7 @@ class Main:
 			raise ValueError('Needs not AppType.NUL param.!')
 		ocr_done = []
 		glob_patt = '*' + APP_TYPE_TO_STEM_END[app_type] + ext
-		logger.debug(f"glob_patt: {glob_patt}")
+		logger.debug("glob_patt: %s", glob_patt)
 		parent = self.my_ocr.input_dir
 		for img_file in self.img_dir.glob(glob_patt):
 			stem = img_file.stem
