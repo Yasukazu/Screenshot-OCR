@@ -2,7 +2,7 @@
 from pathlib import Path
 import tomllib
 from typing import Any, Callable, Iterator
-from dataclasses import dataclass, field, fields
+from dataclasses import asdict, dataclass, field, fields
 from enum import Enum
 from dataclass_binder import Binder
 import sys
@@ -124,9 +124,9 @@ def get_toml_path(fullpath: str|None, replacement_chars: str | None = "_-")-> Pa
 		logger.error("No proper TOML configuration file found at: %s", toml)
 		raise FileNotFoundError(f"No proper TOML configuration file found at: {toml}")
 	return toml
-def load_main_settings(fullpath: Path, table: str = "")-> MainSettings:
+def load_main_settings(fullpath: Path|str, table: str = "")-> MainSettings:
 	"""Load the TOML file and return the MainSettings instance of Binder"""
-	with fullpath.open("rb") as f:
+	with Path(fullpath).open("rb") as f:
 		config = tomllib.load(f)
 	main_settings = Binder(MainSettings).bind(config[table] if table else config)
 	return main_settings
@@ -136,14 +136,33 @@ if __name__ == '__main__':
 	print('-*-' * 20 + 'template'+ '-*-' * 20)
 	print('\n'.join(main_settings_toml_lines()))
 	print('-*-' * 20 + 'toml'+ '-*-' * 20)
-	main_settings_file = 'image-filer-main-settings.toml'
-	main_settings = load_main_settings(Path(main_settings_file))
-	print(f"{main_settings=}")
-	def get_args(settings_files=[main_settings_file]):
-		import typed_settings as tst
-		from image_filter_main_settings import MainSettings
-		args = tst.load(MainSettings, __name__, [str(f) for f in settings_files])
-		return args
-	print('--- Arguments ---')
-	args = get_args()
-	print(args)
+	script_fullpath = Path(__file__)
+	script_dir = script_fullpath.parent
+	user_home_dir = Path('~').expanduser()
+	main_settings_file = script_dir / (toml_name:=(script_fullpath.stem.replace('_', '-') + '.toml'))
+	found = False
+	while not (found:=main_settings_file.exists()) and script_dir != user_home_dir:
+		script_dir = script_dir.parent
+		main_settings_file = script_dir / toml_name
+	if not found:
+		raise FileNotFoundError(f"No proper TOML configuration file found at: {main_settings_file}")
+	main_settings = load_main_settings(main_settings_file)
+	main_settings_dict = asdict(main_settings)
+	# print(f"{main_settings=}")
+	# print('--- Arguments ---')
+	from simple_parsing import ArgumentParser
+	settings_class = MainSettings
+	parser = ArgumentParser()
+	parser.add_arguments(settings_class, dest="settings")
+	args = parser.parse_args()
+	args_settings_dict = asdict(args.settings)
+	from deepdiff import DeepDiff
+	main_diff_args = DeepDiff(main_settings_dict, args_settings_dict)
+	settings_keys_diff = main_diff_args.affected_root_keys
+	for key in settings_keys_diff:
+		setattr(main_settings, key, getattr(args.settings, key))
+	settings_dict = main_settings_dict | args_settings_dict
+	diff2 = DeepDiff(main_settings_dict, settings_dict)
+	print(diff2)
+	#print(args_settings_dict)
+	#print(args)
