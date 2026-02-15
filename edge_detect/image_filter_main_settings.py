@@ -6,6 +6,8 @@ from dataclasses import asdict, dataclass, field, fields
 from enum import Enum
 from dataclass_binder import Binder
 import sys
+from simple_parsing import ArgumentParser
+from deepdiff import DeepDiff
 parent_dir = str(Path(__file__).resolve().parent.parent)
 if parent_dir not in sys.path:
 	sys.path.insert(0, parent_dir) # Add to the beginning of the path
@@ -124,11 +126,41 @@ def get_toml_path(fullpath: str|None, replacement_chars: str | None = "_-")-> Pa
 		logger.error("No proper TOML configuration file found at: %s", toml)
 		raise FileNotFoundError(f"No proper TOML configuration file found at: {toml}")
 	return toml
-def load_main_settings(fullpath: Path|str, table: str = "")-> MainSettings:
+def load_main_settings(fullpath: Path|str, settings_class=MainSettings, table: str = "") -> MainSettings:
 	"""Load the TOML file and return the MainSettings instance of Binder"""
 	with Path(fullpath).open("rb") as f:
 		config = tomllib.load(f)
-	main_settings = Binder(MainSettings).bind(config[table] if table else config)
+	main_settings = Binder(settings_class).bind(config[table] if table else config)
+	return main_settings
+
+def search_settings_file(script_fullpath: Path|str = Path(__file__), replace=('_', '-'))-> Path:
+	"""Search for the TOML configuration file in the script directory and its parent directories"""
+	if isinstance(script_fullpath, str):
+		script_fullpath = Path(script_fullpath)
+	script_dir = (script_fullpath).parent
+	user_home_dir = Path('~').expanduser()
+	main_settings_file = script_dir / (toml_name:=(Path(script_fullpath).stem.replace(replace[0], replace[1]) + '.toml'))
+	found = False
+	while not (found:=main_settings_file.exists()) and script_dir != user_home_dir:
+		script_dir = script_dir.parent
+		main_settings_file = script_dir / toml_name
+	if found:
+		return main_settings_file
+	else:
+		raise FileNotFoundError(f"No proper TOML configuration file found at: {main_settings_file}")
+
+def load_merged_settings(main_settings_file: Path|str, settings_class = MainSettings, dest="settings") -> MainSettings:
+	"""Load and merge the main settings with the arguments settings"""
+	main_settings = load_main_settings(main_settings_file)
+	main_settings_dict = asdict(main_settings)
+	parser = ArgumentParser()
+	parser.add_arguments(settings_class, dest=dest)
+	args = parser.parse_args()
+	args_settings_dict = asdict(args.settings)
+	main_diff_args = DeepDiff(main_settings_dict, args_settings_dict)
+	settings_keys_diff = main_diff_args.affected_root_keys
+	for key in settings_keys_diff:
+		setattr(main_settings, key, getattr(args.settings, key))
 	return main_settings
 
 if __name__ == '__main__':
@@ -139,30 +171,15 @@ if __name__ == '__main__':
 	script_fullpath = Path(__file__)
 	script_dir = script_fullpath.parent
 	user_home_dir = Path('~').expanduser()
-	main_settings_file = script_dir / (toml_name:=(script_fullpath.stem.replace('_', '-') + '.toml'))
-	found = False
-	while not (found:=main_settings_file.exists()) and script_dir != user_home_dir:
-		script_dir = script_dir.parent
-		main_settings_file = script_dir / toml_name
-	if not found:
-		raise FileNotFoundError(f"No proper TOML configuration file found at: {main_settings_file}")
+	main_settings_file = search_settings_file(__file__)#script_dir / (toml_name:=(script_fullpath.stem.replace('_', '-') + '.toml'))
+
 	main_settings = load_main_settings(main_settings_file)
+	merged_settings = load_merged_settings(main_settings_file)
 	main_settings_dict = asdict(main_settings)
+	merged_settings_dict = asdict(merged_settings)
+	diff2 = DeepDiff(main_settings_dict, merged_settings_dict)
+	for key in diff2.affected_root_keys:
+		print(f"{key}: {getattr(merged_settings,key)}")
+	# print(diff2)
 	# print(f"{main_settings=}")
 	# print('--- Arguments ---')
-	from simple_parsing import ArgumentParser
-	settings_class = MainSettings
-	parser = ArgumentParser()
-	parser.add_arguments(settings_class, dest="settings")
-	args = parser.parse_args()
-	args_settings_dict = asdict(args.settings)
-	from deepdiff import DeepDiff
-	main_diff_args = DeepDiff(main_settings_dict, args_settings_dict)
-	settings_keys_diff = main_diff_args.affected_root_keys
-	for key in settings_keys_diff:
-		setattr(main_settings, key, getattr(args.settings, key))
-	settings_dict = main_settings_dict | args_settings_dict
-	diff2 = DeepDiff(main_settings_dict, settings_dict)
-	print(diff2)
-	#print(args_settings_dict)
-	#print(args)
