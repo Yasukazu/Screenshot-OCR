@@ -5,11 +5,12 @@ from typing import Any, Callable, Iterator
 from dataclasses import dataclass, field, fields
 from enum import Enum
 from dataclass_binder import Binder
-from set_logger import set_logger
 import sys
 parent_dir = str(Path(__file__).resolve().parent.parent)
 if parent_dir not in sys.path:
 	sys.path.insert(0, parent_dir) # Add to the beginning of the path
+from set_logger import set_logger
+
 logger = set_logger(__name__)
 # import typed_settings as tst
 def image_area_param_names():
@@ -128,5 +129,12 @@ def load_main_settings(fullpath: Path, table: str = "")-> MainSettings:
 	return main_settings
 
 if __name__ == '__main__':
-	#print(MainSettings.__doc__)
 	print('\n'.join(main_settings_toml_lines()))
+	print("-" * 80)
+	from simple_parsing import ArgumentParser
+	settings_class = MainSettings
+	parser = ArgumentParser()
+	parser.add_arguments(settings_class, dest="settings")
+	args = parser.parse_args()
+	print(args.settings)
+	#print(MainSettings.__doc__)
