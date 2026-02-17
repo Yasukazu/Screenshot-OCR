@@ -34,9 +34,6 @@ class MainSettings:
 	Extract/OCR paystub text from an image file: Files for OCR by 'files' option may be specified with app-name-suffix in wildcard(glob pattern matching like '--files *.<APP_NAME>*.png') or by 'shot-month' option (like '--shot_month -1' for last month, 0 for current month, other positive value for month number: Jan. is 1, Dec. is 12, ...) and 'app' option (like '--app taimee')
 	"""
 
-	@classmethod
-	def from_dict(cls, toml_dict: dict[str, Any]) -> 'MainSettings':
-		return Binder(MainSettings).bind(toml_dict)
 	app_name_to_suffix: dict[str, set[str]] = field(default_factory=lambda: {"taimee":{"co", "taimee"}, "mercari":{"mercari", "work"}})
 	"""Screenshot image file suffix set: suffix is the part of filename before extention, delimiter is dot (.)"""
 	app_names: list[str] = field(default_factory=lambda: ['TAIMEE', 'MERCARI'])
@@ -102,6 +99,10 @@ class MainSettings:
 	exclude_area_param_set: set[str] = field(default_factory=set) # { {f'{n}' for n in image_area_param_names()} }
 	"""Exclude a set of image area parameter names"""
 
+	@classmethod
+	def from_dict(cls, toml_dict: dict[str, Any]) -> 'MainSettings':
+		return Binder(MainSettings).bind(toml_dict)
+
 def append_doc(fd):
 	return f"{fd}:{fd.default_factory()}"
 MainSettings.__doc__ = MainSettings.__doc__ or '' + "\n".join([append_doc(fd) for fd in fields(MainSettings) if callable(fd.default_factory)])
@@ -149,14 +150,14 @@ def search_settings_file(script_fullpath: Path|str = Path(__file__), replace=('_
 	else:
 		raise FileNotFoundError(f"No proper TOML configuration file found at: {main_settings_file}")
 
-def load_merged_settings(main_settings_file: Path|str, settings_class = MainSettings) -> MainSettings:
-	"""Load and merge the main settings with the arguments settings"""
-	toml_settings = load_main_settings(main_settings_file)
+def load_merged_settings(main_settings_file: Path|str, main_settings_class = MainSettings, merge_settings_class = MainSettings) -> MainSettings:
+	"""Load and merge the main settings with the merge settings"""
+	toml_settings = load_main_settings(main_settings_file, main_settings_class)
 	parser = ArgumentParser()
-	parser.add_arguments(settings_class, dest="settings")
+	parser.add_arguments(merge_settings_class, dest="settings")
 	args = parser.parse_args()
 	args_settings_dict = asdict(args.settings)
-	org_settings = settings_class()
+	org_settings = merge_settings_class()
 	org_settings_dict = asdict(org_settings)
 	org_diff_args = DeepDiff(org_settings_dict, args_settings_dict)
 	settings_keys_diff = org_diff_args.affected_root_keys
