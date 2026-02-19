@@ -149,21 +149,23 @@ def search_settings_file(script_fullpath: Path|str = Path(__file__), replace=('_
 		return main_settings_file
 	else:
 		raise FileNotFoundError(f"No proper TOML configuration file found at: {main_settings_file}")
-
-def load_merged_settings(main_settings_file: Path|str, main_settings_class = MainSettings, merge_settings_class = MainSettings) -> MainSettings:
-	"""Load and merge the main settings with the merge settings"""
-	toml_settings = load_main_settings(main_settings_file, main_settings_class)
+class SubSettings(MainSettings):
+	pass
+def load_merged_settings(main_settings_file: Path|str, main_settings_class = MainSettings, sub_settings_class = SubSettings) -> SubSettings:
+	"""Load and merge the main settings with the sub settings(descendent of main class: 'sub' is broader than 'main') from settings file(in TOML format, 'main' settings range) and command line parameters('sub' settings range)"""
+	file_settings = load_main_settings(main_settings_file, main_settings_class)
+	settings = sub_settings_class()
+	settings_dict = asdict(settings)
+	file_sub_diff = DeepDiff(asdict(file_settings), (settings_dict))
+	for key in file_sub_diff.affected_root_keys:
+		setattr(settings, key, getattr(file_settings, key))
 	parser = ArgumentParser()
-	parser.add_arguments(merge_settings_class, dest="settings")
+	parser.add_arguments(sub_settings_class, dest="settings") # from command line param.
 	args = parser.parse_args()
-	args_settings_dict = asdict(args.settings)
-	org_settings = merge_settings_class()
-	org_settings_dict = asdict(org_settings)
-	org_diff_args = DeepDiff(org_settings_dict, args_settings_dict)
-	settings_keys_diff = org_diff_args.affected_root_keys
-	for key in settings_keys_diff:
-		setattr(toml_settings, key, getattr(args.settings, key))
-	return toml_settings
+	args_diff = DeepDiff(asdict(args.settings), settings_dict)
+	for key in args_diff.affected_root_keys:
+		setattr(settings, key, args.key)
+	return settings
 
 if __name__ == '__main__':
 	#print(MainSettings.__doc__)

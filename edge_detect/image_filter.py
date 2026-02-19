@@ -33,6 +33,7 @@ import tomllib
 
 cwd = Path(__file__).resolve().parent
 sys.path.insert(0, str(cwd.parent))
+from edge_detect.image_filter_main_settings import MainSettings
 from set_logger import set_logger
 logger = set_logger(__name__)
 def load_main_settings_safely(file: str = __file__):
@@ -1074,6 +1075,12 @@ CONFIG_FILE_STEM = "image-filter"
 IMAGE_AREA_PARAM_STR = "image_area_param"
 from os import environ as os_environ
 # @tst.cli(MainSettings, "image_filter")
+
+class OptionalMainSettings(MainSettings):
+	toml_template: bool = False
+	""" Generate TOML format template of MainSettings"""
+
+
 def main(#settings: MainSettings,
 	config_file = __file__,
 	config_dir = '', 
@@ -1085,72 +1092,21 @@ def main(#settings: MainSettings,
 	try:
 		main_settings_file = search_settings_file(config_file, replace=['_', '-'])
 		logger.info("main_settings_file: %s", main_settings_file)
-		args = load_merged_settings(main_settings_file)
+		args = load_merged_settings(main_settings_file, main_settings_class=MainSettings, sub_settings_class=OptionalMainSettings)
 		# config_dir = Path(config_dir) if config_dir else Path.cwd() if usecwd else Path(__file__).parent
 		# if str(config_dir)[0] == '~':
 		#	config_dir = config_dir.expanduser()
 	except Exception as e:
 		logger.error("Failed to load main settings.", exc_info=True)
 		raise ValueError("Invalid config_dir") from e
-	'''if not config_dir.is_dir():
-		raise ValueError("Invalid config_dir")
-	dotenv_path = ''
-	used_env_files = []
-	clean_env_values = {}
-	env_values = {}
-	for env_file in env_files:
-		if (dotenv_path := find_dotenv( filename = env_file, usecwd = usecwd)):
-			try:
-				with open(dotenv_path) as rf:
-					_env_values = dotenv_values(stream=rf) #, override=True) # f"{config_dir}/{env_file}")
-					clean_env_values = {str(k): str(v) for k, v in _env_values.items() if v is not None}
-					if clean_env_values:
-						env_values |= clean_env_values
-						used_env_files.append(env_file)
-			except IOError:
-				logger.warning("Failed to load environment values from environment file '%s': Using default environment values.", dotenv_path)
-	if (dotenv_path := find_dotenv( filename = common_env_file, usecwd = usecwd)):
-		try:
-			with open(dotenv_path) as rf:
-				_env_values = dotenv_values(stream=rf) #, override=True) # f"{config_dir}/{env_file}")
-				clean_env_values2 = {str(k): str(v) for k, v in _env_values.items() if startswith_prefixes(k) and k not in clean_env_values and v is not None} # Convert all keys and values to strings explicitly
-				if clean_env_values2:
-					env_values |= clean_env_values2
-					used_env_files.append(common_env_file)
-		except IOError:
-			logger.warning("Failed to load environment values from environment file '%s': Using default environment values.", dotenv_path)
-	if used_env_files:
-		os_environ.update(env_values)
-		logger.info("Environment values updated from %s as: %s", used_env_files, env_values)
-
-	args = MAIN_SETTINGS #get_args([settings_file])
-	command_config_files = [MAIN_SETTINGS_TOML_PATH]
-	parser = ArgParser( default_config_files=command_config_files,
-		description='OCR Image filter for PAYSTUB screenshots',
-		epilog=f"Example: python image_filter.py --files image1.png image2.png --app <APP_NAME> --nth 1\nConfig file: {MAIN_SETTINGS_TOML_PATH}\nConfig file template:\n{'\n'.join(list(main_settings_toml_lines()))}",
-		formatter_class=RawTextHelpFormatter)
-	parser.add_argument('--files', type=str, nargs='*')
-	parser.add_argument('--app', type=str, choices=[n.name.lower() for n in APP_NAME])
-	parser.add_argument('--nth', type=int, default=1)
-	from sys import argv
-	opts, other_args = parser.parse_known_args(argv[1:])'''
+	if args.toml_template:
+		from image_filter_main_settings import generate_toml_template
+		generate_toml_template(MainSettings)
+		return
 	from taimee_filter import TaimeeFilter
 	APP_NAME_TO_FILTER_CLASS = {APP_NAME.TAIMEE: TaimeeFilter}
 	OCR_FILTER = "ocr-filter"
 
-	'''if opts.app:
-		try:
-			opts.app = APP_NAME[opts.app.upper()]
-		except KeyError:
-			opts.app = None
-	args.app = opts.app
-	if opts.nth:
-		args.nth = opts.nth
-
-	if opts.files:
-		args.files = opts.files
-		for file in opts.files:
-			args.files.append(file)'''
 	args.app = APP_NAME[args.app.upper()]
 	image_path_dir: Path | None = None
 	args.image_dir = Path(args.image_dir).expanduser()
