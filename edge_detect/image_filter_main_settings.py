@@ -151,21 +151,25 @@ def search_settings_file(script_fullpath: Path|str = Path(__file__), replace=('_
 		raise FileNotFoundError(f"No proper TOML configuration file found at: {main_settings_file}")
 class SubSettings(MainSettings):
 	pass
-def load_merged_settings(main_settings_file: Path|str, main_settings_class = MainSettings, sub_settings_class = SubSettings) -> SubSettings:
+def load_merged_settings(main_settings_file: Path|str, main_settings_class = MainSettings, sub_settings_class = MainSettings, file_main_diff_list:list[str]|None=None, args_sub_diff_list:list[str]|None=None) -> MainSettings:
 	"""Load and merge the main settings with the sub settings(descendent of main class: 'sub' is broader than 'main') from settings file(in TOML format, 'main' settings range) and command line parameters('sub' settings range)"""
 	file_settings = load_main_settings(main_settings_file, main_settings_class)
-	settings = sub_settings_class()
-	settings_dict = asdict(settings)
-	file_sub_diff = DeepDiff(asdict(file_settings), (settings_dict))
-	for key in file_sub_diff.affected_root_keys:
-		setattr(settings, key, getattr(file_settings, key))
+	main_settings = main_settings_class()
+	file_main_diff = DeepDiff(asdict(file_settings), (asdict(main_settings)))
+	for key in file_main_diff.affected_root_keys:
+		setattr(main_settings, key, getattr(file_settings, key))
+		if file_main_diff_list is not None:
+			file_main_diff_list.append(key)
+	sub_settings = sub_settings_class()
 	parser = ArgumentParser()
 	parser.add_arguments(sub_settings_class, dest="settings") # from command line param.
 	args = parser.parse_args()
-	args_diff = DeepDiff(asdict(args.settings), settings_dict)
-	for key in args_diff.affected_root_keys:
-		setattr(settings, key, args.key)
-	return settings
+	args_sub_diff = DeepDiff(asdict(args.settings), asdict(sub_settings))
+	for key in args_sub_diff.affected_root_keys:
+		setattr(sub_settings, key, getattr(args.settings, key))
+		if args_sub_diff_list is not None:
+			args_sub_diff_list.append(key)
+	return sub_settings
 
 if __name__ == '__main__':
 	#print(MainSettings.__doc__)

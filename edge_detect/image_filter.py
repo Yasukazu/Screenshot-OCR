@@ -1076,6 +1076,7 @@ IMAGE_AREA_PARAM_STR = "image_area_param"
 from os import environ as os_environ
 # @tst.cli(MainSettings, "image_filter")
 
+@dataclass
 class OptionalMainSettings(MainSettings):
 	toml_template: bool = False
 	""" Generate TOML format template of MainSettings"""
@@ -1092,7 +1093,9 @@ def main(#settings: MainSettings,
 	try:
 		main_settings_file = search_settings_file(config_file, replace=['_', '-'])
 		logger.info("main_settings_file: %s", main_settings_file)
-		args = load_merged_settings(main_settings_file, main_settings_class=MainSettings, sub_settings_class=OptionalMainSettings)
+		file_sub_diff_list = []
+		args_sub_diff_list = []
+		args = load_merged_settings(main_settings_file, main_settings_class=MainSettings, sub_settings_class=OptionalMainSettings, file_main_diff_list=file_sub_diff_list, args_sub_diff_list=args_sub_diff_list)
 		# config_dir = Path(config_dir) if config_dir else Path.cwd() if usecwd else Path(__file__).parent
 		# if str(config_dir)[0] == '~':
 		#	config_dir = config_dir.expanduser()
