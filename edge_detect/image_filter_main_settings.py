@@ -108,9 +108,9 @@ def append_doc(fd):
 MainSettings.__doc__ = MainSettings.__doc__ or '' + "\n".join([append_doc(fd) for fd in fields(MainSettings) if callable(fd.default_factory)])
 def main_settings_from_dict(toml_dict: dict[str, Any]) -> MainSettings:
 	return Binder(MainSettings).bind(toml_dict)
-def main_settings_toml_lines()-> Iterator[str]:
+def main_settings_toml_lines(Settings=MainSettings)-> Iterator[str]:
 	from dataclass_binder import Binder
-	for line in Binder(MainSettings()).format_toml_template(): # Need to generate an instance to get default values of default factory
+	for line in Binder(Settings()).format_toml_template(): # Need to generate an instance to get default values of default factory
 		yield(line)
 def get_toml_path(fullpath: str|None, replacement_chars: str | None = "_-")-> Path:
 	"""Get the default TOML filename from the given filename(as fullpath: <dir>/<stem>.<ext>). 
@@ -170,7 +170,9 @@ def load_merged_settings(main_settings_file: Path|str, main_settings_class = Mai
 		if args_sub_diff_list is not None:
 			args_sub_diff_list.append(key)
 	return sub_settings
-
+def generate_toml_template(Settings=MainSettings, file=sys.stdout):
+	for line in main_settings_toml_lines(Settings):
+		print(line, file=file)
 if __name__ == '__main__':
 	#print(MainSettings.__doc__)
 	print('-*-' * 20 + 'template'+ '-*-' * 20)
