@@ -1,7 +1,7 @@
 """ MainSettings by DataclassBinder"""
 from pathlib import Path
 import tomllib
-from typing import Any, Callable, Iterator
+from typing import Any, Callable, Iterator, Type
 from dataclasses import asdict, dataclass, field, fields
 from enum import Enum
 from dataclass_binder import Binder
@@ -28,8 +28,12 @@ def area_param_names():
 	return ['HEADING', 'SHIFT', 'BREAKTIME', 'PAYSTUB', 'SALARY']
 def default_factories():
 	return [app_names, area_param_names]
+
+@dataclass
+class Settings:
+	pass
 @dataclass(kw_only=True)
-class MainSettings:
+class MainSettings(Settings):
 	"""
 	Extract/OCR paystub text from an image file: Files for OCR by 'files' option may be specified with app-name-suffix in wildcard(glob pattern matching like '--files *.<APP_NAME>*.png') or by 'shot-month' option (like '--shot_month -1' for last month, 0 for current month, other positive value for month number: Jan. is 1, Dec. is 12, ...) and 'app' option (like '--app taimee')
 	"""
@@ -108,7 +112,8 @@ def append_doc(fd):
 MainSettings.__doc__ = MainSettings.__doc__ or '' + "\n".join([append_doc(fd) for fd in fields(MainSettings) if callable(fd.default_factory)])
 def main_settings_from_dict(toml_dict: dict[str, Any]) -> MainSettings:
 	return Binder(MainSettings).bind(toml_dict)
-def main_settings_toml_lines(Settings=MainSettings)-> Iterator[str]:
+def main_settings_toml_lines(Settings:Type[Settings]=MainSettings)-> Iterator[str]:
+	"""Generate TOML lines from the given settings class"""
 	from dataclass_binder import Binder
 	for line in Binder(Settings()).format_toml_template(): # Need to generate an instance to get default values of default factory
 		yield(line)
@@ -127,8 +132,8 @@ def get_toml_path(fullpath: str|None, replacement_chars: str | None = "_-")-> Pa
 		logger.error("No proper TOML configuration file found at: %s", toml)
 		raise FileNotFoundError(f"No proper TOML configuration file found at: {toml}")
 	return toml
-def load_main_settings(fullpath: Path|str, settings_class=MainSettings, table: str = "") -> MainSettings:
-	"""Load the TOML file and return the MainSettings instance of Binder"""
+def load_main_settings(fullpath: Path|str, settings_class:Type[Settings]=Settings, table: str = "") -> Settings:
+	"""Load the TOML file and return the Settings instance of Binder"""
 	with Path(fullpath).open("rb") as f:
 		config = tomllib.load(f)
 	main_settings = Binder(settings_class).bind(config[table] if table else config)
@@ -149,9 +154,31 @@ def search_settings_file(script_fullpath: Path|str = Path(__file__), replace=('_
 		return main_settings_file
 	else:
 		raise FileNotFoundError(f"No proper TOML configuration file found at: {main_settings_file}")
-class SubSettings(MainSettings):
-	pass
-def load_merged_settings(main_settings_file: Path|str, main_settings_class = MainSettings, sub_settings_class = MainSettings, file_main_diff_list:list[str]|None=None, args_sub_diff_list:list[str]|None=None) -> MainSettings:
+
+from deepmerge import always_merger
+# result = always_merger.merge(base, next_dict)
+def load_merged_settings(main_settings_file: Path|str, main_settings_class = Settings, sub_settings_class = Settings, file_args_diffs={}) -> Settings:
+	"""Load and merge the main settings with the sub settings(descendent of main class: 'sub' is broader than 'main') from settings file(in TOML format, 'main' settings range) and command line parameters('sub' settings range).
+	Every difference in dict.value is replaced.
+	Any difference in a list is appended.
+	DeepDiff search results in keys:('file', 'args') are stored in dict. 'file_args_diff'."""
+	by_file_settings = load_main_settings(main_settings_file, main_settings_class)
+	default_main_settings = main_settings_class()
+	file_main_diff = DeepDiff((by_file_settings_dict:=asdict(by_file_settings)), (default_main_settings_dict:=asdict(default_main_settings)))
+	file_args_diffs['file'] = file_main_diff # .affected_root_keys
+	merged_main_settings_dict = always_merger.merge(default_main_settings_dict, by_file_settings_dict)
+	sub_settings = sub_settings_class()
+	parser = ArgumentParser()
+	parser.add_arguments(sub_settings_class, dest="settings") # from command line param.
+	args = parser.parse_args()
+	args_sub_diff = DeepDiff((args_settings_dict:=asdict(args.settings)), (sub_settings_dict:=asdict(sub_settings)))
+	file_args_diffs['args'] = args_sub_diff # .affected_root_keys
+	merged_sub_settings_dict = always_merger.merge(sub_settings_dict, args_settings_dict)
+	merged_sub_settings_dict = always_merger.merge(merged_main_settings_dict, {k:v for k,v in merged_sub_settings_dict.items() if k in merged_main_settings_dict})
+	return sub_settings_class(**(merged_main_settings_dict | merged_sub_settings_dict))
+
+
+def load_merged_settings_no_deep_merge(main_settings_file: Path|str, main_settings_class = MainSettings, sub_settings_class = MainSettings, file_main_diff_list:list[str]|None=None, args_sub_diff_list:list[str]|None=None) -> MainSettings:
 	"""Load and merge the main settings with the sub settings(descendent of main class: 'sub' is broader than 'main') from settings file(in TOML format, 'main' settings range) and command line parameters('sub' settings range)"""
 	file_settings = load_main_settings(main_settings_file, main_settings_class)
 	main_settings = main_settings_class()
@@ -170,9 +197,34 @@ def load_merged_settings(main_settings_file: Path|str, main_settings_class = Mai
 		if args_sub_diff_list is not None:
 			args_sub_diff_list.append(key)
 	return sub_settings
-def generate_toml_template(Settings=MainSettings, file=sys.stdout):
+
+def load_main_settings_safely(file: str = __file__, settings_class=Settings, replace: tuple[str, str] = ('_', '-')) -> tuple[Settings, Path]:
+	"""Load main settings(with exception handlings as messages: FileNotFoundError, OSError, tomllib.TOMLDecodeError, KeyError, ValueError) from a TOML file, the name is replaced the filename of the script as underscore(_) to hypen(-).
+	Returns: (Settings, Path)"""
+	try:
+		toml_path = search_settings_file(file, replace)
+		MAIN_SETTINGS = load_main_settings(toml_path, settings_class)
+	except FileNotFoundError as e:
+		logger.error("TOML configuration file not found: %s", e)
+		raise
+	except OSError as e:
+		logger.error("File system error accessing TOML configuration: %s", e)
+		raise
+	except tomllib.TOMLDecodeError as e:
+		logger.error("TOML configuration file is malformed or contains invalid syntax: %s", e)
+		raise
+	except (KeyError, ValueError) as e:
+		logger.error("Configuration error in main settings: %s", e)
+		raise
+	else:
+		logger.info("Loaded main settings: %s", MAIN_SETTINGS)
+	return MAIN_SETTINGS, toml_path
+
+def generate_toml_template(Settings:Type[Settings]=MainSettings, file=sys.stdout):
+	""" print each line to the specified file """
 	for line in main_settings_toml_lines(Settings):
 		print(line, file=file)
+
 if __name__ == '__main__':
 	#print(MainSettings.__doc__)
 	print('-*-' * 20 + 'template'+ '-*-' * 20)
