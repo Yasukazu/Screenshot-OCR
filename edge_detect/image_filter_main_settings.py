@@ -165,7 +165,7 @@ def search_settings_file(script_fullpath: Path|str = Path(__file__), replace=('_
 
 from deepmerge import always_merger
 # result = always_merger.merge(base, next_dict)
-def load_merged_settings(by_file_settings: MainSettings, main_settings_class = MainSettings, sub_settings_class = MainSettings, file_diffs:dict|None=None, args_diffs:dict|None=None) -> Settings:
+def load_merged_settings(by_file_settings: MainSettings, main_settings_class = MainSettings, sub_settings_class = MainSettings, file_diffs:list|None=None, args_diffs:list|None=None) -> Settings:
 	"""Load and merge the main settings with the sub settings(descendent of main class: 'sub' is broader than 'main') from settings file(in TOML format, 'main' settings range) and command line parameters('sub' settings range).
 	Every difference in dict.value is replaced.
 	Any difference in a list is appended.
@@ -174,7 +174,7 @@ def load_merged_settings(by_file_settings: MainSettings, main_settings_class = M
 	default_main_settings = main_settings_class()
 	file_main_diff = DeepDiff((by_file_settings_dict:=asdict(by_file_settings)), (default_main_settings_dict:=asdict(default_main_settings)))
 	if file_diffs is not None:
-		file_diffs['file'] = file_main_diff # .affected_root_keys
+		file_diffs += file_main_diff.affected_root_keys
 	merged_main_settings_dict = always_merger.merge(default_main_settings_dict, by_file_settings_dict)
 	sub_settings = sub_settings_class()
 	parser = ArgumentParser()
@@ -182,7 +182,7 @@ def load_merged_settings(by_file_settings: MainSettings, main_settings_class = M
 	args = parser.parse_args()
 	args_sub_diff = DeepDiff((args_settings_dict:=asdict(args.settings)), (sub_settings_dict:=asdict(sub_settings)))
 	if args_diffs is not None:
-		args_diffs['args'] = args_sub_diff # .affected_root_keys
+		args_diffs += args_sub_diff.affected_root_keys
 	merged_sub_settings_dict = always_merger.merge(sub_settings_dict, args_settings_dict)
 	merged_sub_settings_dict = always_merger.merge(merged_main_settings_dict, {k:v for k,v in merged_sub_settings_dict.items() if k in merged_main_settings_dict})
 	return sub_settings_class(**(merged_main_settings_dict | merged_sub_settings_dict))
@@ -247,8 +247,8 @@ if __name__ == '__main__':
 	main_settings_file = search_settings_file(__file__)#script_dir / (toml_name:=(script_fullpath.stem.replace('_', '-') + '.toml'))
 
 	by_file_main_settings, used_settings_file = load_main_settings_safely(main_settings_file)
-	file_diffs = {}
-	args_diffs = {}
+	file_diffs = []
+	args_diffs = []
 	from image_filter import OptionalMainSettings
 	merged_settings = load_merged_settings(by_file_main_settings, sub_settings_class=OptionalMainSettings, file_diffs=file_diffs, args_diffs=args_diffs)
 	main_settings_dict = asdict(by_file_main_settings)
