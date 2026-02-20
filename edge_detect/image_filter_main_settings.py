@@ -132,7 +132,7 @@ def get_toml_path(fullpath: str|None, replacement_chars: str | None = "_-")-> Pa
 		logger.error("No proper TOML configuration file found at: %s", toml)
 		raise FileNotFoundError(f"No proper TOML configuration file found at: {toml}")
 	return toml
-def load_main_settings(fullpath: Path|str, settings_class:Type[Settings]=Settings, table: str = "") -> Settings:
+def load_main_settings(fullpath: Path|str, settings_class:Type[Settings]=MainSettings, table: str = "") -> Settings:
 	"""Load the TOML file and return the Settings instance of Binder"""
 	with Path(fullpath).open("rb") as f:
 		config = tomllib.load(f)
@@ -147,32 +147,42 @@ def search_settings_file(script_fullpath: Path|str = Path(__file__), replace=('_
 	user_home_dir = Path('~').expanduser()
 	main_settings_file = script_dir / (toml_name:=(Path(script_fullpath).stem.replace(replace[0], replace[1]) + '.toml'))
 	found = False
-	while not (found:=main_settings_file.exists()) and script_dir != user_home_dir:
-		script_dir = script_dir.parent
-		main_settings_file = script_dir / toml_name
-	if found:
-		return main_settings_file
-	else:
-		raise FileNotFoundError(f"No proper TOML configuration file found at: {main_settings_file}")
+	class SameDir(Exception):
+		pass
+	try:
+		while not (found:=main_settings_file.exists()) :
+			script_dir = script_dir.parent
+			if script_dir == user_home_dir:
+				raise SameDir()
+			main_settings_file = script_dir / toml_name
+		if found:
+			return main_settings_file
+	except SameDir:
+		if (main_settings_file:=(script_dir / toml_name)).exists():
+			return main_settings_file
+	logger.error("No proper TOML configuration file found at: %s", main_settings_file)
+	raise FileNotFoundError("No proper TOML configuration file found")
 
 from deepmerge import always_merger
 # result = always_merger.merge(base, next_dict)
-def load_merged_settings(main_settings_file: Path|str, main_settings_class = Settings, sub_settings_class = Settings, file_args_diffs={}) -> Settings:
+def load_merged_settings(by_file_settings: Settings, main_settings_class = Settings, sub_settings_class = Settings, file_diffs:dict|None=None, args_diffs:dict|None=None) -> Settings:
 	"""Load and merge the main settings with the sub settings(descendent of main class: 'sub' is broader than 'main') from settings file(in TOML format, 'main' settings range) and command line parameters('sub' settings range).
 	Every difference in dict.value is replaced.
 	Any difference in a list is appended.
 	DeepDiff search results in keys:('file', 'args') are stored in dict. 'file_args_diff'."""
-	by_file_settings = load_main_settings(main_settings_file, main_settings_class)
+
 	default_main_settings = main_settings_class()
 	file_main_diff = DeepDiff((by_file_settings_dict:=asdict(by_file_settings)), (default_main_settings_dict:=asdict(default_main_settings)))
-	file_args_diffs['file'] = file_main_diff # .affected_root_keys
+	if file_diffs is not None:
+		file_diffs['file'] = file_main_diff # .affected_root_keys
 	merged_main_settings_dict = always_merger.merge(default_main_settings_dict, by_file_settings_dict)
 	sub_settings = sub_settings_class()
 	parser = ArgumentParser()
 	parser.add_arguments(sub_settings_class, dest="settings") # from command line param.
 	args = parser.parse_args()
 	args_sub_diff = DeepDiff((args_settings_dict:=asdict(args.settings)), (sub_settings_dict:=asdict(sub_settings)))
-	file_args_diffs['args'] = args_sub_diff # .affected_root_keys
+	if args_diffs is not None:
+		args_diffs['args'] = args_sub_diff # .affected_root_keys
 	merged_sub_settings_dict = always_merger.merge(sub_settings_dict, args_settings_dict)
 	merged_sub_settings_dict = always_merger.merge(merged_main_settings_dict, {k:v for k,v in merged_sub_settings_dict.items() if k in merged_main_settings_dict})
 	return sub_settings_class(**(merged_main_settings_dict | merged_sub_settings_dict))
@@ -198,11 +208,11 @@ def load_merged_settings_no_deep_merge(main_settings_file: Path|str, main_settin
 			args_sub_diff_list.append(key)
 	return sub_settings
 
-def load_main_settings_safely(file: str = __file__, settings_class=Settings, replace: tuple[str, str] = ('_', '-')) -> tuple[Settings, Path]:
+def load_main_settings_safely(file: str|Path = __file__, settings_class=MainSettings, replace: tuple[str, str] = ('_', '-'), search_file=False) -> tuple[Settings, Path]:
 	"""Load main settings(with exception handlings as messages: FileNotFoundError, OSError, tomllib.TOMLDecodeError, KeyError, ValueError) from a TOML file, the name is replaced the filename of the script as underscore(_) to hypen(-).
 	Returns: (Settings, Path)"""
 	try:
-		toml_path = search_settings_file(file, replace)
+		toml_path = search_settings_file(file, replace) if search_file else Path(file).with_name(Path(file).stem.replace(*replace) + '.toml')
 		MAIN_SETTINGS = load_main_settings(toml_path, settings_class)
 	except FileNotFoundError as e:
 		logger.error("TOML configuration file not found: %s", e)
@@ -220,7 +230,7 @@ def load_main_settings_safely(file: str = __file__, settings_class=Settings, rep
 		logger.info("Loaded main settings: %s", MAIN_SETTINGS)
 	return MAIN_SETTINGS, toml_path
 
-def generate_toml_template(Settings:Type[Settings]=MainSettings, file=sys.stdout):
+def print_toml_template(Settings:Type[Settings]=MainSettings, file=sys.stdout):
 	""" print each line to the specified file """
 	for line in main_settings_toml_lines(Settings):
 		print(line, file=file)
@@ -228,16 +238,19 @@ def generate_toml_template(Settings:Type[Settings]=MainSettings, file=sys.stdout
 if __name__ == '__main__':
 	#print(MainSettings.__doc__)
 	print('-*-' * 20 + 'template'+ '-*-' * 20)
-	print('\n'.join(main_settings_toml_lines()))
+	print_toml_template()
+	# print('\n'.join(main_settings_toml_lines()))
 	print('-*-' * 20 + 'toml'+ '-*-' * 20)
 	script_fullpath = Path(__file__)
 	script_dir = script_fullpath.parent
 	user_home_dir = Path('~').expanduser()
 	main_settings_file = search_settings_file(__file__)#script_dir / (toml_name:=(script_fullpath.stem.replace('_', '-') + '.toml'))
 
-	main_settings = load_main_settings(main_settings_file)
-	merged_settings = load_merged_settings(main_settings_file)
-	main_settings_dict = asdict(main_settings)
+	by_file_main_settings, used_settings_file = load_main_settings_safely(main_settings_file)
+	file_diffs = {}
+	args_diffs = {}
+	merged_settings = load_merged_settings(by_file_main_settings, file_diffs=file_diffs, args_diffs=args_diffs)
+	main_settings_dict = asdict(by_file_main_settings)
 	merged_settings_dict = asdict(merged_settings)
 	diff2 = DeepDiff(main_settings_dict, merged_settings_dict)
 	for key in diff2.affected_root_keys:
