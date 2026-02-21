@@ -35,7 +35,7 @@ class Settings:
 @dataclass(kw_only=True)
 class MainSettings(Settings):
 	"""
-	Extract/OCR paystub text from an image file: Files for OCR by 'files' option may be specified with app-name-suffix in wildcard(glob pattern matching like '--files *.<APP_NAME>*.png') or by 'shot-month' option (like '--shot_month -1' for last month, 0 for current month, other positive value for month number: Jan. is 1, Dec. is 12, ...) and 'app' option (like '--app taimee')
+	Extract/OCR paystub text from an image file: Files for OCR by 'files' option may be specified with app-name-suffix in wildcard(glob pattern matching like '--files *.<APP_NAME>*.png') or by 'shot-month' option (like '--shot_month -1' for last month, 0 for current month, other positive value for month number: Jan. is 1, Dec. is 12, ...) and 'app' option (like '--app <APP_NAME>')
 	"""
 
 	app_name_to_suffix: dict[str, set[str]] = field(default_factory=lambda: {"taimee":{"co", "taimee"}, "mercari":{"mercari", "work"}})
@@ -106,10 +106,19 @@ class MainSettings(Settings):
 	@classmethod
 	def from_dict(cls, toml_dict: dict[str, Any]) -> 'MainSettings':
 		return Binder(MainSettings).bind(toml_dict)
+	@classmethod
+
+	def __init_subclass__(cls, **kwargs):
+		super().__init_subclass__(**kwargs)
+		parent_doc = cls.__doc__ or ""
+		child_doc = super(cls, cls).__doc__ or ""
+		cls.__doc__ = parent_doc + "\n\n" + (child_doc or "")
 
 def append_doc(fd):
 	return f"{fd}:{fd.default_factory()}"
+
 MainSettings.__doc__ = MainSettings.__doc__ or '' + "\n".join([append_doc(fd) for fd in fields(MainSettings) if callable(fd.default_factory)])
+
 def main_settings_from_dict(toml_dict: dict[str, Any]) -> MainSettings:
 	return Binder(MainSettings).bind(toml_dict)
 def main_settings_toml_lines(Settings:Type[Settings]=MainSettings)-> Iterator[str]:

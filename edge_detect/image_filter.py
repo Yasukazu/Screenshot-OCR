@@ -49,7 +49,7 @@ if env_path:
 		logger.warning("No 'IMAGE_FILTER_MAIN_SETTINGS_PATH' in environment variables, try to find file in current directory and upward directories of filename: %s", MAIN_SETTINGS_FILENAME)
 		MAIN_SETTINGS_PATH = search_settings_file(MAIN_SETTINGS_FILENAME)
 else:
-	logger.warning("No 'load_dotenv' since no %s file found", ENV_FILENAME)
+	logger.warning("No 'dotenv' file loaded since no file found: %s", ENV_FILENAME)
 	MAIN_SETTINGS_PATH = search_settings_file(MAIN_SETTINGS_FILENAME)
 _load_result = load_main_settings_safely(MAIN_SETTINGS_PATH)
 if is_successful(_load_result):
@@ -1089,8 +1089,9 @@ from os import environ as os_environ
 
 @dataclass
 class OptionalMainSettings(MainSettings):
+	""" Optional settings for MainSettings: print TOML format option is added """
 	toml_template: bool = False
-	""" Generate TOML format template of MainSettings"""
+	""" Print TOML format template of MainSettings"""
 
 
 def main(main_settings: MainSettings=MAIN_SETTINGS,
