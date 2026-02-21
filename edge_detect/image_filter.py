@@ -1,3 +1,4 @@
+from os import environ as os_environ
 from os import getcwd
 from os import path as os_path
 from configparser import ConfigParser
@@ -13,10 +14,9 @@ from datetime import date as Date
 import sys
 import atexit
 from tomlkit import TOMLDocument
-from dotenv import load_dotenv
-
-from cv2 import UMat
+from dotenv import load_dotenv, find_dotenv
 import cv2
+from cv2 import UMat
 from returns.result import safe #, attempt, Result, Failure, Success
 from returns.pipeline import is_successful
 # from returns.primitives.exceptions import UnwrapFailedError
@@ -34,31 +34,41 @@ import tomllib
 cwd = Path(__file__).resolve().parent
 sys.path.insert(0, str(cwd.parent))
 from edge_detect.image_filter_main_settings import MainSettings
+from edge_detect.image_filter_main_settings import load_main_settings_safely, search_settings_file
 from set_logger import set_logger
-logger = set_logger(__name__)
-def load_main_settings_safely(file: str = __file__):
-	"""Load main settings(with comprehensive exception handling) from a TOML file, the name is replaced the filename of the script as underscore(_) to hypen(-)."""
-	from image_filter_main_settings import load_main_settings, main_settings_toml_lines, search_settings_file
-	try:
-		toml_path = search_settings_file(file)
-		MAIN_SETTINGS = load_main_settings(toml_path)
-	except FileNotFoundError as e:
-		logger.error("TOML configuration file not found: %s", e)
-		raise
-	except OSError as e:
-		logger.error("File system error accessing TOML configuration: %s", e)
-		raise
-	except tomllib.TOMLDecodeError as e:
-		logger.error("TOML configuration file is malformed or contains invalid syntax: %s", e)
-		raise
-	except (KeyError, ValueError) as e:
-		logger.error("Configuration error in main settings: %s", e)
-		raise
-	else:
-		logger.info("Loaded main settings: %s", MAIN_SETTINGS)
-	return MAIN_SETTINGS, toml_path
-
-MAIN_SETTINGS, MAIN_SETTINGS_TOML_PATH = load_main_settings_safely(__file__)
+from logging import INFO as LOG_LEVEL_INFO
+logger = set_logger(__name__, loglevel=LOG_LEVEL_INFO)
+ENV_FILENAME = ".env"
+env_path = find_dotenv(ENV_FILENAME)  # Searches up the tree from __file__ or cwd
+if env_path:
+	load_dotenv(env_path)
+else:
+	logger.warning("No 'load_dotenv' since no %s file found", ENV_FILENAME)
+MAIN_SETTINGS_FILENAME = "image-filter-main-settings.toml"
+try:
+	MAIN_SETTINGS_PATH = os_environ["IMAGE_FILTER_MAIN_SETTINGS_PATH"]
+except KeyError:
+	logger.warning("No 'IMAGE_FILTER_MAIN_SETTINGS_PATH' in environment variables, try to find file in current directory and upward directories of filename: %s", MAIN_SETTINGS_FILENAME)
+	MAIN_SETTINGS_PATH = search_settings_file(MAIN_SETTINGS_FILENAME)
+_load_result = load_main_settings_safely(MAIN_SETTINGS_PATH)
+if is_successful(_load_result):
+	MAIN_SETTINGS = _load_result.unwrap()
+else:
+	logger.error("Failed to load main settings")
+	match(exception:=_load_result.failure()):
+		case FileNotFoundError():
+			logger.error("File not found")
+		case OSError():
+			logger.error("File system error")
+		case tomllib.TOMLDecodeError():
+			logger.error("TOML configuration file is malformed or contains invalid syntax")
+		case KeyError():
+			logger.error("Key Configuration error in main settings")
+		case ValueError():
+			logger.error("Value Configuration error in main settings")
+		case _:
+			logger.error("exception=%s", exception)
+	exit(1)
 
 APP_NAME = Enum('APP_NAME', MAIN_SETTINGS.app_names, module=__name__)
 """ APP_NAME = Enum('APP_NAME', MAIN_SETTINGS.app_names, module="image_filter") """
@@ -1082,20 +1092,20 @@ class OptionalMainSettings(MainSettings):
 	""" Generate TOML format template of MainSettings"""
 
 
-def main(#settings: MainSettings,
-	config_file = __file__,
-	config_dir = '', 
-	env_files = ENV_FILE_NAMES,
-	common_env_file = COMMON_ENV_FILE_NAME,
+def main(main_settings: MainSettings=MAIN_SETTINGS,
+	config_file: str = __file__,
+	config_dir: str = '', 
+	env_files: list[str] = ENV_FILE_NAMES,
+	common_env_file: str = COMMON_ENV_FILE_NAME,
 	usecwd: bool = False,
 ): #abspath(dirname(__file__)) "image-filter.env"
 	from image_filter_main_settings import search_settings_file, load_merged_settings
 	try:
-		main_settings_file = search_settings_file(config_file, replace=['_', '-'])
-		logger.info("main_settings_file: %s", main_settings_file)
+		# main_settings_file = search_settings_file(config_file, replace=['_', '-'])
+		# logger.info("main_settings_file: %s", main_settings_file)
 		file_sub_diff_list = []
 		args_sub_diff_list = []
-		args = load_merged_settings(main_settings_file, main_settings_class=MainSettings, sub_settings_class=OptionalMainSettings, file_main_diff_list=file_sub_diff_list, args_sub_diff_list=args_sub_diff_list)
+		args = load_merged_settings(main_settings, main_settings_class=MainSettings, sub_settings_class=OptionalMainSettings, file_diffs=file_sub_diff_list, args_diffs=args_sub_diff_list)
 		# config_dir = Path(config_dir) if config_dir else Path.cwd() if usecwd else Path(__file__).parent
 		# if str(config_dir)[0] == '~':
 		#	config_dir = config_dir.expanduser()
@@ -1103,8 +1113,8 @@ def main(#settings: MainSettings,
 		logger.error("Failed to load main settings.", exc_info=True)
 		raise ValueError("Invalid config_dir") from e
 	if args.toml_template:
-		from image_filter_main_settings import generate_toml_template
-		generate_toml_template(MainSettings)
+		from image_filter_main_settings import print_toml_template
+		print_toml_template(MainSettings)
 		return
 	from taimee_filter import TaimeeFilter
 	APP_NAME_TO_FILTER_CLASS = {APP_NAME.TAIMEE: TaimeeFilter}
