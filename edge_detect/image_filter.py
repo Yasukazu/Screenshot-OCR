@@ -37,7 +37,8 @@ from edge_detect.image_filter_main_settings import MainSettings
 from edge_detect.image_filter_main_settings import load_main_settings_safely, search_settings_file
 from set_logger import set_logger
 from logging import INFO as LOG_LEVEL_INFO
-logger = set_logger(__name__, loglevel=LOG_LEVEL_INFO)
+from logging import WARN as LV_WARN
+logger = set_logger(__name__, loglevel=LV_WARN)
 MAIN_SETTINGS_FILENAME = "image-filter-main-settings.toml"
 ENV_FILENAME = ".env"
 env_path = find_dotenv(ENV_FILENAME)  # Searches up the tree from __file__ or cwd
@@ -1089,7 +1090,12 @@ from os import environ as os_environ
 
 @dataclass
 class OptionalMainSettings(MainSettings):
-	""" Optional settings for MainSettings: print TOML format option is added """
+	""" Optional settings for MainSettings: print TOML format option is added 
+	# To find the config. file(TOML format), it searches up directory from current Python script file(__file__).
+	Default config filename is "image-filter-main-settings.toml".
+	Or it follows to the environ variable 'IMAGE_FILTER_MAIN_SETTINGS_PATH' ('.env' file acts as an environment variable table).
+	"""
+
 	toml_template: bool = False
 	""" Print TOML format template of MainSettings"""
 
