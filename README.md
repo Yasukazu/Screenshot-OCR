@@ -11,6 +11,10 @@
 - `uv sync` # install dependencies (*uv* will refer to a `pyproject.toml` file)
 - `sudo apt install tesseract-ocr`
 ## Current development concern:
+### Configuration of `image_filter.py`
+- `dataclass binder` is used to bind a dataclass for configuration and a TOML file. It can print a template TOML file with comment in docstring of every field.
+- `simple_parsing` is used to parse command line arguments according to a dataclass configuration. It also refers comment in docstring of every field to print a help message.
+- `deepmerge` library is used to merge configurations(TOML and command line arguments) recursively.
 - edge_detect/image_filter.py: 
 - `image_filter.py` is a script to extract text from PNG (screenshot) files using OCR(_Tesseract_)
  - It uses config file with filename of `image-filter.toml` to get parameters;the config file is searched in the current directory and upward directories;if the fullpath of the file is specified in environment variable `IMAGE_FILTER_MAIN_SETTINGS_PATH`, the config file is specified by the fullpath.
