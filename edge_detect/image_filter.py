@@ -38,17 +38,18 @@ from edge_detect.image_filter_main_settings import load_main_settings_safely, se
 from set_logger import set_logger
 from logging import INFO as LOG_LEVEL_INFO
 logger = set_logger(__name__, loglevel=LOG_LEVEL_INFO)
+MAIN_SETTINGS_FILENAME = "image-filter-main-settings.toml"
 ENV_FILENAME = ".env"
 env_path = find_dotenv(ENV_FILENAME)  # Searches up the tree from __file__ or cwd
 if env_path:
 	load_dotenv(env_path)
+	try:
+		MAIN_SETTINGS_PATH = os_environ["IMAGE_FILTER_MAIN_SETTINGS_PATH"]
+	except KeyError:
+		logger.warning("No 'IMAGE_FILTER_MAIN_SETTINGS_PATH' in environment variables, try to find file in current directory and upward directories of filename: %s", MAIN_SETTINGS_FILENAME)
+		MAIN_SETTINGS_PATH = search_settings_file(MAIN_SETTINGS_FILENAME)
 else:
 	logger.warning("No 'load_dotenv' since no %s file found", ENV_FILENAME)
-MAIN_SETTINGS_FILENAME = "image-filter-main-settings.toml"
-try:
-	MAIN_SETTINGS_PATH = os_environ["IMAGE_FILTER_MAIN_SETTINGS_PATH"]
-except KeyError:
-	logger.warning("No 'IMAGE_FILTER_MAIN_SETTINGS_PATH' in environment variables, try to find file in current directory and upward directories of filename: %s", MAIN_SETTINGS_FILENAME)
 	MAIN_SETTINGS_PATH = search_settings_file(MAIN_SETTINGS_FILENAME)
 _load_result = load_main_settings_safely(MAIN_SETTINGS_PATH)
 if is_successful(_load_result):
