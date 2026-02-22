@@ -56,21 +56,22 @@ _load_result = load_main_settings_safely(MAIN_SETTINGS_PATH)
 if is_successful(_load_result):
 	MAIN_SETTINGS = _load_result.unwrap()
 else:
-	logger.error("Failed to load main settings")
+	logger.warning("Failed to load MainSettings from a configuration file: %s. Loading the original MainSettings class as a fallback.", MAIN_SETTINGS_PATH)
 	match(exception:=_load_result.failure()):
 		case FileNotFoundError():
-			logger.error("File not found")
+			logger.warning("File not found")
 		case OSError():
-			logger.error("File system error")
+			logger.warning("File system error")
 		case tomllib.TOMLDecodeError():
-			logger.error("TOML configuration file is malformed or contains invalid syntax")
+			logger.warning("TOML configuration file is malformed or contains invalid syntax")
 		case KeyError():
-			logger.error("Key Configuration error in main settings")
+			logger.warning("Key Configuration error in main settings")
 		case ValueError():
-			logger.error("Value Configuration error in main settings")
+			logger.warning("Value Configuration error in main settings")
 		case _:
-			logger.error("exception=%s", exception)
-	exit(1)
+			logger.warning("Error from an exception: %s", exception)
+	from image_filter_main_settings import MainSettings
+	MAIN_SETTINGS = MainSettings()
 
 APP_NAME = Enum('APP_NAME', MAIN_SETTINGS.app_names, module=__name__)
 """ APP_NAME = Enum('APP_NAME', MAIN_SETTINGS.app_names, module="image_filter") """
@@ -1090,10 +1091,10 @@ from os import environ as os_environ
 
 @dataclass
 class OptionalMainSettings(MainSettings):
-	""" Optional settings for MainSettings: print TOML format option is added 
-	# To find the config. file(TOML format), it searches up directory from current Python script file(__file__).
-	Default config filename is "image-filter-main-settings.toml".
-	Or it follows to the environ variable 'IMAGE_FILTER_MAIN_SETTINGS_PATH' ('.env' file acts as an environment variable table).
+	""" OptionalMainSettings is a descendant of MainSettings: print TOML format option is added 
+	# To find the configuration file(TOML format), it searches up directory tree from this Python script file(__file__)'s current directory.
+	Configuration filename is "image-filter-main-settings.toml".
+	unless an environ variable 'IMAGE_FILTER_MAIN_SETTINGS_PATH' points to a configuration file ('.env' file acts as an environment variable table).
 	"""
 
 	toml_template: bool = False
@@ -1107,7 +1108,7 @@ def main(main_settings: MainSettings=MAIN_SETTINGS,
 	common_env_file: str = COMMON_ENV_FILE_NAME,
 	usecwd: bool = False,
 ): #abspath(dirname(__file__)) "image-filter.env"
-	from image_filter_main_settings import search_settings_file, load_merged_settings
+	from image_filter_main_settings import load_merged_settings
 	try:
 		# main_settings_file = search_settings_file(config_file, replace=['_', '-'])
 		# logger.info("main_settings_file: %s", main_settings_file)

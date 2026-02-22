@@ -141,7 +141,7 @@ def get_toml_path(fullpath: str|None, replacement_chars: str | None = "_-")-> Pa
 		logger.error("No proper TOML configuration file found at: %s", toml)
 		raise FileNotFoundError(f"No proper TOML configuration file found at: {toml}")
 	return toml
-def load_main_settings(fullpath: Path|str, settings_class:Type[Settings]=MainSettings, table: str = "") -> Settings:
+def load_main_settings(fullpath: Path|str, settings_class:Type[MainSettings]=MainSettings, table: str = "") -> MainSettings:
 	"""Load the TOML file and return the Settings instance of Binder"""
 	with Path(fullpath).open("rb") as f:
 		config = tomllib.load(f)
@@ -220,7 +220,7 @@ def load_merged_settings_no_deep_merge(main_settings_file: Path|str, main_settin
 
 from returns.result import safe
 @safe
-def load_main_settings_safely(file: str|Path = __file__, settings_class=MainSettings, replace: tuple[str, str] = ('_', '-'), search_file=False) -> Settings:
+def load_main_settings_safely(file: str|Path = __file__, settings_class=MainSettings, replace: tuple[str, str] = ('_', '-'), search_file=False) -> MainSettings:
 	"""Load main settings(with exception handlings as messages: FileNotFoundError, OSError, tomllib.TOMLDecodeError, KeyError, ValueError) from a TOML file, the name is replaced the filename of the script as underscore(_) to hypen(-).
 	Returns: (Settings, Path)"""
 	try:
