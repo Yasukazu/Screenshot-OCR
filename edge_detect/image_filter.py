@@ -53,8 +53,10 @@ else:
 	logger.warning("No 'dotenv' file loaded since no file found: %s", ENV_FILENAME)
 	MAIN_SETTINGS_PATH = search_settings_file(MAIN_SETTINGS_FILENAME)
 _load_result = load_main_settings_safely(MAIN_SETTINGS_PATH)
+MAIN_SETTINGS_BY_FILE = False
 if is_successful(_load_result):
 	MAIN_SETTINGS = _load_result.unwrap()
+	MAIN_SETTINGS_BY_FILE = True
 else:
 	logger.warning("Failed to load MainSettings from a configuration file: %s. Loading the original MainSettings class as a fallback.", MAIN_SETTINGS_PATH)
 	match(exception:=_load_result.failure()):
@@ -74,14 +76,7 @@ else:
 	MAIN_SETTINGS = MainSettings()
 
 APP_NAME = Enum('APP_NAME', MAIN_SETTINGS.app_names, module=__name__)
-""" APP_NAME = Enum('APP_NAME', MAIN_SETTINGS.app_names, module="image_filter") """
-'''class APP_NAME(Enum):
-	""" name of app: value is stem end """
-	TAIMEE = auto()
-	MERCARI = auto()
 
-	def __str__(self):
-		return self.name.lower() '''
 
 class AppNameToEnum(TypedDict):
 	key: str

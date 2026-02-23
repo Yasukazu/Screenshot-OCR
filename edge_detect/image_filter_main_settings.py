@@ -1,7 +1,7 @@
 """ MainSettings by DataclassBinder"""
 from pathlib import Path
 import tomllib
-from typing import Any, Callable, Iterator, Type
+from typing import Any, Callable, Iterator, Sequence, Type
 from dataclasses import asdict, dataclass, field, fields
 from enum import Enum
 from dataclass_binder import Binder
@@ -114,6 +114,19 @@ class MainSettings(Settings):
 		child_doc = super(cls, cls).__doc__ or ""
 		cls.__doc__ = parent_doc + "\n\n" + (child_doc or "")
 
+	@classmethod
+	def load(cls, fullpath: Path|str, table: str = "") -> 'MainSettings':
+		"""Load the TOML file and return the Settings instance of Binder"""
+		with Path(fullpath).open("rb") as f:
+			config = tomllib.load(f)
+		main_settings = Binder(cls).bind(config[table] if table else config)
+		return main_settings
+	
+	@classmethod
+	def toml_lines(cls):
+		""" Iterate TOML template lines"""
+		return Binder(cls()).format_toml_template()
+
 def append_doc(fd):
 	return f"{fd}:{fd.default_factory()}"
 
@@ -123,7 +136,6 @@ def main_settings_from_dict(toml_dict: dict[str, Any]) -> MainSettings:
 	return Binder(MainSettings).bind(toml_dict)
 def main_settings_toml_lines(Settings:Type[Settings]=MainSettings)-> Iterator[str]:
 	"""Generate TOML lines from the given settings class"""
-	from dataclass_binder import Binder
 	for line in Binder(Settings()).format_toml_template(): # Need to generate an instance to get default values of default factory
 		yield(line)
 def get_toml_path(fullpath: str|None, replacement_chars: str | None = "_-")-> Path:
@@ -220,12 +232,12 @@ def load_merged_settings_no_deep_merge(main_settings_file: Path|str, main_settin
 
 from returns.result import safe
 @safe
-def load_main_settings_safely(file: str|Path = __file__, settings_class=MainSettings, replace: tuple[str, str] = ('_', '-'), search_file=False) -> MainSettings:
+def load_main_settings_safely(file: str|Path = __file__, settings_class=MainSettings, replace: Sequence[str] = ('_', '-'), search_file=False) -> MainSettings:
 	"""Load main settings(with exception handlings as messages: FileNotFoundError, OSError, tomllib.TOMLDecodeError, KeyError, ValueError) from a TOML file, the name is replaced the filename of the script as underscore(_) to hypen(-).
 	Returns: (Settings, Path)"""
 	try:
-		toml_path = search_settings_file(file, replace) if search_file else Path(file).with_name(Path(file).stem.replace(*replace) + '.toml')
-		main_settings = load_main_settings(toml_path, settings_class)
+		toml_path = search_settings_file(file, replace) if search_file else Path(file).with_name(Path(file).stem.replace(replace[0], replace[1]) + '.toml')
+		main_settings = settings_class.load(toml_path)
 	except FileNotFoundError as e:
 		logger.error("TOML configuration file not found: %s", e)
 		raise
@@ -238,11 +250,12 @@ def load_main_settings_safely(file: str|Path = __file__, settings_class=MainSett
 	except (KeyError, ValueError) as e:
 		logger.error("Configuration error in main settings: %s", e)
 		raise
+	except Exception as e:
+		logger.error("Failed to load main settings: %s", e)
+		raise
 	else:
 		logger.info("Loaded main settings: %s", main_settings)
 		return main_settings
-	logger.error("Failed to load main settings")
-	raise
 
 def print_toml_template(Settings:Type[Settings]=MainSettings, file=sys.stdout):
 	""" print each line to the specified file """
