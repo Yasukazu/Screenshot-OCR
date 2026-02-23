@@ -1107,9 +1107,7 @@ def main(main_settings: MainSettings=MAIN_SETTINGS,
 	try:
 		# main_settings_file = search_settings_file(config_file, replace=['_', '-'])
 		# logger.info("main_settings_file: %s", main_settings_file)
-		file_sub_diff_list = []
-		args_sub_diff_list = []
-		args = load_merged_settings(main_settings, main_settings_class=MainSettings, sub_settings_class=OptionalMainSettings, file_diffs=file_sub_diff_list, args_diffs=args_sub_diff_list)
+		args = load_merged_settings(main_settings, main_settings_class=MainSettings, sub_settings_class=OptionalMainSettings)
 		# config_dir = Path(config_dir) if config_dir else Path.cwd() if usecwd else Path(__file__).parent
 		# if str(config_dir)[0] == '~':
 		#	config_dir = config_dir.expanduser()
@@ -1123,15 +1121,16 @@ def main(main_settings: MainSettings=MAIN_SETTINGS,
 	from taimee_filter import TaimeeFilter
 	APP_NAME_TO_FILTER_CLASS = {APP_NAME.TAIMEE: TaimeeFilter}
 	OCR_FILTER = "ocr-filter"
-
-	args.app = APP_NAME[args.app.upper()]
+	try:
+		app = APP_NAME[args.get_app_name()] # APP_NAME[args.app.upper()]
+	except Exception as e:
+		logger.error("Failed to get a proper app name instance.")
+		raise ConfigError("Failed to get a proper app name instance.") from e
 	image_path_dir: Path | None = None
 	args.image_dir = Path(args.image_dir).expanduser()
 	if not args.files and args.image_dir:# and args.glob_pattern:
-		app = args.app.name.lower()
-		for ext in args.image_ext_set:
-			glob_pattern = f"*.{app}*.{ext.strip('.')}"
-			args.files += [str(p) for p in (Path(args.image_dir).rglob(glob_pattern) if args.glob_recursive else Path(args.image_dir).glob(glob_pattern))]
+		args.files += args.glob_files() # [str(p) for p in (Path(args.image_dir).rglob(glob_pattern) if args.glob_recursive else Path(args.image_dir).glob(glob_pattern))]
+			# glob_pattern = f"*.{app}*.{ext.strip('.')}"
 
 	if not args.files:
 		logger.info("No files selected")

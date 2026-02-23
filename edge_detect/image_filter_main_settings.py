@@ -56,10 +56,14 @@ class MainSettings(Settings):
 	"""Image file root directory"""
 	shot_month: list[int] = field(default_factory=list)
 	"""Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD]) included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like "[1,2,..]"""
-	glob_pattern: str = "*.png"
+	glob: str = "*.png"
 	"""Image file name pattern as glob pattern to commit OCR or to get parameters."""
-	glob_recursive: bool = True
-	"""Recursive glob pattern matching"""
+	rglob: bool = True
+	"""Search glob pattern matching recursively in a directory tree downto every subdirectories"""
+	recurse_symlinks: bool = False
+	""" Use symbolic links for searching glob pattern"""
+	case_sensitive: bool = False
+	""" Segregate char case(capital/small) for searching glob pattern"""
 	files: list[str] = field(default_factory=list)
 	"""Image file name list to commit OCR or to get parameters. Every file name's pattern is: <prefix>_<date>_<suffix>.<ext>"""
 
@@ -126,6 +130,18 @@ class MainSettings(Settings):
 	def toml_lines(cls):
 		""" Iterate TOML template lines"""
 		return Binder(cls()).format_toml_template()
+	
+	def get_app_name(self):
+		try:
+			return self.app.upper()
+		except AttributeError:
+			return Path(self.glob).suffixes[-2].strip('.').upper()
+	
+	def glob_files(self):
+		for ext in self.image_ext_set:
+			glob_pattern = f"*.{self.app}*.{ext.strip('.')}"
+			self.files += [str(p) for p in (Path(self.image_dir).rglob(glob_pattern, case_sensitive=self.case_sensitive, recurse_symlinks=self.recurse_symlinks) if self.rglob else Path(self.image_dir).glob(glob_pattern, case_sensitive=self.case_sensitive, recurse_symlinks=self.recurse_symlinks))]
+
 
 def append_doc(fd):
 	return f"{fd}:{fd.default_factory()}"
@@ -186,28 +202,34 @@ def search_settings_file(script_fullpath: Path|str = Path(__file__), replace=('_
 
 from deepmerge import always_merger
 # result = always_merger.merge(base, next_dict)
-def load_merged_settings(by_file_settings: MainSettings, main_settings_class = MainSettings, sub_settings_class = MainSettings, file_diffs:list|None=None, args_diffs:list|None=None) -> Settings:
+def load_merged_settings(by_file_settings: MainSettings, main_settings_class = MainSettings, sub_settings_class = MainSettings) -> MainSettings:
 	"""Load and merge the main settings with the sub settings(descendent of main class: 'sub' is broader than 'main') from settings file(in TOML format, 'main' settings range) and command line parameters('sub' settings range).
 	Every difference in dict.value is replaced.
 	Any difference in a list is appended.
 	DeepDiff search results in keys:('file', 'args') are stored in dict. 'file_args_diff'."""
 
+	from deepmerge import always_merger as am
 	main_settings = main_settings_class()
 	file_main_diff = DeepDiff((by_file_settings_dict:=asdict(by_file_settings)), (main_settings_dict:=asdict(main_settings)))
-	if file_diffs is not None:
-		file_diffs += file_main_diff.affected_root_keys
-	merged_main_settings_dict = always_merger.merge(main_settings_dict, by_file_settings_dict)
+
+	main_merged_settings = am.merge(main_settings_dict, by_file_settings_dict)
+	for key in file_main_diff.affected_root_keys:
+		assert main_merged_settings[key] == by_file_settings_dict[key], f"Key {key} has different values: {main_merged_settings[key]} != {by_file_settings_dict[key]}"
 	sub_settings = sub_settings_class()
 	parser = ArgumentParser()
 	parser.add_arguments(sub_settings_class, dest="settings") # from command line param.
 	args = parser.parse_args()
 	args_sub_diff = DeepDiff((args_settings_dict:=asdict(args.settings)), (sub_settings_dict:=asdict(sub_settings)))
-	if args_diffs is not None:
-		args_diffs += args_sub_diff.affected_root_keys
-	merged_sub_settings_dict = always_merger.merge(sub_settings_dict, args_settings_dict)
-	sub_only_items = {k:v for k, v in merged_sub_settings_dict.items() if k not in merged_main_settings_dict}
-	merged_main_settings_dict2 = always_merger.merge(merged_main_settings_dict, {k:v for k,v in merged_sub_settings_dict.items() if k in merged_main_settings_dict})
-	return sub_settings_class(** merged_main_settings_dict2, **sub_only_items)
+	affected_args_sub_diff = {k:v for k,v in args_settings_dict.items() if k in args_sub_diff.affected_root_keys}
+	affected_args_main_diff = {k:v for k,v in affected_args_sub_diff.items() if k in main_settings_dict.keys()}
+	main_merged_settings = am.merge(main_merged_settings, affected_args_main_diff)
+	main_merged_diff = {k:v for k,v in main_merged_settings.items() if k in file_main_diff.affected_root_keys or k in args_sub_diff.affected_root_keys}
+
+	sub_merged_settings = am.merge(sub_settings_dict, args_settings_dict)
+	for key in args_sub_diff.affected_root_keys:
+		assert sub_merged_settings[key] == args_settings_dict[key], f"Key {key} has different values: {sub_merged_settings[key]} != {args_settings_dict[key]}"
+	sub_merged_diff = {k:v for k,v in sub_merged_settings.items() if k in args_sub_diff.affected_root_keys}
+	return sub_settings_class(** main_merged_diff, **sub_merged_diff)
 
 
 def load_merged_settings_no_deep_merge(main_settings_file: Path|str, main_settings_class = MainSettings, sub_settings_class = MainSettings, file_main_diff_list:list[str]|None=None, args_sub_diff_list:list[str]|None=None) -> MainSettings:
@@ -245,7 +267,7 @@ def load_main_settings_safely(file: str|Path = __file__, settings_class=MainSett
 		logger.error("File system error accessing TOML configuration: %s", e)
 		raise
 	except tomllib.TOMLDecodeError as e:
-		logger.error("TOML configuration file is malformed or contains invalid syntax: %s", e)
+		logger.error("TOML configuration file[%s] is malformed or contains invalid syntax: %s", toml_path, e)
 		raise
 	except (KeyError, ValueError) as e:
 		logger.error("Configuration error in main settings: %s", e)
