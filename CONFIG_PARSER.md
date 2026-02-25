@@ -14,8 +14,8 @@
 		config_class=TrainConfig, args=args, config_path="config-file.yaml"
 	)
 	```
-	- Benefits:
-	 - loading from/to YAML/JSON files
+	- Features:
+	 - loading from / saving to: YAML / JSON file
 	 - Enum type field in dataclass
 
  3. `dataparsers`
