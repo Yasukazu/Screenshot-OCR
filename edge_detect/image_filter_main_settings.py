@@ -8,6 +8,10 @@ from dataclass_binder import Binder
 import sys
 from simple_parsing import ArgumentParser
 from deepdiff import DeepDiff
+from fancy_dataclass import version
+from dotenv import find_dotenv, load_dotenv
+from os import environ as os_environ
+
 parent_dir = str(Path(__file__).resolve().parent.parent)
 if parent_dir not in sys.path:
 	sys.path.insert(0, parent_dir) # Add to the beginning of the path
@@ -17,13 +21,22 @@ parent_dir = str(Path(__file__).resolve().parent.parent)
 if parent_dir not in sys.path:
 	sys.path.insert(0, parent_dir) # Add to the beginning of the path
 logger = set_logger(__name__)
+ENV_FILENAME = ".env"
+load_dotenv(find_dotenv(), override=True)
+MAIN_SETTINGS_FILENAME = os_environ.get("IMAGE_FILTER_MAIN_SETTINGS_FILENAME", "image-filter-main-settings.toml")
+# Environment variables will be loaded after function definitions
+
 # import typed_settings as tst
 def image_area_param_names():
 	from image_filter import ImageAreaParamName
 	return list(ImageAreaParamName)
+
+APP_NAMES = os_environ.get("IMAGE_FILTER_APP_NAMES", "TAIMEE,MERCARI").split(",")
+APP_NAME = Enum('APP_NAME', APP_NAMES, module='__main__')
+
 def app_names():
 	#from image_filter import APP_NAME
-	return ['TAIMEE', 'MERCARI']#[n.name.lower() for n in APP_NAME]
+	return APP_NAMES
 def area_param_names():
 	return ['HEADING', 'SHIFT', 'BREAKTIME', 'PAYSTUB', 'SALARY']
 def default_factories():
@@ -31,24 +44,42 @@ def default_factories():
 
 @dataclass
 class Settings:
+	""" Base settings """
 	pass
-@dataclass(kw_only=True)
-class MainSettings(Settings):
-	"""
-	Extract/OCR paystub text from an image file: Files for OCR by 'files' option may be specified with app-name-suffix in wildcard(glob pattern matching like '--files *.<APP_NAME>*.png') or by 'shot-month' option (like '--shot_month -1' for last month, 0 for current month, other positive value for month number: Jan. is 1, Dec. is 12, ...) and 'app' option (like '--app <APP_NAME>')
-	"""
+
+@version((1,2))
+@dataclass
+class AppSettings(Settings):
+	""" Application Name as Enum: {APP_NAME} is defined in environment variable IMAGE_FILTER_APP_NAMES """
+	app: APP_NAME
+	app_to_suffix_set: dict[APP_NAME, set[str]] = field(default_factory=lambda: {APP_NAME.TAIMEE:{"co", "taimee"}, APP_NAME.MERCARI:{"mercari", "work"}})
+	"""Screenshot image file suffix set: suffix is the part of filename before extention, delimiter is dot (.)"""
+@version((1,2))
+@dataclass
+class AppNameSettings(Settings):
+	""" Application Name settings """
+
+	app_names: list[str] = field(default_factory=lambda: APP_NAMES)
+	"""Application name list"""
+
+	app: str|None = None #: choices={', '.join(app_names())} 
+	"""Application name of the screenshot to execute OCR"""
+
+	def app_name_enum(self, module: str = '__main__')-> type[Enum]:
+		return Enum('APP_NAME', self.app_names, module=module)
 
 	app_name_to_suffix: dict[str, set[str]] = field(default_factory=lambda: {"taimee":{"co", "taimee"}, "mercari":{"mercari", "work"}})
 	"""Screenshot image file suffix set: suffix is the part of filename before extention, delimiter is dot (.)"""
-	app_names: list[str] = field(default_factory=lambda: ['TAIMEE', 'MERCARI'])
-	"""Application name list"""
-	app: str|None = None #: choices={', '.join(app_names())} 
-	"""Application name of the screenshot to execute OCR"""
-	def app_name_enum(self, module)-> type[Enum]:
-		return Enum('APP_NAME', self.app_names, module=module)
 
 	app_name_to_stem_end: dict[str, str] = field(default_factory=lambda: {'taimee': '_jp.co.taimee', 'mercari': '_jp.mercari.work.android'})
 	"""Dictionary of 'app name' to 'stem end': 'stem' means the part of the filename before the extension"""
+
+@version((1,2,1))
+@dataclass(kw_only=True)
+class MainSettings(AppNameSettings):
+	"""
+	Extract/OCR paystub text from an image file: Files for OCR by 'files' option may be specified with app-name-suffix in wildcard(glob pattern matching like '--files *.<APP_NAME>*.png') or by 'shot-month' option (like '--shot_month -1' for last month, 0 for current month, other positive value for month number: Jan. is 1, Dec. is 12, ...) and 'app' option (like '--app <APP_NAME>')
+	"""
 
 	image_ext_set: set[str] = field(default_factory=lambda:set([".png"]))
 	"""Image file extension set, every extention starts with dot (default is {'.png'})"""
@@ -285,6 +316,13 @@ def print_toml_template(Settings:Type[Settings]=MainSettings, file=sys.stdout):
 		print(line, file=file)
 
 if __name__ == '__main__':
+	# for line in Binder(AppSettings).format_toml_template(): # Need to generate an instance to get default values of default factory print(line)
+	from simple_parsing import ArgumentParser,parse
+	app_settings = parse(config_class=AppSettings, config_path='app-config.yaml')#, add_config_path_arg
+	parser = ArgumentParser()
+	parser.add_arguments(AppSettings, dest='app_settings')
+	args = parser.parse_args()
+	exit(0)
 	#print(MainSettings.__doc__)
 	print('-*-' * 20 + 'template'+ '-*-' * 20)
 	print_toml_template()
