@@ -47,13 +47,13 @@ class Settings:
 	""" Base settings """
 	pass
 
-@version((1,2))
+@version((1,5))
 @dataclass
 class AppSettings(Settings):
 	""" Application Name as Enum: {APP_NAME} is defined in environment variable IMAGE_FILTER_APP_NAMES """
-	app: APP_NAME
-	app_to_suffix_set: dict[APP_NAME, set[str]] = field(default_factory=lambda: {APP_NAME.TAIMEE:{"co", "taimee"}, APP_NAME.MERCARI:{"mercari", "work"}})
-	"""Screenshot image file suffix set: suffix is the part of filename before extention, delimiter is dot (.)"""
+	app: APP_NAME | None = None
+	app_to_suffixes: dict[APP_NAME, list[str]] = field(default_factory=lambda: {APP_NAME.TAIMEE:["co", "taimee"], APP_NAME.MERCARI:["mercari", "work"]})
+	"""Screenshot image file suffixes: suffixes is the part of filename before extention, it is used for file search as blog pattern as: *.<suffixes>*.<extention>"""
 @version((1,2))
 @dataclass
 class AppNameSettings(Settings):
@@ -322,6 +322,10 @@ if __name__ == '__main__':
 	parser = ArgumentParser()
 	parser.add_arguments(AppSettings, dest='app_settings')
 	args = parser.parse_args()
+	diff = DeepDiff(app_settings, args.app_settings)
+	affected_args = {key: getattr(args.app_settings, key) for key in diff.affected_root_keys}
+	from deepmerge import always_merger as merger
+	merged_settings = merger.merge(app_settings, affected_args)
 	exit(0)
 	#print(MainSettings.__doc__)
 	print('-*-' * 20 + 'template'+ '-*-' * 20)
