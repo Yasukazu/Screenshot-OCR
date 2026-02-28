@@ -64,7 +64,7 @@ class AppSettings(Settings):
 	""" Application Name as Enum: {APP_NAME} is defined in environment variable IMAGE_FILTER_APP_NAMES """
 	app: APP_NAME | None = None
 	""" Application name to get screenshots of """
-	app_to_suffixes: dict[APP_NAME, list[str]] = field(default_factory=dict)
+	app_to_suffixes: dict[APP_NAME, list[str]] = field(default_factory=lambda: {APP_NAME.NUL: []})
 	"""Screenshot image file suffixes: suffixes is the part of filename before extention, it is used for file search as blog pattern as: *.<suffixes>*.<extention>"""
 @version((1,2))
 @dataclass
