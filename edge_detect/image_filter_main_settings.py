@@ -9,7 +9,7 @@ import sys
 from simple_parsing import ArgumentParser
 from deepdiff import DeepDiff
 from fancy_dataclass import version
-from dotenv import find_dotenv, load_dotenv
+from dotenv import find_dotenv, load_dotenv, dotenv_values
 from os import environ as os_environ
 
 parent_dir = str(Path(__file__).resolve().parent.parent)
@@ -22,7 +22,17 @@ if parent_dir not in sys.path:
 	sys.path.insert(0, parent_dir) # Add to the beginning of the path
 logger = set_logger(__name__)
 ENV_FILENAME = ".env"
-load_dotenv(find_dotenv(), override=True)
+try:
+	dotenv_path = find_dotenv(ENV_FILENAME, raise_error_if_not_found=True)
+	logger.info(f"Loading .env file: {dotenv_path}")
+	with open(dotenv_path, 'r') as f:
+		logger.info(f"Contents of .env file:\n{f.read()}")
+		dotenv_values = dotenv_values(dotenv_path)
+		logger.info(f"Loaded .env values: {dotenv_values}")
+		os_environ |= dotenv_values
+	# load_dotenv(dotenv_path, override=True)
+except Exception as e:
+	logger.info(f"Failed to load .env file: {e}")
 MAIN_SETTINGS_FILENAME = os_environ.get("IMAGE_FILTER_MAIN_SETTINGS_FILENAME", "image-filter-main-settings.toml")
 # Environment variables will be loaded after function definitions
 
@@ -31,8 +41,9 @@ def image_area_param_names():
 	from image_filter import ImageAreaParamName
 	return list(ImageAreaParamName)
 
-APP_NAMES = os_environ.get("IMAGE_FILTER_APP_NAMES", "TAIMEE,MERCARI").split(",")
-APP_NAME = Enum('APP_NAME', APP_NAMES, module='__main__')
+APP_NAMES = os_environ.get("IMAGE_FILTER_APP_NAMES", "NUL").split(",")
+APP_NAMES_PAIR = [(name, i) for i, name in enumerate(APP_NAMES)]
+APP_NAME = Enum('APP_NAME', APP_NAMES_PAIR, module='__main__')
 
 def app_names():
 	#from image_filter import APP_NAME
@@ -41,18 +52,19 @@ def area_param_names():
 	return ['HEADING', 'SHIFT', 'BREAKTIME', 'PAYSTUB', 'SALARY']
 def default_factories():
 	return [app_names, area_param_names]
-
+from fancy_dataclass import version
 @dataclass
 class Settings:
 	""" Base settings """
 	pass
 
-@version((1,5))
+@version((1,6))
 @dataclass
 class AppSettings(Settings):
 	""" Application Name as Enum: {APP_NAME} is defined in environment variable IMAGE_FILTER_APP_NAMES """
 	app: APP_NAME | None = None
-	app_to_suffixes: dict[APP_NAME, list[str]] = field(default_factory=lambda: {APP_NAME.TAIMEE:["co", "taimee"], APP_NAME.MERCARI:["mercari", "work"]})
+	""" Application name to get screenshots of """
+	app_to_suffixes: dict[APP_NAME, list[str]] = field(default_factory=dict)
 	"""Screenshot image file suffixes: suffixes is the part of filename before extention, it is used for file search as blog pattern as: *.<suffixes>*.<extention>"""
 @version((1,2))
 @dataclass
@@ -74,6 +86,12 @@ class AppNameSettings(Settings):
 	app_name_to_stem_end: dict[str, str] = field(default_factory=lambda: {'taimee': '_jp.co.taimee', 'mercari': '_jp.mercari.work.android'})
 	"""Dictionary of 'app name' to 'stem end': 'stem' means the part of the filename before the extension"""
 
+class GLOB(Enum):
+	""" Glob pattern """
+	NONE = 0
+	GLOB = 1
+	RGLOB = 2
+
 @version((1,2,1))
 @dataclass(kw_only=True)
 class MainSettings(AppNameSettings):
@@ -87,10 +105,10 @@ class MainSettings(AppNameSettings):
 	"""Image file root directory"""
 	shot_month: list[int] = field(default_factory=list)
 	"""Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD]) included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like "[1,2,..]"""
-	glob: str = "*.png"
+	glob: GLOB = GLOB.RGLOB
 	"""Image file name pattern as glob pattern to commit OCR or to get parameters."""
 	rglob: bool = True
-	"""Search glob pattern matching recursively in a directory tree downto every subdirectories"""
+	"""Search glob pattern matching Recursively in a directory tree downto every subdirectories"""
 	recurse_symlinks: bool = False
 	""" Use symbolic links for searching glob pattern"""
 	case_sensitive: bool = False
@@ -317,8 +335,9 @@ def print_toml_template(Settings:Type[Settings]=MainSettings, file=sys.stdout):
 
 if __name__ == '__main__':
 	# for line in Binder(AppSettings).format_toml_template(): # Need to generate an instance to get default values of default factory print(line)
-	from simple_parsing import ArgumentParser,parse
-	app_settings = parse(config_class=AppSettings, config_path='app-config.yaml')#, add_config_path_arg
+	from simple_parsing import parse as simple_parse
+	app_settings = simple_parse(config_class=AppSettings, config_path='app-config.yaml')#, add_config_path_arg
+	from simple_parsing import ArgumentParser
 	parser = ArgumentParser()
 	parser.add_arguments(AppSettings, dest='app_settings')
 	args = parser.parse_args()
