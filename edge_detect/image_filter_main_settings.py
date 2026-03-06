@@ -351,7 +351,7 @@ if __name__ == '__main__':
 	diff = DeepDiff(app_settings, args.app_settings)
 	affected_args = {key: getattr(args.app_settings, key) for key in diff.affected_root_keys}
 	from deepmerge import always_merger as merger
-	merged_settings = merger.merge(app_settings, args.app_settings)
+	app_settings.app_to_suffixes |= args.app_settings.app_to_suffixes # merger.merge(app_settings, args.app_settings)
 	exit(0)
 	#print(MainSettings.__doc__)
 	print('-*-' * 20 + 'template'+ '-*-' * 20)
