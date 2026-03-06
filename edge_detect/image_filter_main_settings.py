@@ -68,11 +68,11 @@ class AppSettings(Settings):
 	app_to_suffixes: dict[APP_NAME|Literal[str], list[str]] = field(default_factory=lambda: {APP_NAME.NUL: []})
 	"""Screenshot image file suffixes: suffixes is the part of filename before extention, it is used for file search as blog pattern as: *.<suffixes>*.<extention>"""
 	def __post_init__(self):
-		for key, v in self.app_to_suffixes.items():
-			if not isinstance(key, APP_NAME):
-				k = key
-				del self.app_to_suffixes[key]
-				self.app_to_suffixes[APP_NAME[k]] = v
+		str_keys = [key for key in self.app_to_suffixes.keys() if isinstance(key, str)]
+		for key in str_keys:
+			self.app_to_suffixes[APP_NAME[key]] = self.app_to_suffixes[key]
+		for key in str_keys:
+			del self.app_to_suffixes[key]
 @version((1,2))
 @dataclass
 class AppNameSettings(Settings):
