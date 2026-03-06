@@ -1,7 +1,7 @@
 """ MainSettings by DataclassBinder"""
 from pathlib import Path
 import tomllib
-from typing import Any, Callable, Iterator, Sequence, Type
+from typing import Any, Callable, Iterator, Sequence, Type, Literal, get_args
 from dataclasses import asdict, dataclass, field, fields
 from enum import Enum
 from dataclass_binder import Binder
@@ -44,6 +44,7 @@ def image_area_param_names():
 APP_NAMES = os_environ.get("IMAGE_FILTER_APP_NAMES", "NUL").split(",")
 APP_NAMES_PAIR = [(name, i) for i, name in enumerate(APP_NAMES)]
 APP_NAME = Enum('APP_NAME', APP_NAMES_PAIR, module='__main__')
+APP_NAME_LITERAL = Literal[*APP_NAMES]
 
 def app_names():
 	#from image_filter import APP_NAME
@@ -64,8 +65,14 @@ class AppSettings(Settings):
 	""" Application Name as Enum: {APP_NAME} is defined in environment variable IMAGE_FILTER_APP_NAMES """
 	app: APP_NAME | None = None
 	""" Application name to get screenshots of """
-	app_to_suffixes: dict[APP_NAME, list[str]] = field(default_factory=lambda: {APP_NAME.NUL: []})
+	app_to_suffixes: dict[APP_NAME|Literal[str], list[str]] = field(default_factory=lambda: {APP_NAME.NUL: []})
 	"""Screenshot image file suffixes: suffixes is the part of filename before extention, it is used for file search as blog pattern as: *.<suffixes>*.<extention>"""
+	def __post_init__(self):
+		for key, v in self.app_to_suffixes.items():
+			if not isinstance(key, APP_NAME):
+				k = key
+				del self.app_to_suffixes[key]
+				self.app_to_suffixes[APP_NAME[k]] = v
 @version((1,2))
 @dataclass
 class AppNameSettings(Settings):
@@ -336,7 +343,7 @@ def print_toml_template(Settings:Type[Settings]=MainSettings, file=sys.stdout):
 if __name__ == '__main__':
 	# for line in Binder(AppSettings).format_toml_template(): # Need to generate an instance to get default values of default factory print(line)
 	from simple_parsing import parse as simple_parse
-	app_settings = simple_parse(config_class=AppSettings, config_path='app-config.yaml')#, add_config_path_arg
+	app_settings: AppSettings = simple_parse(config_class=AppSettings, config_path='app-config.yaml')#, add_config_path_arg
 	from simple_parsing import ArgumentParser
 	parser = ArgumentParser()
 	parser.add_arguments(AppSettings, dest='app_settings')
@@ -344,7 +351,7 @@ if __name__ == '__main__':
 	diff = DeepDiff(app_settings, args.app_settings)
 	affected_args = {key: getattr(args.app_settings, key) for key in diff.affected_root_keys}
 	from deepmerge import always_merger as merger
-	merged_settings = merger.merge(app_settings, affected_args)
+	merged_settings = merger.merge(app_settings, args.app_settings)
 	exit(0)
 	#print(MainSettings.__doc__)
 	print('-*-' * 20 + 'template'+ '-*-' * 20)
