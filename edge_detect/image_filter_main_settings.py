@@ -68,11 +68,16 @@ class AppSettings(Settings):
 	app_to_suffixes: dict[APP_NAME|Literal[str], list[str]] = field(default_factory=lambda: {APP_NAME.NUL: []})
 	"""Screenshot image file suffixes: suffixes is the part of filename before extention, it is used for file search as blog pattern as: *.<suffixes>*.<extention>"""
 	def __post_init__(self):
+		""" Convert string keys to APP_NAME keys """
 		str_keys = [key for key in self.app_to_suffixes.keys() if isinstance(key, str)]
-		for key in str_keys:
-			self.app_to_suffixes[APP_NAME[key]] = self.app_to_suffixes[key]
-		for key in str_keys:
-			del self.app_to_suffixes[key]
+		try:
+			for key in str_keys:
+				self.app_to_suffixes[APP_NAME[key]] = self.app_to_suffixes[key]
+			for key in str_keys:
+				del self.app_to_suffixes[key]
+		except ValueError as e:
+			logger.error("Invalid APP_NAME:[%s], not included in APP_NAMES: %s", str_keys, APP_NAME_LITERAL)
+			raise ValueError(f"Invalid APP_NAME:[{str_keys}], not included in APP_NAMES: {APP_NAME_LITERAL}") from e
 @version((1,2))
 @dataclass
 class AppNameSettings(Settings):
@@ -344,14 +349,15 @@ if __name__ == '__main__':
 	# for line in Binder(AppSettings).format_toml_template(): # Need to generate an instance to get default values of default factory print(line)
 	from simple_parsing import parse as simple_parse
 	app_settings: AppSettings = simple_parse(config_class=AppSettings, config_path='app-config.yaml')#, add_config_path_arg
-	from simple_parsing import ArgumentParser
+	app_settings.app_to_suffixes |= AppSettings().app_to_suffixes # add default values
+	'''from simple_parsing import ArgumentParser
 	parser = ArgumentParser()
 	parser.add_arguments(AppSettings, dest='app_settings')
 	args = parser.parse_args()
 	diff = DeepDiff(app_settings, args.app_settings)
 	affected_args = {key: getattr(args.app_settings, key) for key in diff.affected_root_keys}
 	from deepmerge import always_merger as merger
-	app_settings.app_to_suffixes |= args.app_settings.app_to_suffixes # merger.merge(app_settings, args.app_settings)
+	app_settings.app_to_suffixes |= args.app_settings.app_to_suffixes # merger.merge(app_settings, args.app_settings)'''
 	exit(0)
 	#print(MainSettings.__doc__)
 	print('-*-' * 20 + 'template'+ '-*-' * 20)
