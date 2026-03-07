@@ -357,7 +357,7 @@ def print_toml_template(Settings:Type[Settings]=MainSettings, file=sys.stdout):
 if __name__ == '__main__':
 	# for line in Binder(AppSettings).format_toml_template(): # Need to generate an instance to get default values of default factory print(line)
 	from simple_parsing import parse as simple_parse
-	app_settings: AppSettings = simple_parse(config_class=AppSettings, config_path='app-config.yaml')#, add_config_path_arg
+	app_settings: AppSettings = simple_parse(config_class=AppSettings, config_path='app-config.json')#, add_config_path_arg
 	app_settings.app_to_suffixes |= AppSettings().app_to_suffixes # add default values
 	'''from simple_parsing import ArgumentParser
 	parser = ArgumentParser()
