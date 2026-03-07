@@ -25,3 +25,16 @@
  4. `Yada`(Yet another dataclass argument parser)
 	```Python
 	```
+ 5. `tap`
+	- https://github.com/omarish/tap
+	- Limitations:
+	 - Dict type is not supported(Extendable by `def configure(self):self.add_argument(type=..)` in Tap successor class)
+	 - Configuration file is a text file(with every line as a command option) or a json file
+	```Python
+	from tap import Tap
+	class ArgParser(Tap):
+		find_env_file = True
+		env_file: str = '.env' 
+		"""Environment variable setting file name"""
+	args = ArgParser().parse_args()
+	```
