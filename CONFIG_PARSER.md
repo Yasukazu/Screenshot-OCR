@@ -26,7 +26,7 @@
 	```Python
 	```
  5. `tap`
-	- https://github.com/omarish/tap
+	- https://github.com/swansonk14/typed-argument-parser
 	- Limitations:
 	 - Dict type is not supported(Extendable by `def configure(self):self.add_argument(type=..)` in Tap successor class)
 	 - Configuration file is a text file(with every line as a command option) or a json file
