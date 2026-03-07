@@ -1,8 +1,8 @@
 [project]
-name = "taimi-screen"
-version = "1.1.1"
-description = "generate PDF from taimi screenshots"
-authors = [{ name = "Yasukazu ", email = "yasukazu@makyno.jp" }]
+name = "screenshot-ocr"
+version = "1.2.1"
+description = "OCR from screenshots"
+authors = [{ name = "Yasukazu ", email = "mkn@yskz.dev" }]
 requires-python = ">=3.12"
 readme = "README.md"
 dependencies = [
@@ -72,6 +72,7 @@ dev = [
     "typed-argument-parser>=1.11.0",
     "flet[all]>=0.80.4",
     "tkeasygui>=1.0.36",
+    "ruamel-yaml>=0.19.1",
 ]
 
 [build-system]
@@ -84,3 +85,10 @@ package = false
 [[tool.uv.index]]
 name = "pypi"
 url = "https://pypi.org/simple"
+
+[tool.ruff]
+select = ["G002"]  # logging-percent-format
+fix = true         # allow autofix
+
+[tool.ruff.lint]
+extend-select = ["G002"]
