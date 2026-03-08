@@ -40,19 +40,9 @@ MAIN_SETTINGS_FILENAME = os_environ.get("IMAGE_FILTER_MAIN_SETTINGS_FILENAME", "
 def image_area_param_names():
 	from image_filter import ImageAreaParamName
 	return list(ImageAreaParamName)
-
-try:
-	APP_NAMES = os_environ["IMAGE_FILTER_APP_NAMES"].split(",")
-except KeyError:
-	raise ValueError("IMAGE_FILTER_APP_NAMES environment variable is not set!")
-APP_NAMES_PAIR = [(name, i) for i, name in enumerate(APP_NAMES)]
-APP_NAME = Enum('APP_NAME', APP_NAMES_PAIR, module='__main__')
-APP_NAME_LITERAL = Literal[*APP_NAMES]
 from enum import StrEnum
-APP_STR = StrEnum('APP_NAME_STR', APP_NAMES, module='__main__')
-from enum import StrEnum
-def make_app_name_to_suffix(prefix="IMAGE_FILTER", enum_name="APP_TO_SUFFIXES") -> StrEnum:
-	"""Create a StrEnum from a comma-separated string of key:value pairs."""
+def make_name_to_suffix_strenum(prefix="IMAGE_FILTER", enum_name="APP_TO_SUFFIX") -> StrEnum:
+	"""Create a StrEnum from a comma-separated string of 'key:value' pairs."""
 	env_var = f"{prefix}_{enum_name}"
 	env_str = os_environ.get(env_var)
 	if not env_str:
@@ -63,9 +53,20 @@ def make_app_name_to_suffix(prefix="IMAGE_FILTER", enum_name="APP_TO_SUFFIXES") 
 			k, v = pair.split(":")
 		except ValueError:
 			raise ValueError(f"Invalid pair format (key:value): {pair}")
-		mappings[k.strip().upper()] = v.strip().lower()
+		mappings[k.strip().upper()] = v.strip().lower()#.split('.')
 	return StrEnum(enum_name, mappings)
-APP_TO_SUFFIXES = make_app_name_to_suffix()
+APP_TO_SUFFIX = make_name_to_suffix_strenum()
+'''try:
+	APP_NAMES = os_environ["IMAGE_FILTER_APP_NAMES"].split(",")
+except KeyError:
+	raise ValueError("IMAGE_FILTER_APP_NAMES environment variable is not set!")
+APP_NAMES_PAIR = [(name, i) for i, name in enumerate(APP_NAMES)]'''
+APP_NAMES = [n.name for n in APP_TO_SUFFIX]
+APP_NAME_LITERAL = Literal[*APP_NAMES]
+from enum import StrEnum
+APP_STR = StrEnum('APP_NAME_STR', APP_NAMES, module='__main__')
+APP_NAME = Enum('APP_NAME', APP_NAMES, module='__main__')
+
 def app_names():
 	#from image_filter import APP_NAME
 	return APP_NAMES
@@ -79,13 +80,18 @@ from tap import Tap
 class Settings(Tap):
 	""" Base settings """
 	pass
-
+# from tap import TapIgnore
 #@version((1,6))
 #@dataclass
 class AppSettings(Settings):
-	""" Application Name as Enum: {APP_NAME} is defined in environment variable IMAGE_FILTER_APP_NAMES """
+	""" Application_name to suffix mapping must be defined as 'IMAGE_FILTER_APP_TO_SUFFIX=<app1>:<suffix1>,<app2>:<suffix2>,<app3>:<suffix3>' """
 	app: APP_STR | None = None
 	""" Application name to get screenshots of """
+	@property
+	def app_name(self) -> APP_NAME|None:
+		if self.app is None:
+			return None
+		return APP_NAME[self.app.name]
 
 @version((1,2))
 @dataclass
@@ -356,7 +362,8 @@ def print_toml_template(Settings:Type[Settings]=MainSettings, file=sys.stdout):
 
 if __name__ == '__main__':
 	# for line in Binder(AppSettings).format_toml_template(): # Need to generate an instance to get default values of default factory print(line)
-	settings = AppSettings().parse_args() #config_files=['app-config.json']
+	from sys import argv
+	settings = AppSettings().parse_args(argv[1:]) #config_files=['app-config.json']
 	from simple_parsing import parse as simple_parse
 	app_settings: AppSettings = simple_parse(config_class=AppSettings, config_path='app-config.yaml')#, add_config_path_arg
 	app_settings.app_to_suffixes |= AppSettings().app_to_suffixes # add default values
