@@ -41,11 +41,31 @@ def image_area_param_names():
 	from image_filter import ImageAreaParamName
 	return list(ImageAreaParamName)
 
-APP_NAMES = os_environ.get("IMAGE_FILTER_APP_NAMES", "NUL").split(",")
+try:
+	APP_NAMES = os_environ["IMAGE_FILTER_APP_NAMES"].split(",")
+except KeyError:
+	raise ValueError("IMAGE_FILTER_APP_NAMES environment variable is not set!")
 APP_NAMES_PAIR = [(name, i) for i, name in enumerate(APP_NAMES)]
 APP_NAME = Enum('APP_NAME', APP_NAMES_PAIR, module='__main__')
 APP_NAME_LITERAL = Literal[*APP_NAMES]
-
+from enum import StrEnum
+APP_STR = StrEnum('APP_NAME_STR', APP_NAMES, module='__main__')
+from enum import StrEnum
+def make_app_name_to_suffix(prefix="IMAGE_FILTER", enum_name="APP_TO_SUFFIXES") -> StrEnum:
+	"""Create a StrEnum from a comma-separated string of key:value pairs."""
+	env_var = f"{prefix}_{enum_name}"
+	env_str = os_environ.get(env_var)
+	if not env_str:
+		raise ValueError(f"'{env_var}' env. var. is missing!")
+	mappings = {}
+	for pair in env_str.split(","):
+		try:
+			k, v = pair.split(":")
+		except ValueError:
+			raise ValueError(f"Invalid pair format (key:value): {pair}")
+		mappings[k.strip().upper()] = v.strip().lower()
+	return StrEnum(enum_name, mappings)
+APP_TO_SUFFIXES = make_app_name_to_suffix()
 def app_names():
 	#from image_filter import APP_NAME
 	return APP_NAMES
@@ -54,30 +74,19 @@ def area_param_names():
 def default_factories():
 	return [app_names, area_param_names]
 from fancy_dataclass import version
-@dataclass
-class Settings:
+from tap import Tap
+#@dataclass
+class Settings(Tap):
 	""" Base settings """
 	pass
 
-@version((1,6))
-@dataclass
+#@version((1,6))
+#@dataclass
 class AppSettings(Settings):
 	""" Application Name as Enum: {APP_NAME} is defined in environment variable IMAGE_FILTER_APP_NAMES """
-	app: APP_NAME | None = None
+	app: APP_STR | None = None
 	""" Application name to get screenshots of """
-	app_to_suffixes: dict[APP_NAME|Literal[str], list[str]] = field(default_factory=lambda: {APP_NAME.NUL: []})
-	"""Screenshot image file suffixes: suffixes is the part of filename before extention, it is used for file search as blog pattern as: *.<suffixes>*.<extention>"""
-	def __post_init__(self):
-		""" Convert string keys to APP_NAME keys """
-		str_keys = [key for key in self.app_to_suffixes.keys() if isinstance(key, str)]
-		try:
-			for key in str_keys:
-				self.app_to_suffixes[APP_NAME[key]] = self.app_to_suffixes[key]
-			for key in str_keys:
-				del self.app_to_suffixes[key]
-		except ValueError as e:
-			logger.error("Invalid APP_NAME:[%s], not included in APP_NAMES: %s", str_keys, APP_NAME_LITERAL)
-			raise ValueError(f"Invalid APP_NAME:[{str_keys}], not included in APP_NAMES: {APP_NAME_LITERAL}") from e
+
 @version((1,2))
 @dataclass
 class AppNameSettings(Settings):
@@ -347,6 +356,7 @@ def print_toml_template(Settings:Type[Settings]=MainSettings, file=sys.stdout):
 
 if __name__ == '__main__':
 	# for line in Binder(AppSettings).format_toml_template(): # Need to generate an instance to get default values of default factory print(line)
+	settings = AppSettings().parse_args() #config_files=['app-config.json']
 	from simple_parsing import parse as simple_parse
 	app_settings: AppSettings = simple_parse(config_class=AppSettings, config_path='app-config.yaml')#, add_config_path_arg
 	app_settings.app_to_suffixes |= AppSettings().app_to_suffixes # add default values
