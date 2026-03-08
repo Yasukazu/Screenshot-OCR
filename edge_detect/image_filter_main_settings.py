@@ -84,7 +84,7 @@ class Settings(Tap):
 #@version((1,6))
 #@dataclass
 class AppSettings(Settings):
-	""" Application_name to suffix mapping must be defined as 'IMAGE_FILTER_APP_TO_SUFFIX=<app1>:<suffix1>,<app2>:<suffix2>,<app3>:<suffix3>' """
+	""" Application_name to suffix mapping must be defined in the environment variable or in '.env' file as 'IMAGE_FILTER_APP_TO_SUFFIX=<app1>:<suffix1>,<app2>:<suffix2>,<app3>:<suffix3>' """
 	app: APP_STR | None = None
 	""" Application name to get screenshots of """
 	@property
