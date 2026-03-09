@@ -42,7 +42,7 @@ def image_area_param_names():
 	return list(ImageAreaParamName)
 from enum import StrEnum
 def make_name_to_suffix_strenum(prefix="IMAGE_FILTER", enum_name="APP_TO_SUFFIX") -> StrEnum:
-	"""Create a StrEnum from a comma-separated string of 'key:value' pairs."""
+	"""Create StrEnum APP_NAME from a comma-separated string of 'key:value' pairs."""
 	env_var = f"{prefix}_{enum_name}"
 	env_str = os_environ.get(env_var)
 	if not env_str:
@@ -51,21 +51,20 @@ def make_name_to_suffix_strenum(prefix="IMAGE_FILTER", enum_name="APP_TO_SUFFIX"
 	for pair in env_str.split(","):
 		try:
 			k, v = pair.split(":")
+			if not v or not k:
+				raise ValueError(f"Invalid pair format [key:value]: no value or key: {pair}")
 		except ValueError:
-			raise ValueError(f"Invalid pair format (key:value): {pair}")
+			raise ValueError("Invalid pair format [key:value] no delimiter: (:)")
 		mappings[k.strip().upper()] = v.strip().lower()#.split('.')
+	if not mappings:
+		raise ValueError(f"'{env_var}' env. var. is empty!")
 	return StrEnum(enum_name, mappings)
-APP_TO_SUFFIX = make_name_to_suffix_strenum()
-'''try:
-	APP_NAMES = os_environ["IMAGE_FILTER_APP_NAMES"].split(",")
-except KeyError:
-	raise ValueError("IMAGE_FILTER_APP_NAMES environment variable is not set!")
-APP_NAMES_PAIR = [(name, i) for i, name in enumerate(APP_NAMES)]'''
-APP_NAMES = [n.name for n in APP_TO_SUFFIX]
+
+APP_TO_SUFFIX: type[StrEnum] = make_name_to_suffix_strenum()
+APP_NAMES: list[str] = [n.name.upper() for n in APP_TO_SUFFIX]
+APP_NAME: type[Enum] = Enum("APP_NAME", APP_NAMES, module='__main__')
 APP_NAME_LITERAL = Literal[*APP_NAMES]
-from enum import StrEnum
-APP_STR = StrEnum('APP_NAME_STR', APP_NAMES, module='__main__')
-APP_NAME = Enum('APP_NAME', APP_NAMES, module='__main__')
+APP_STR: type[StrEnum] = StrEnum('APP_NAME_STR', APP_NAMES, module='__main__')
 
 def app_names():
 	#from image_filter import APP_NAME
@@ -86,38 +85,49 @@ class Settings(Tap):
 class AppSettings(Settings):
 	""" Application_name to suffix mapping must be defined in the environment variable or in '.env' file as 'IMAGE_FILTER_APP_TO_SUFFIX=<app1>:<suffix1>,<app2>:<suffix2>,<app3>:<suffix3>' """
 	app: APP_STR | None = None
-	""" Application name to get screenshots of """
+	""" Application name to process OCR from its screenshots """
 	@property
-	def app_name(self) -> APP_NAME|None:
+	def app_name(self) -> Enum|None:
 		if self.app is None:
 			return None
-		return APP_NAME[self.app.name]
+		return getattr(APP_NAME, self.app.name)
 
-@version((1,2))
-@dataclass
+#@version((1,2))
+#@dataclass
 class AppNameSettings(Settings):
 	""" Application Name settings """
 
-	app_names: list[str] = field(default_factory=lambda: APP_NAMES)
-	"""Application name list"""
+	@classmethod
+	def get_app_names(cls):
+		"""Application name list"""
+		return APP_NAMES
 
-	app: str|None = None #: choices={', '.join(app_names())} 
-	"""Application name of the screenshot to execute OCR"""
+	@property
+	def app_names(self) -> list[str]:
+		"""Application name list"""
+		return self.get_app_names()
 
-	def app_name_enum(self, module: str = '__main__')-> type[Enum]:
-		return Enum('APP_NAME', self.app_names, module=module)
+	@classmethod
+	def get_app_name_enum(cls, module: str = '__main__')-> type[Enum]:
+		return Enum('APP_NAME', cls.get_app_names(), module=module)
 
-	app_name_to_suffix: dict[str, set[str]] = field(default_factory=lambda: {"taimee":{"co", "taimee"}, "mercari":{"mercari", "work"}})
-	"""Screenshot image file suffix set: suffix is the part of filename before extention, delimiter is dot (.)"""
+	@classmethod
+	def app_name_to_suffix_set(cls)-> dict[str, set[str]] :
+		"""Screenshot image file suffix set: suffix is the part of filename before extention, delimiter is dot (.)"""
+		dic = {}
+		for app_suffix in APP_TO_SUFFIX:
+			app = app_suffix.name
+			suffix = app_suffix.value
+			dic[app_suffix.name] = set([s for s in suffix.split('.') if s])
+		return dic
+		
 
-	app_name_to_stem_end: dict[str, str] = field(default_factory=lambda: {'taimee': '_jp.co.taimee', 'mercari': '_jp.mercari.work.android'})
-	"""Dictionary of 'app name' to 'stem end': 'stem' means the part of the filename before the extension"""
+	@property
+	def app_name_to_stem_end(self)-> dict[str, str]:
+		"""Dictionary of 'app name' to 'stem end': 'stem' means the part of the filename before the extension"""
+		return {k.name:k.value for k in APP_TO_SUFFIX}
 
-class GLOB(Enum):
-	""" Glob pattern """
-	NONE = 0
-	GLOB = 1
-	RGLOB = 2
+GLOB_MODE = StrEnum('GLOB', ['NONE', 'GLOB', 'RGLOB'])  # Glob pattern 
 
 @version((1,2,1))
 @dataclass(kw_only=True)
@@ -132,7 +142,7 @@ class MainSettings(AppNameSettings):
 	"""Image file root directory"""
 	shot_month: list[int] = field(default_factory=list)
 	"""Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD]) included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like "[1,2,..]"""
-	glob: GLOB = GLOB.RGLOB
+	glob: GLOB_MODE = GLOB_MODE.RGLOB
 	"""Image file name pattern as glob pattern to commit OCR or to get parameters."""
 	rglob: bool = True
 	"""Search glob pattern matching Recursively in a directory tree downto every subdirectories"""
