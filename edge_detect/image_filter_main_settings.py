@@ -90,10 +90,10 @@ class AppSettings(Settings):
 	""" Delimiter for splitting screenshot filename stem into 3 parts like: prefix:'Screenshot', datetime:'yyyy-mm-ddThh:mm:ss', suffix:'app.proper.name'"""
 
 	@property
-	def app_name(self) -> StrEnum|None:
+	def app_name(self) -> Enum|None:
 		if self.app is None:
 			return None
-		return getattr(APP_NAME, self.app.name)
+		return APP_NAME[self.app.name]
 
 
 	@classmethod
