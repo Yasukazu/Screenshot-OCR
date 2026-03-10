@@ -60,11 +60,11 @@ def make_name_to_suffix_strenum(prefix="IMAGE_FILTER", enum_name="APP_TO_SUFFIX"
 		raise ValueError(f"'{env_var}' env. var. is empty!")
 	return StrEnum(enum_name, mappings)
 
-APP_TO_SUFFIX: type[StrEnum] = make_name_to_suffix_strenum()
-APP_NAMES: list[str] = [n.name.upper() for n in APP_TO_SUFFIX]
-APP_NAME: type[Enum] = Enum("APP_NAME", APP_NAMES, module='__main__')
+APP_TO_SUFFIX: StrEnum = make_name_to_suffix_strenum()
+APP_NAMES: list[str] = [n.name for n in APP_TO_SUFFIX]
+APP_NAME = Enum("APP_NAME", APP_NAMES, module='__main__')
 APP_NAME_LITERAL = Literal[*APP_NAMES]
-APP_STR: type[StrEnum] = StrEnum('APP_NAME_STR', APP_NAMES, module='__main__')
+APP_STR = StrEnum('APP_NAME_STR', APP_NAMES, module='__main__')
 
 def app_names():
 	#from image_filter import APP_NAME
@@ -84,18 +84,17 @@ class Settings(Tap):
 #@dataclass
 class AppSettings(Settings):
 	""" Application_name to suffix mapping must be defined in the environment variable or in '.env' file as 'IMAGE_FILTER_APP_TO_SUFFIX=<app1>:<suffix1>,<app2>:<suffix2>,<app3>:<suffix3>' """
-	app: APP_STR | None = None
+	app: APP_NAME_LITERAL | None = None
 	""" Application name to process OCR from its screenshots """
+	stem_delimiter: str = '_'
+	""" Delimiter for splitting screenshot filename stem into 3 parts like: prefix:'Screenshot', datetime:'yyyy-mm-ddThh:mm:ss', suffix:'app.proper.name'"""
+
 	@property
-	def app_name(self) -> Enum|None:
+	def app_name(self) -> StrEnum|None:
 		if self.app is None:
 			return None
 		return getattr(APP_NAME, self.app.name)
 
-#@version((1,2))
-#@dataclass
-class AppNameSettings(Settings):
-	""" Application Name settings """
 
 	@classmethod
 	def get_app_names(cls):
@@ -113,10 +112,9 @@ class AppNameSettings(Settings):
 
 	@classmethod
 	def app_name_to_suffix_set(cls)-> dict[str, set[str]] :
-		"""Screenshot image file suffix set: suffix is the part of filename before extention, delimiter is dot (.)"""
+		"""Screenshot image file suffix set: suffix is the part of file stem(filename before extention), stem delimiter is underscore (_)"""
 		dic = {}
 		for app_suffix in APP_TO_SUFFIX:
-			app = app_suffix.name
 			suffix = app_suffix.value
 			dic[app_suffix.name] = set([s for s in suffix.split('.') if s])
 		return dic
@@ -129,18 +127,18 @@ class AppNameSettings(Settings):
 
 GLOB_MODE = StrEnum('GLOB', ['NONE', 'GLOB', 'RGLOB'])  # Glob pattern 
 
-@version((1,2,1))
-@dataclass(kw_only=True)
-class MainSettings(AppNameSettings):
+#@version((1,2,1))
+#@dataclass(kw_only=True)
+class MainSettings(AppSettings):
 	"""
 	Extract/OCR paystub text from an image file: Files for OCR by 'files' option may be specified with app-name-suffix in wildcard(glob pattern matching like '--files *.<APP_NAME>*.png') or by 'shot-month' option (like '--shot_month -1' for last month, 0 for current month, other positive value for month number: Jan. is 1, Dec. is 12, ...) and 'app' option (like '--app <APP_NAME>')
 	"""
 
-	image_ext_set: set[str] = field(default_factory=lambda:set([".png"]))
+	image_ext_set: set[str] = set([".png"])
 	"""Image file extension set, every extention starts with dot (default is {'.png'})"""
 	image_dir: str = "~/Documents/screenshots"
 	"""Image file root directory"""
-	shot_month: list[int] = field(default_factory=list)
+	shot_month: list[int] = []
 	"""Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD]) included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like "[1,2,..]"""
 	glob: GLOB_MODE = GLOB_MODE.RGLOB
 	"""Image file name pattern as glob pattern to commit OCR or to get parameters."""
@@ -150,7 +148,7 @@ class MainSettings(AppNameSettings):
 	""" Use symbolic links for searching glob pattern"""
 	case_sensitive: bool = False
 	""" Segregate char case(capital/small) for searching glob pattern"""
-	files: list[str] = field(default_factory=list)
+	files: list[str] = []
 	"""Image file name list to commit OCR or to get parameters. Every file name's pattern is: <prefix>_<date>_<suffix>.<ext>"""
 
 	image_area_param_section_stem: str = "image-area-param"
@@ -196,8 +194,8 @@ class MainSettings(AppNameSettings):
 	@classmethod
 	def from_dict(cls, toml_dict: dict[str, Any]) -> 'MainSettings':
 		return Binder(MainSettings).bind(toml_dict)
-	@classmethod
 
+	@classmethod
 	def __init_subclass__(cls, **kwargs):
 		super().__init_subclass__(**kwargs)
 		parent_doc = cls.__doc__ or ""
@@ -205,7 +203,7 @@ class MainSettings(AppNameSettings):
 		cls.__doc__ = parent_doc + "\n\n" + (child_doc or "")
 
 	@classmethod
-	def load(cls, fullpath: Path|str, table: str = "") -> 'MainSettings':
+	def load_toml(cls, fullpath: Path|str, table: str = "") -> 'MainSettings':
 		"""Load the TOML file and return the Settings instance of Binder"""
 		with Path(fullpath).open("rb") as f:
 			config = tomllib.load(f)
@@ -345,7 +343,7 @@ def load_main_settings_safely(file: str|Path = __file__, settings_class=MainSett
 	Returns: (Settings, Path)"""
 	try:
 		toml_path = search_settings_file(file, replace) if search_file else Path(file).with_name(Path(file).stem.replace(replace[0], replace[1]) + '.toml')
-		main_settings = settings_class.load(toml_path)
+		main_settings = settings_class.load_toml(toml_path)
 	except FileNotFoundError as e:
 		logger.error("TOML configuration file not found: %s", e)
 		raise
