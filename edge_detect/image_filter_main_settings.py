@@ -87,7 +87,7 @@ class AppSettings(Settings):
 	app: APP_NAME_LITERAL | None = None
 	""" Application name to process OCR from its screenshots """
 	stem_delimiter: str = '_'
-	""" Delimiter for splitting screenshot filename stem into 3 parts like: prefix:'Screenshot', datetime:'yyyy-mm-ddThh:mm:ss', suffix:'app.proper.name'"""
+	""" Delimiter for splitting screenshot filename stem into 3 parts like:: prefix:'Screenshot', datetime:'yyyy-mm-ddThh:mm:ss', suffix:'com.example.app.name'"""
 
 	@property
 	def app_name(self) -> Enum|None:
