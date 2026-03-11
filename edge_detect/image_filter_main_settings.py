@@ -24,15 +24,15 @@ logger = set_logger(__name__)
 ENV_FILENAME = ".env"
 try:
 	dotenv_path = find_dotenv(ENV_FILENAME, raise_error_if_not_found=True)
-	logger.info(f"Loading .env file: {dotenv_path}")
+	logger.info("Loading .env file: %s", dotenv_path)
 	with open(dotenv_path, 'r') as f:
-		logger.info(f"Contents of .env file:\n{f.read()}")
+		logger.info("Contents of .env file:\n%s", f.read())
 		dotenv_values = dotenv_values(dotenv_path)
-		logger.info(f"Loaded .env values: {dotenv_values}")
+		logger.info("Loaded .env values: %s", dotenv_values)
 		os_environ |= dotenv_values
 	# load_dotenv(dotenv_path, override=True)
 except Exception as e:
-	logger.info(f"Failed to load .env file: {e}")
+	logger.info("Failed to load .env file: %s", e)
 MAIN_SETTINGS_FILENAME = os_environ.get("IMAGE_FILTER_MAIN_SETTINGS_FILENAME", "image-filter-main-settings.toml")
 # Environment variables will be loaded after function definitions
 
