@@ -93,7 +93,7 @@ class AppSettings(Settings):
 	def app_name(self) -> Enum|None:
 		if self.app is None:
 			return None
-		return APP_NAME[self.app.name]
+		return APP_NAME[self.app]
 
 
 	@classmethod
@@ -125,7 +125,8 @@ class AppSettings(Settings):
 		"""Dictionary of 'app name' to 'stem end': 'stem' means the part of the filename before the extension"""
 		return {k.name:k.value for k in APP_TO_SUFFIX}
 
-GLOB_MODE = StrEnum('GLOB', ['NONE', 'GLOB', 'RGLOB'])  # Glob pattern 
+GLOB_MODE_LITERAL = Literal['NONE', 'GLOB', 'RGLOB'] # Glob pattern 
+GLOB_MODE = StrEnum('GLOB', GLOB_MODE_LITERAL.__args__)
 class AppBorderRatio:
 	""" Application name to border ratio mapping """
 	def __init__(self, s: str):
@@ -153,9 +154,9 @@ class MainSettings(AppSettings):
 	"""Image file extension set, every extention starts with dot (default is {'.png'})"""
 	image_dir: str = "~/Documents/screenshots"
 	"""Image file root directory"""
-	shot_month: list[int] = []
+	shot_months: list[int] = []
 	"""Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD]) included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like "[1,2,..]"""
-	glob: GLOB_MODE = GLOB_MODE.RGLOB
+	glob: GLOB_MODE_LITERAL = GLOB_MODE.RGLOB.name
 	"""Image file name pattern as glob pattern to commit OCR or to get parameters."""
 	rglob: bool = True
 	"""Search glob pattern matching Recursively in a directory tree downto every subdirectories"""
@@ -386,8 +387,8 @@ def print_toml_template(Settings:Type[Settings]=MainSettings, file=sys.stdout):
 if __name__ == '__main__':
 	# for line in Binder(AppSettings).format_toml_template(): # Need to generate an instance to get default values of default factory print(line)
 	from sys import argv
-	app_settings = AppSettings().parse_args(argv[1:]) #config_files=['app-config.json']
-	main_settings = MainSettings(underscores_to_dashes=True,config_files=['app-config.json']).parse_args(argv[1:]) #config_files=['app-config.json']
+	#app_settings = AppSettings().parse_args(argv[1:]) #config_files=['app-config.json']
+	main_settings = MainSettings(underscores_to_dashes=True).parse_args(argv[1:]) #config_files=['main-config.json']
 	from simple_parsing import parse as simple_parse
 	app_settings: AppSettings = simple_parse(config_class=AppSettings, config_path='app-config.yaml')#, add_config_path_arg
 	app_settings.app_to_suffixes |= AppSettings().app_to_suffixes # add default values
