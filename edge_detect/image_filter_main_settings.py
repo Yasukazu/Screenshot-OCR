@@ -387,7 +387,7 @@ if __name__ == '__main__':
 	# for line in Binder(AppSettings).format_toml_template(): # Need to generate an instance to get default values of default factory print(line)
 	from sys import argv
 	app_settings = AppSettings().parse_args(argv[1:]) #config_files=['app-config.json']
-	main_settings = MainSettings().parse_args(argv[1:]) #config_files=['app-config.json']
+	main_settings = MainSettings(underscores_to_dashes=True,config_files=['app-config.json']).parse_args(argv[1:]) #config_files=['app-config.json']
 	from simple_parsing import parse as simple_parse
 	app_settings: AppSettings = simple_parse(config_class=AppSettings, config_path='app-config.yaml')#, add_config_path_arg
 	app_settings.app_to_suffixes |= AppSettings().app_to_suffixes # add default values
