@@ -1,7 +1,7 @@
 """ MainSettings by DataclassBinder"""
 from pathlib import Path
 import tomllib
-from typing import Any, Callable, Iterator, Sequence, Type, Literal, get_args
+from typing import Any, Callable, Iterator, Sequence, Type, Literal, get_args, TYPE_CHECKING
 from dataclasses import asdict, dataclass, field, fields
 from enum import Enum
 from dataclass_binder import Binder
@@ -126,7 +126,22 @@ class AppSettings(Settings):
 		return {k.name:k.value for k in APP_TO_SUFFIX}
 
 GLOB_MODE = StrEnum('GLOB', ['NONE', 'GLOB', 'RGLOB'])  # Glob pattern 
-
+class AppBorderRatio:
+	""" Application name to border ratio mapping """
+	def __init__(self, s: str):
+		"""Initialize from string like "APP1:0.1, 0.2;APP2:0.3, 0.4" while APPn must be in APP_NAMES """
+		self.dic = {}
+		for item in s.split(';'):
+			if not item:
+				break
+			key, values = item.split(':')
+			if key not in APP_NAMES:
+				raise ValueError(f"Invalid app name: {key}")
+			values = [v for v in values.split(',') if v]
+			self.dic[key] = [float(v) for v in values]
+	def __getitem__(self, key):
+		""" Getter for obj[key] """
+		return self.dic[key]
 #@version((1,2,1))
 #@dataclass(kw_only=True)
 class MainSettings(AppSettings):
@@ -153,11 +168,11 @@ class MainSettings(AppSettings):
 
 	image_area_param_section_stem: str = "image-area-param"
 	"""Image area parameter section/table in image-area-param.ini"""
-	app_border_ratio: dict[str, list[float]] = field( default_factory=lambda:{"taimee":[2.2,3.2]})
+	app_border_ratio: AppBorderRatio = AppBorderRatio('TAIMEE:2.2,3.2') #dict[str, list[float]] = field( default_factory=lambda:{"taimee":[2.2,3.2]})
 	"""Screenshot image file horizontal border ratio list of the app to execute OCR:(specified in format as "<app_name1>:<ratio1>,<ratio2> ..." )"""
 	app_suffix: bool = False
 	"""Screenshot image file name has suffix(sub extention) of the same as app name i.e. "<stem>.<suffix>.<ext>" (default: True)"""
-	save: str = ''
+	save_as: str = ''
 	"""Output path to save OCR text of the image file as TOML format into the image file name extention as '.ocr-<app_name>.toml' """
 	nth: int =1
 	"""Rank(default: 1) of files descending sorted(the latest, the first) by modified date as wildcard(*, ?)"""
@@ -176,7 +191,7 @@ class MainSettings(AppSettings):
 	"""PSM value for Tesseract"""
 	area_param_dir: str = ''
 	"""Screenshot image area parameter config file directory"""
-	area_param_name_list: list[str] = field(default_factory=area_param_names)
+	area_param_name_list: list[str] = area_param_names()
 	"""Screenshot image area parameter name list"""
 	area_param_file: str = "image-area-param.ini"
 	"""Screenshot image area parameter config file: format as INI or TOML(".ini" or ".toml" extention respectively): in [image_area_param.<app>] section, items as "<area_name>=[<p1>,<p2>,<p3>,<p4>]" (e.g. "heading=[0,106,196,-1]") """
@@ -188,7 +203,7 @@ class MainSettings(AppSettings):
 	"""Month of data (like -1, 0, 1, 2, ...). 0 means current month, negative value is difference from current month (like -1 means last month), positive value means month number (1: Jan, 2: Feb, ...). If this value is larger than current month, data's date is treated as the last year."""
 	show_ocr_area: bool = False
 	"""Show every area before to commit OCR"""
-	exclude_area_param_set: set[str] = field(default_factory=set) # { {f'{n}' for n in image_area_param_names()} }
+	exclude_area_param_set: set[str] = set() # field(default_factory=set) # { {f'{n}' for n in image_area_param_names()} }
 	"""Exclude a set of image area parameter names"""
 
 	@classmethod
@@ -371,7 +386,8 @@ def print_toml_template(Settings:Type[Settings]=MainSettings, file=sys.stdout):
 if __name__ == '__main__':
 	# for line in Binder(AppSettings).format_toml_template(): # Need to generate an instance to get default values of default factory print(line)
 	from sys import argv
-	settings = AppSettings().parse_args(argv[1:]) #config_files=['app-config.json']
+	app_settings = AppSettings().parse_args(argv[1:]) #config_files=['app-config.json']
+	main_settings = MainSettings().parse_args(argv[1:]) #config_files=['app-config.json']
 	from simple_parsing import parse as simple_parse
 	app_settings: AppSettings = simple_parse(config_class=AppSettings, config_path='app-config.yaml')#, add_config_path_arg
 	app_settings.app_to_suffixes |= AppSettings().app_to_suffixes # add default values
