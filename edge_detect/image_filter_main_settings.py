@@ -40,9 +40,9 @@ MAIN_SETTINGS_FILENAME = os_environ.get("IMAGE_FILTER_MAIN_SETTINGS_FILENAME", "
 def image_area_param_names():
 	from image_filter import ImageAreaParamName
 	return list(ImageAreaParamName)
-from enum import StrEnum
-def make_name_to_suffix_strenum(prefix="IMAGE_FILTER", enum_name="APP_TO_SUFFIX") -> StrEnum:
-	"""Create StrEnum APP_NAME from a comma-separated string of 'key:value' pairs."""
+ENV_PREFIX = "IMAGE_FILTER"
+def make_app_name_enum(prefix=ENV_PREFIX, enum_name="APP_NAME", module="__main__") -> Enum:
+	"""Create APP_NAME Enum from a comma-separated string of 'name:integer' pairs.(like APP_NAME=A:1,B:2)"""
 	env_var = f"{prefix}_{enum_name}"
 	env_str = os_environ.get(env_var)
 	if not env_str:
@@ -55,16 +55,53 @@ def make_name_to_suffix_strenum(prefix="IMAGE_FILTER", enum_name="APP_TO_SUFFIX"
 				raise ValueError(f"Invalid pair format [key:value]: no value or key: {pair}")
 		except ValueError:
 			raise ValueError("Invalid pair format [key:value] no delimiter: (:)")
-		mappings[k.strip().upper()] = v.strip().lower()#.split('.')
+		mappings[k.strip().upper()] = int(v)
 	if not mappings:
 		raise ValueError(f"'{env_var}' env. var. is empty!")
-	return StrEnum(enum_name, mappings)
+	return Enum(enum_name, mappings, module)
 
-APP_TO_SUFFIX: StrEnum = make_name_to_suffix_strenum()
-APP_NAMES: list[str] = [n.name for n in APP_TO_SUFFIX]
-APP_NAME = Enum("APP_NAME", APP_NAMES, module='__main__')
+APP_NAME = make_app_name_enum(module='__main__')
+APP_NAMES: list[str] = [n.name for n in APP_NAME]
 APP_NAME_LITERAL = Literal[*APP_NAMES]
-APP_STR = StrEnum('APP_NAME_STR', APP_NAMES, module='__main__')
+
+from enum import StrEnum
+def make_app_to_suffix_strenum(prefix=ENV_PREFIX, enum_name="APP_TO_SUFFIX", make_strenum=True, name_to_suffix: str = None) -> StrEnum|str:# tuple[str, dict[str, str]]:
+	"""Create StrEnum APP_NAME from a comma-separated string of 'key:value' pairs."""
+	env_var = f"{prefix}_{enum_name}"
+	env_str = name_to_suffix or os_environ.get(env_var)
+	if not env_str:
+		raise ValueError(f"'{env_var}' env. var. is missing!")
+	mappings = {}
+	for pair in env_str.split(","):
+		try:
+			k, v = pair.split(":")
+			if not v or not k:
+				raise ValueError(f"Invalid pair format [key:value]: no value or key: {pair}")
+		except ValueError:
+			raise ValueError("Invalid pair format [key:value] no delimiter: (:)")
+		name = k.strip().upper()
+		if name not in APP_NAMES:
+			raise ValueError(f"Invalid app name: {name}")
+		mappings[name] = v.strip().lower()#.split('.')
+	if not mappings:
+		raise ValueError(f"'{env_var}' env. var. is empty!")
+	return StrEnum(enum_name, mappings) if make_strenum else env_str #(enum_name, mappings)
+
+class AppToSuffix:
+	""" partial emuration of StrEnum """
+	def __init__(self, app_to_suffix: str):
+		self.app_to_suffix = make_app_to_suffix_strenum(name_to_suffix=app_to_suffix, make_strenum=True)
+	def __getitem__(self, key: str):
+		""" Getter: [] access like StrEnum """
+		return self.app_to_suffix[key]
+	def items(self)-> dict[str, str]:
+		""" Return items like StrEnum """
+		return self.app_to_suffix.items()
+
+
+
+# APP_TO_SUFFIX: StrEnum = make_app_to_suffix_strenum()
+# APP_STR = StrEnum('APP_NAME_STR', [name for name in dir(APP_TO_SUFFIX) if not name.startswith('_')], module='__main__')
 
 def app_names():
 	#from image_filter import APP_NAME
@@ -88,6 +125,8 @@ class AppSettings(Settings):
 	""" Application name to process OCR from its screenshots """
 	stem_delimiter: str = '_'
 	""" Delimiter for splitting screenshot filename stem into 3 parts like:: prefix:'Screenshot', datetime:'yyyy-mm-ddThh:mm:ss', suffix:'com.example.app.name'"""
+	app_to_suffix: AppToSuffix = AppToSuffix(make_app_to_suffix_strenum(make_strenum=False))
+	""" Application name to suffix mapping """
 
 	@property
 	def app_name(self) -> Enum|None:
@@ -110,11 +149,10 @@ class AppSettings(Settings):
 	def get_app_name_enum(cls, module: str = '__main__')-> type[Enum]:
 		return Enum('APP_NAME', cls.get_app_names(), module=module)
 
-	@classmethod
-	def app_name_to_suffix_set(cls)-> dict[str, set[str]] :
+	def app_name_to_suffix_set(self)-> dict[str, set[str]] :
 		"""Screenshot image file suffix set: suffix is the part of file stem(filename before extention), stem delimiter is underscore (_)"""
 		dic = {}
-		for app_suffix in APP_TO_SUFFIX:
+		for app_suffix in self.app_to_suffix:
 			suffix = app_suffix.value
 			dic[app_suffix.name] = set([s for s in suffix.split('.') if s])
 		return dic
@@ -123,7 +161,7 @@ class AppSettings(Settings):
 	@property
 	def app_name_to_stem_end(self)-> dict[str, str]:
 		"""Dictionary of 'app name' to 'stem end': 'stem' means the part of the filename before the extension"""
-		return {k.name:k.value for k in APP_TO_SUFFIX}
+		return self.app_to_suffix.items()
 
 GLOB_MODE_LITERAL = Literal['NONE', 'GLOB', 'RGLOB'] # Glob pattern 
 GLOB_MODE = StrEnum('GLOB', GLOB_MODE_LITERAL.__args__)
