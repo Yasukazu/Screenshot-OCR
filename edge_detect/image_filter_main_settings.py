@@ -4,7 +4,7 @@ import tomllib
 from typing import Any, Callable, Iterator, Sequence, Type, Literal, get_args, TYPE_CHECKING
 from dataclasses import asdict, dataclass, field, fields
 from enum import Enum, StrEnum
-from dataclass_binder import Binder
+#from dataclass_binder import Binder
 import sys
 from simple_parsing import ArgumentParser
 from deepdiff import DeepDiff
@@ -40,13 +40,13 @@ from tap import Tap
 import typed_argparse as tap
 #@dataclass
 from app_to_suffix import APP_TO_SUFFIX
-APP_NAME = Enum('APP_NAME', [m.name for m in APP_TO_SUFFIX], module='__main__')
+APP_NAME = StrEnum('APP_NAME', [m.name for m in APP_TO_SUFFIX], module='__main__')
 class Settings(tap.TypedArgs):
 	""" Base settings """
 	app: APP_NAME | None = tap.arg(default=None, help="Application name to process OCR from its screenshots")
 def settings_runner(settings: Settings):
 	""" Run the settings """
-	print(f"Running settings for app: {settings.app}")
+	print(f"Running settings for app[{type(settings.app)}]: {settings.app=}")
 # from tap import TapIgnore
 #@version((1,6))
 #@dataclass
@@ -361,62 +361,13 @@ def print_toml_template(Settings:Type[Settings]=MainSettings, file=sys.stdout):
 if __name__ == '__main__':
 	# for line in Binder(AppSettings).format_toml_template(): # Need to generate an instance to get default values of default factory print(line)
 	from sys import argv
-	settings = tap.Parser(Settings)
-	settings.bind(settings_runner).run()
+	parser = tap.Parser(Settings)
+	import argcomplete
+	#argcomplete.autocomplete(Settings)
+	parser.bind(settings_runner).run()
 	#app_settings = AppSettings().parse_args(argv[1:]) #config_files=['app-config.json']
+	exit(0)
 	main_settings = MainSettings(underscores_to_dashes=True).parse_args(argv[1:]) #config_files=['main-config.json']
 	from simple_parsing import parse as simple_parse
 	app_settings: AppSettings = simple_parse(config_class=AppSettings, config_path='app-config.yaml')#, add_config_path_arg
 	app_settings.app_to_suffixes |= AppSettings().app_to_suffixes # add default values
-	'''from simple_parsing import ArgumentParser
-	parser = ArgumentParser()
-	parser.add_arguments(AppSettings, dest='app_settings')
-	args = parser.parse_args()
-	diff = DeepDiff(app_settings, args.app_settings)
-	affected_args = {key: getattr(args.app_settings, key) for key in diff.affected_root_keys}
-	from deepmerge import always_merger as merger
-	app_settings.app_to_suffixes |= args.app_settings.app_to_suffixes # merger.merge(app_settings, args.app_settings)'''
-	exit(0)
-	#print(MainSettings.__doc__)
-	print('-*-' * 20 + 'template'+ '-*-' * 20)
-	print_toml_template()
-	# print('\n'.join(main_settings_toml_lines()))
-	print('-*-' * 20 + 'toml'+ '-*-' * 20)
-	script_fullpath = Path(__file__)
-	script_dir = script_fullpath.parent
-	user_home_dir = Path('~').expanduser()
-	main_settings_file = search_settings_file(__file__)#script_dir / (toml_name:=(script_fullpath.stem.replace('_', '-') + '.toml'))
-
-	load_result = load_main_settings_safely(main_settings_file)
-	from returns.pipeline import is_successful
-	if is_successful(load_result):
-		by_file_main_settings, used_settings_file = load_result.unwrap()
-	else:
-		exception = load_result.failure()
-		match(exception):
-			case FileNotFoundError():
-				print("File not found")
-			case OSError():
-				print("File system error")
-			case tomllib.TOMLDecodeError():
-				print("TOML configuration file is malformed or contains invalid syntax")
-			case KeyError():
-				print("Key Configuration error in main settings")
-			case ValueError():
-				print("Value Configuration error in main settings")
-			case _:
-				print(f"{exception=}")
-		logger.error("Failed to load main settings: %s", exception)
-		raise exception
-	file_diffs = []
-	args_diffs = []
-	from image_filter import OptionalMainSettings
-	merged_settings = load_merged_settings(by_file_main_settings, sub_settings_class=OptionalMainSettings, file_diffs=file_diffs, args_diffs=args_diffs)
-	main_settings_dict = asdict(by_file_main_settings)
-	merged_settings_dict = asdict(merged_settings)
-	diff2 = DeepDiff(main_settings_dict, merged_settings_dict)
-	for key in diff2.affected_root_keys:
-		print(f"{key}: {getattr(merged_settings,key)}")
-	# print(diff2)
-	# print(f"{main_settings=}")
-	# print('--- Arguments ---')
