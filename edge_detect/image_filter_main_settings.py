@@ -1,4 +1,5 @@
 """ MainSettings by DataclassBinder"""
+# PYTHON_ARGCOMPLETE_OK 
 from pathlib import Path
 import tomllib
 from typing import Any, Callable, Iterator, Sequence, Type, Literal, get_args, TYPE_CHECKING
@@ -364,9 +365,9 @@ def print_toml_template(Settings:Type[Settings]=MainSettings, file=sys.stdout):
 if __name__ == '__main__':
 	# for line in Binder(AppSettings).format_toml_template(): # Need to generate an instance to get default values of default factory print(line)
 	from sys import argv
-	parser = tap.Parser(Settings)
+	parser = tap.Parser(Settings, usage="%(prog)s [--app {taimee,mercari}];Set env. variable: IMAGE_FILTER_APP_TO_SUFFIX=<app_name1>:<app_suffix1>,<app_name2>:<app_suffix2>;Image file name's stem(except extention like '.png') is consisted of 3 parts:{prefix,date,suffix} delimitered by underscore('_').")
 	import argcomplete
-	#argcomplete.autocomplete(Settings)
+	argcomplete.autocomplete(parser)
 	parser.bind(settings_runner).run()
 	#app_settings = AppSettings().parse_args(argv[1:]) #config_files=['app-config.json']
 	exit(0)
