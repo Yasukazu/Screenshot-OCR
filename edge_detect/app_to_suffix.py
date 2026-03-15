@@ -102,3 +102,7 @@ class AppName:
 				if hasattr(attr, 'value'):
 					result[attr_name] = attr.value
 		return result
+
+class APP_TO_SUFFIX(StrEnum):
+	TAIMEE = "jp.co.taimee"
+	MERCARI = "jp.mercari.work"

@@ -37,15 +37,21 @@ def area_param_names():
 	return ['HEADING', 'SHIFT', 'BREAKTIME', 'PAYSTUB', 'SALARY']
 from fancy_dataclass import version
 from tap import Tap
+import typed_argparse as tap
 #@dataclass
-class Settings(Tap):
+from app_to_suffix import APP_TO_SUFFIX
+APP_NAME = Enum('APP_NAME', [m.name for m in APP_TO_SUFFIX], module='__main__')
+class Settings(tap.TypedArgs):
 	""" Base settings """
-	pass
+	app: APP_NAME | None = tap.arg(default=None, help="Application name to process OCR from its screenshots")
+def settings_runner(settings: Settings):
+	""" Run the settings """
+	print(f"Running settings for app: {settings.app}")
 # from tap import TapIgnore
 #@version((1,6))
 #@dataclass
 TYPE_CHECKING = True
-class AppSettings(Settings):
+class AppSettings:
 	""" Application_name to suffix mapping must be defined in the environment variable or in '.env' file as 'IMAGE_FILTER_APP_TO_SUFFIX=<app1>:<suffix1>,<app2>:<suffix2>,<app3>:<suffix3>' """
 	if TYPE_CHECKING:
 		app: AppName | None = None
@@ -94,6 +100,7 @@ class AppSettings(Settings):
 
 GLOB_MODE_LITERAL = Literal['NONE', 'GLOB', 'RGLOB'] # Glob pattern 
 GLOB_MODE = StrEnum('GLOB', GLOB_MODE_LITERAL.__args__)
+APP_NAMES = [m.name for m in APP_TO_SUFFIX]
 class AppBorderRatio:
 	""" Application name to border ratio mapping """
 	def __init__(self, s: str):
@@ -354,6 +361,8 @@ def print_toml_template(Settings:Type[Settings]=MainSettings, file=sys.stdout):
 if __name__ == '__main__':
 	# for line in Binder(AppSettings).format_toml_template(): # Need to generate an instance to get default values of default factory print(line)
 	from sys import argv
+	settings = tap.Parser(Settings)
+	settings.bind(settings_runner).run()
 	#app_settings = AppSettings().parse_args(argv[1:]) #config_files=['app-config.json']
 	main_settings = MainSettings(underscores_to_dashes=True).parse_args(argv[1:]) #config_files=['main-config.json']
 	from simple_parsing import parse as simple_parse

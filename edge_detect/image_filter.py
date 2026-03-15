@@ -1436,8 +1436,8 @@ def main(main_settings: MainSettings=MAIN_SETTINGS,
 				logger.info("Inserted OCR data [%s] into database: %s", inserted_item, db_fullpath)
 		# else: doc_dict[area_name] = '\n'.join(col_list[0])
 		# doc.add(area_tbl)
-	if args.save:
-		save_path = Path(args.save) / f"{image_file.stem}.ocr-{args.app}'.toml'"
+	if args.save_as:
+		save_path = Path(args.save_as) / f"{image_file.stem}.ocr-{args.app}'.toml'"
 		if save_path.exists():
 			yn = input(
 				f"\nThe file path to save the image file area configuration:{save_path} already exists. Overwrite?(Enter 'Yes' or 'Affirmative' if you want to overwparser.parse_args()rite)"
