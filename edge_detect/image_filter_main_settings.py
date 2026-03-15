@@ -39,8 +39,11 @@ from fancy_dataclass import version
 from tap import Tap
 import typed_argparse as tap
 #@dataclass
-from app_to_suffix import APP_TO_SUFFIX
+from app_to_suffix import make_app_to_suffix_strenum # APP_TO_SUFFIX
+APP_TO_SUFFIX = make_app_to_suffix_strenum()
+logger.info("APP_TO_SUFFIX: %s", list(APP_TO_SUFFIX))
 APP_NAME = StrEnum('APP_NAME', [m.name for m in APP_TO_SUFFIX], module='__main__')
+logger.info("APP_NAME: %s", list(APP_NAME))
 class Settings(tap.TypedArgs):
 	""" Base settings """
 	app: APP_NAME | None = tap.arg(default=None, help="Application name to process OCR from its screenshots")
