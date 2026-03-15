@@ -15,10 +15,7 @@ from dot_env import DOTENV_INFO
 if not DOTENV_INFO.is_valid:
 	logger.error("Failed to load '.env' file.")
 	raise ValueError("Failed to load '.env' file.")
-else:
-	if DOTENV_INFO.values is not None:
-		os_environ.update(DOTENV_INFO.values)
-		logger.info("Loaded .env values: %s", DOTENV_INFO.values)
+
 
 ENV_PREFIX = "IMAGE_FILTER"
 
@@ -41,12 +38,17 @@ def make_app_name_enum(prefix=ENV_PREFIX, enum_name="APP_NAME", module="__main__
 		raise ValueError(f"'{env_var}' env. var. is empty!")
 	return Enum(enum_name, mappings, module)
 
-def make_app_to_suffix_strenum(prefix=ENV_PREFIX, strenum_name="APP_TO_SUFFIX", make_strenum=True, enum_name="APP_NAME", also_enum=False, name_to_suffix: str|None = None, module="__main__") -> tuple[StrEnum, Enum]|StrEnum|str:# tuple[str, dict[str, str]]:
+def make_app_to_suffix_strenum(prefix=ENV_PREFIX, strenum_name="APP_TO_SUFFIX", make_strenum=True, enum_name="APP_NAME", also_enum=False, name_to_suffix: str|None = None, module="__main__", dic: dict|None=DOTENV_INFO.values) -> tuple[StrEnum, Enum]|StrEnum|str:# tuple[str, dict[str, str]]:
 	"""Create StrEnum APP_TO_SUFFIX from a comma-separated string of 'key:value' pairs.  And also Enum APP_NAME if 'also_enum' is True."""
-	env_var = f"{prefix}_{strenum_name}"
-	env_str = name_to_suffix or os_environ.get(env_var)
+	if not strenum_name:
+		raise ValueError("'strenum_name' is empty!")
+	env_var = '_'.join([s for s in [prefix, strenum_name] if s])
+	try:
+		env_str = name_to_suffix or dic[env_var]
+	except (KeyError, TypeError) as err:
+		raise ValueError(f"'{env_var}' env. var. is missing!") from err
 	if not env_str:
-		raise ValueError(f"'{env_var}' env. var. is missing!")
+		raise ValueError("'env_str' is empty!")
 	mappings = {}
 	for pair in env_str.split(","):
 		try:
@@ -58,7 +60,7 @@ def make_app_to_suffix_strenum(prefix=ENV_PREFIX, strenum_name="APP_TO_SUFFIX", 
 		name = k.strip().upper()
 		mappings[name] = v.strip().lower()#.split('.')
 	if not mappings:
-		raise ValueError(f"'{env_var}' env. var. is empty!")
+		raise ValueError(f"'{env_var}' env. var. is empty! it needs for example: '{env_var}=APP1:suffix1,APP2:suffix2'")
 	if make_strenum:
 		if also_enum:
 			return StrEnum(strenum_name, mappings, module=module), Enum(enum_name, list(mappings.keys()), module=module)

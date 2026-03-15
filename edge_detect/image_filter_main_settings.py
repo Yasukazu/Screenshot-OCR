@@ -365,7 +365,7 @@ def print_toml_template(Settings:Type[Settings]=MainSettings, file=sys.stdout):
 if __name__ == '__main__':
 	# for line in Binder(AppSettings).format_toml_template(): # Need to generate an instance to get default values of default factory print(line)
 	from sys import argv
-	parser = tap.Parser(Settings, usage=f"%(prog)s [--app {{{'|'.join([n.lower() for n in APP_NAMES])}}}];Set env. variable: IMAGE_FILTER_APP_TO_SUFFIX=<app_name1>:<app_suffix1>,<app_name2>:<app_suffix2>;Image file name's stem(except extention like '.png') is consisted of 3 parts:{{prefix,date,suffix}} delimitered by underscore('_').")
+	parser = tap.Parser(Settings, usage=f"%(prog)s [--app {{{'|'.join([n.lower() for n in APP_NAMES])}}}];Set env. variable: IMAGE_FILTER_APP_TO_SUFFIX=<app_name1>:<app_suffix1>,<app_name2>:<app_suffix2>;Suffix is the last part of split-by-underscore('_') in the image file name's stem part (filename except extention like '.png').")
 	import argcomplete
 	argcomplete.autocomplete(parser)
 	parser.bind(settings_runner).run()
