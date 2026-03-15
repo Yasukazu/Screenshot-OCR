@@ -1,4 +1,4 @@
-""" AppToSuffix StrEnum from env. val. """
+""" Load num from env. val. """
 from pathlib import Path
 import sys
 from dotenv import find_dotenv, dotenv_values
