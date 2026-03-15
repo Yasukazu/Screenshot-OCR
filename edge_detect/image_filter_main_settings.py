@@ -21,18 +21,15 @@ parent_dir = str(Path(__file__).resolve().parent.parent)
 if parent_dir not in sys.path:
 	sys.path.insert(0, parent_dir) # Add to the beginning of the path
 logger = set_logger(__name__)
-ENV_FILENAME = ".env"
-try:
-	dotenv_path = find_dotenv(ENV_FILENAME, raise_error_if_not_found=True)
-	logger.info("Loading .env file: %s", dotenv_path)
-	with open(dotenv_path, 'r') as f:
-		logger.info("Contents of .env file:\n%s", f.read())
-		dotenv_values = dotenv_values(dotenv_path)
-		logger.info("Loaded .env values: %s", dotenv_values)
-		os_environ |= dotenv_values
-	# load_dotenv(dotenv_path, override=True)
-except Exception as e:
-	logger.info("Failed to load .env file: %s", e)
+from dot_env import DOTENV_INFO
+if not DOTENV_INFO.is_valid:
+	logger.error("Failed to load '.env' file.")
+	raise ValueError("Failed to load '.env' file.")
+else:
+	if DOTENV_INFO.values is not None:
+		os_environ.update(DOTENV_INFO.values)
+		logger.info("Loaded .env values: %s", DOTENV_INFO.values)
+
 MAIN_SETTINGS_FILENAME = os_environ.get("IMAGE_FILTER_MAIN_SETTINGS_FILENAME", "image-filter-main-settings.toml")
 # Environment variables will be loaded after function definitions
 
@@ -93,10 +90,10 @@ class AppToSuffix:
 		self.app_to_suffix = make_app_to_suffix_strenum(name_to_suffix=app_to_suffix, make_strenum=True)
 	def __getitem__(self, key: str):
 		""" Getter: [] access like StrEnum """
-		return self.app_to_suffix[key]
+		return self.app_to_suffix[key.upper()]
 	def items(self)-> dict[str, str]:
 		""" Return items like StrEnum """
-		return self.app_to_suffix.items()
+		return {member.name: member.value for member in self.app_to_suffix}
 
 
 
