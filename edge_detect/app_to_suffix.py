@@ -39,7 +39,7 @@ def make_app_name_enum(prefix=ENV_PREFIX, enum_name="APP_NAME", module="__main__
 	return Enum(enum_name, mappings, module)
 
 def make_app_to_suffix_strenum(prefix=ENV_PREFIX, strenum_name="APP_TO_SUFFIX", make_strenum=True, enum_name="APP_NAME", also_enum=False, name_to_suffix: str|None = None, module="__main__", dic: dict|None=DOTENV_INFO.values) -> tuple[StrEnum, Enum]|StrEnum|str:# tuple[str, dict[str, str]]:
-	"""Create StrEnum APP_TO_SUFFIX from a comma-separated string of 'key:value' pairs.  And also Enum APP_NAME if 'also_enum' is True."""
+	"""Based on `dic`, make StrEnum APP_TO_SUFFIX from a comma-separated string of 'key:value' pairs.  And also Enum APP_NAME if 'also_enum' is True."""
 	if not strenum_name:
 		raise ValueError("'strenum_name' is empty!")
 	env_var = '_'.join([s for s in [prefix, strenum_name] if s])

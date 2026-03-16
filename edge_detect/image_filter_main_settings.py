@@ -9,20 +9,17 @@ from enum import Enum, StrEnum
 import sys
 from simple_parsing import ArgumentParser
 from deepdiff import DeepDiff
-from fancy_dataclass import version
-from dotenv import find_dotenv, load_dotenv, dotenv_values
 from os import environ as os_environ
 
 parent_dir = str(Path(__file__).resolve().parent.parent)
 if parent_dir not in sys.path:
 	sys.path.insert(0, parent_dir) # Add to the beginning of the path
 from set_logger import set_logger
-import sys
 parent_dir = str(Path(__file__).resolve().parent.parent)
 if parent_dir not in sys.path:
 	sys.path.insert(0, parent_dir) # Add to the beginning of the path
 logger = set_logger(__name__)
-from dot_env import DOTENV_INFO
+from dot_env import DOTENV_INFO, ENV_PREFIX
 if not DOTENV_INFO.is_valid:
 	logger.error("Failed to load '.env' file.")
 	raise ValueError("Failed to load '.env' file.")
@@ -41,7 +38,7 @@ from tap import Tap
 import typed_argparse as tap
 #@dataclass
 from app_to_suffix import make_app_to_suffix_strenum # APP_TO_SUFFIX
-APP_TO_SUFFIX = make_app_to_suffix_strenum()
+APP_TO_SUFFIX = make_app_to_suffix_strenum(strenum_name="APP_TO_SUFFIX", prefix=ENV_PREFIX)
 logger.info("APP_TO_SUFFIX: %s", list(APP_TO_SUFFIX))
 APP_NAME = StrEnum('APP_NAME', [m.name for m in APP_TO_SUFFIX], module='__main__')
 logger.info("APP_NAME: %s", list(APP_NAME))

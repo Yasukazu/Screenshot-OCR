@@ -13,6 +13,8 @@ if parent_dir not in sys.path:
 	sys.path.insert(0, parent_dir) # Add to the beginning of the path
 logger = set_logger(__name__)
 
+ENV_PREFIX = "IMAGE_FILTER"
+
 @dataclass
 class DotEnvInfo:
 	filename: str
@@ -21,7 +23,7 @@ class DotEnvInfo:
 	exception: Exception | None
 	@property
 	def is_valid(self) -> bool:
-		return bool(self.path) and self.exception is None
+		return bool(self.path) and (self.exception is None)
 	
 DOTENV_INFO = DotEnvInfo(filename="", path="", values={}, exception=None)
 DOTENV_INFO.filename = ".env"
@@ -39,4 +41,3 @@ if DOTENV_INFO.path:
 	except Exception as e:
 		logger.warning("Failed to load .env file: %s", e)
 		DOTENV_INFO.exception = e
-	
