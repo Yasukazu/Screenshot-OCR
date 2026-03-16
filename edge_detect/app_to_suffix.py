@@ -1,4 +1,5 @@
 """ AppToSuffix StrEnum from env. val. """
+APP_TO_SUFFIX_STR = "APP_TO_SUFFIX"
 from pathlib import Path
 from typing import Any, Callable, Iterator, Sequence, Type, Literal, get_args, TYPE_CHECKING, Union
 from enum import Enum, StrEnum
@@ -11,15 +12,13 @@ if parent_dir not in sys.path:
 	sys.path.insert(0, parent_dir) # Add to the beginning of the path
 from set_logger import set_logger
 logger = set_logger(__name__)
-from dot_env import DOTENV_INFO
+from dot_env import DOTENV_INFO, ENV_PREFIX_STR
 if not DOTENV_INFO.is_valid:
 	logger.error("Failed to load '.env' file.")
 	raise ValueError("Failed to load '.env' file.")
 
 
-ENV_PREFIX = "IMAGE_FILTER"
-
-def make_app_name_enum(prefix=ENV_PREFIX, enum_name="APP_NAME", module="__main__") -> Enum:
+def make_app_name_enum(prefix=ENV_PREFIX_STR, enum_name="APP_NAME", module="__main__") -> Enum:
 	"""Create APP_NAME Enum from a comma-separated string of 'name:integer' pairs.(like APP_NAME=A:1,B:2)"""
 	env_var = f"{prefix}_{enum_name}"
 	env_str = os_environ.get(env_var)
@@ -38,7 +37,7 @@ def make_app_name_enum(prefix=ENV_PREFIX, enum_name="APP_NAME", module="__main__
 		raise ValueError(f"'{env_var}' env. var. is empty!")
 	return Enum(enum_name, mappings, module)
 
-def make_app_to_suffix_strenum(prefix=ENV_PREFIX, strenum_name="APP_TO_SUFFIX", make_strenum=True, enum_name="APP_NAME", also_enum=False, name_to_suffix: str|None = None, module="__main__", dic: dict|None=DOTENV_INFO.values) -> tuple[StrEnum, Enum]|StrEnum|str:# tuple[str, dict[str, str]]:
+def make_app_to_suffix_strenum(prefix=ENV_PREFIX_STR, strenum_name="APP_TO_SUFFIX", make_strenum=True, enum_name="APP_NAME", also_enum=False, name_to_suffix: str|None = None, module="__main__", dic: dict|None=DOTENV_INFO.values) -> tuple[StrEnum, Enum]|StrEnum|str:# tuple[str, dict[str, str]]:
 	"""Based on `dic`, make StrEnum APP_TO_SUFFIX from a comma-separated string of 'key:value' pairs.  And also Enum APP_NAME if 'also_enum' is True."""
 	if not strenum_name:
 		raise ValueError("'strenum_name' is empty!")

@@ -13,7 +13,7 @@ if parent_dir not in sys.path:
 	sys.path.insert(0, parent_dir) # Add to the beginning of the path
 logger = set_logger(__name__)
 
-ENV_PREFIX = "IMAGE_FILTER"
+ENV_PREFIX_STR = "IMAGE_FILTER"
 
 @dataclass
 class DotEnvInfo:
