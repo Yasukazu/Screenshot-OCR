@@ -25,14 +25,24 @@ from dot_env import DOTENV_INFO
 if not DOTENV_INFO.is_valid:
 	logger.error("Failed to load '.env' file.")
 	raise ValueError("Failed to load '.env' file.")
-else:
+''' else:
 	if DOTENV_INFO.values is not None:
 		os_environ.update(DOTENV_INFO.values)
-		logger.info("Loaded .env values: %s", DOTENV_INFO.values)
+		logger.info("Loaded .env values: %s", DOTENV_INFO.values) '''
 
 MAIN_SETTINGS_FILENAME = os_environ.get("IMAGE_FILTER_MAIN_SETTINGS_FILENAME", "image-filter-main-settings.toml")
 from app_to_suffix import make_app_to_suffix_strenum, AppToSuffix, AppName
-
+APP_TO_SUFFIX_ENV_NAME = "IMAGE_FILTER_APP_TO_SUFFIX"
+try:
+	APP_TO_SUFFIX_VALUE = os_environ[APP_TO_SUFFIX_ENV_NAME]
+except KeyError:
+	try:
+		APP_TO_SUFFIX_VALUE = DOTENV_INFO.values[APP_TO_SUFFIX_ENV_NAME]
+	except (KeyError, TypeError) as e:
+		raise ValueError("Failed to load 'IMAGE_FILTER_APP_TO_SUFFIX' from environment or .env file.") from e
+APP_TO_SUFFIX = make_app_to_suffix_strenum(APP_TO_SUFFIX_VALUE)
+APP_NAME = Enum("APP_NAME", [app.name for app in APP_TO_SUFFIX], module='__main__')
+APP_NAMES = [app.name for app in APP_TO_SUFFIX]
 def area_param_names():
 	return ['HEADING', 'SHIFT', 'BREAKTIME', 'PAYSTUB', 'SALARY']
 from fancy_dataclass import version
@@ -54,8 +64,7 @@ class AppSettings(Settings):
 	""" Application name to process OCR from its screenshots """
 	stem_delimiter: str = '_'
 	""" Delimiter for splitting screenshot filename stem into 3 parts like:: prefix:'Screenshot', datetime:'yyyy-mm-ddThh:mm:ss', suffix:'com.example.app.name'"""
-	app_to_suffix: AppToSuffix = AppToSuffix(make_app_to_suffix_strenum(make_strenum=False))
-	""" Application name to suffix mapping """
+	#app_to_suffix: AppToSuffix = AppToSuffix(make_app_to_suffix_strenum(make_strenum=False)) """ Application name to suffix mapping """
 
 	@property
 	def app_name(self) -> Enum|None:

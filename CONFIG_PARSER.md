@@ -28,9 +28,9 @@
  5. `tap`: typed_argparse
 	- https://typed-argparse.github.io/typed-argparse/high_level_api/#getting-started
 	- Features:
-	 - Enum type field
+	 - Enum type field: Dynamic StrEnum and Enum creation (useful for from environment variables)
 	 - Parser class with bind method for business logic: `tap.Parser(Config).bind(runner).run()`
-	 - Shell auto-completion based on `argcomplete`
+	 - (? how to use is not enough) Shell auto-completion based on `argcomplete`
 	```Python
 	from typing import List, Optional
 	import typed_argparse as tap
