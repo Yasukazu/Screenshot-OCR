@@ -39,14 +39,15 @@ def area_param_names():
 	return ['HEADING', 'SHIFT', 'BREAKTIME', 'PAYSTUB', 'SALARY']
 from fancy_dataclass import version
 from tap import Tap
-import typed_argparse as tap
+import typed_argparse as tap2
+from typed_argparse import TypedArgs, arg
 #@dataclass
 logger.info("APP_TO_SUFFIX: %s", list(APP_TO_SUFFIX))
 APP_NAME = StrEnum('APP_NAME', [m.name for m in APP_TO_SUFFIX], module='__main__')
 logger.info("APP_NAME: %s", list(APP_NAME))
-class Settings(tap.TypedArgs):
+class Settings(TypedArgs):
 	""" Base settings """
-	app: APP_NAME | None = tap.arg(default=None, help="Application name to process OCR from its screenshots")
+	app: APP_NAME | None = arg(default=None, help="Application name to process OCR from its screenshots")
 def settings_runner(settings: Settings):
 	""" Run the settings """
 	print(f"Running settings for app[{type(settings.app)}]: {settings.app=}")
