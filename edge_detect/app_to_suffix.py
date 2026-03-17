@@ -55,7 +55,7 @@ def make_app_to_suffix_strenum(name_value_pair: str, strenum_name="APP_TO_SUFFIX
 		name = k.strip().upper()
 		mappings[name] = v.strip().lower()#.split('.')
 	if not mappings:
-		raise ValueError(f"'{env_var}' env. var. is empty; it needs for example: '{env_var}=APP1:suffix1,APP2:suffix2'")
+		raise ValueError("mappings for name and value is empty")
 	return StrEnum(strenum_name, mappings, module=module)
 
 class AppToSuffix:
