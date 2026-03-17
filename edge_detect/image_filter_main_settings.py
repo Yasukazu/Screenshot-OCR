@@ -20,16 +20,20 @@ if parent_dir not in sys.path:
 	sys.path.insert(0, parent_dir) # Add to the beginning of the path
 logger = set_logger(__name__)
 from dot_env import DOTENV_INFO, ENV_PREFIX_STR
-if not DOTENV_INFO.is_valid:
-	logger.error("Failed to load '.env' file.")
-	raise ValueError("Failed to load '.env' file.")
-else:
-	if DOTENV_INFO.values is not None:
-		os_environ.update(DOTENV_INFO.values)
-		logger.info("Loaded .env values: %s", DOTENV_INFO.values)
+APP_TO_SUFFIX_KEY = "APP_TO_SUFFIX"
+try:
+	APP_TO_SUFFIX_VALUE = os_environ['_'.join([ENV_PREFIX_STR, APP_TO_SUFFIX_KEY])]
+except KeyError as e:
+	try:
+		APP_TO_SUFFIX_VALUE = DOTENV_INFO.values['_'.join([ENV_PREFIX_STR, APP_TO_SUFFIX_KEY])]
+	except (TypeError, KeyError) as err:
+		logger.error("Failed to get '%s' from environment variable or '.env' file:%s", APP_TO_SUFFIX_KEY, err)
+		raise err
+
+from app_to_suffix import make_app_to_suffix_strenum, AppToSuffix, AppName
+APP_TO_SUFFIX = make_app_to_suffix_strenum(strenum_name=APP_TO_SUFFIX_KEY, name_value_pair=APP_TO_SUFFIX_VALUE)
 
 MAIN_SETTINGS_FILENAME = os_environ.get("IMAGE_FILTER_MAIN_SETTINGS_FILENAME", "image-filter-main-settings.toml")
-from app_to_suffix import make_app_to_suffix_strenum, AppToSuffix, AppName
 
 def area_param_names():
 	return ['HEADING', 'SHIFT', 'BREAKTIME', 'PAYSTUB', 'SALARY']
@@ -37,8 +41,6 @@ from fancy_dataclass import version
 from tap import Tap
 import typed_argparse as tap
 #@dataclass
-from app_to_suffix import make_app_to_suffix_strenum # APP_TO_SUFFIX
-APP_TO_SUFFIX = make_app_to_suffix_strenum(strenum_name="APP_TO_SUFFIX", prefix=ENV_PREFIX_STR)
 logger.info("APP_TO_SUFFIX: %s", list(APP_TO_SUFFIX))
 APP_NAME = StrEnum('APP_NAME', [m.name for m in APP_TO_SUFFIX], module='__main__')
 logger.info("APP_NAME: %s", list(APP_NAME))

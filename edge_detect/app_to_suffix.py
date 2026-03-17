@@ -37,19 +37,15 @@ def make_app_name_enum(prefix=ENV_PREFIX_STR, enum_name="APP_NAME", module="__ma
 		raise ValueError(f"'{env_var}' env. var. is empty!")
 	return Enum(enum_name, mappings, module)
 
-def make_app_to_suffix_strenum(prefix=ENV_PREFIX_STR, strenum_name="APP_TO_SUFFIX", make_strenum=True, enum_name="APP_NAME", also_enum=False, name_to_suffix: str|None = None, module="__main__", dic: dict|None=DOTENV_INFO.values) -> tuple[StrEnum, Enum]|StrEnum|str:# tuple[str, dict[str, str]]:
-	"""Based on `dic`, make StrEnum APP_TO_SUFFIX from a comma-separated string of 'key:value' pairs.  And also Enum APP_NAME if 'also_enum' is True."""
+def make_app_to_suffix_strenum(name_value_pair: str, strenum_name="APP_TO_SUFFIX", module="__main__") -> StrEnum:# tuple[str, dict[str, str]]:
+	"""make StrEnum APP_TO_SUFFIX from a comma-separated string of 'key:value' pairs like: 'APP1:suffix1,APP2:suffix2'."""
 	if not strenum_name:
 		raise ValueError("'strenum_name' is empty!")
-	env_var = '_'.join([s for s in [prefix, strenum_name] if s])
-	try:
-		env_str = name_to_suffix or dic[env_var]
-	except (KeyError, TypeError) as err:
-		raise ValueError(f"'{env_var}' env. var. is missing!") from err
-	if not env_str:
+	if not name_value_pair:
 		raise ValueError("'env_str' is empty!")
+
 	mappings = {}
-	for pair in env_str.split(","):
+	for pair in name_value_pair.split(","):
 		try:
 			k, v = pair.split(":")
 			if not v or not k:
@@ -59,12 +55,8 @@ def make_app_to_suffix_strenum(prefix=ENV_PREFIX_STR, strenum_name="APP_TO_SUFFI
 		name = k.strip().upper()
 		mappings[name] = v.strip().lower()#.split('.')
 	if not mappings:
-		raise ValueError(f"'{env_var}' env. var. is empty! it needs for example: '{env_var}=APP1:suffix1,APP2:suffix2'")
-	if make_strenum:
-		if also_enum:
-			return StrEnum(strenum_name, mappings, module=module), Enum(enum_name, list(mappings.keys()), module=module)
-		return StrEnum(strenum_name, mappings, module=module)
-	return env_str
+		raise ValueError(f"'{env_var}' env. var. is empty; it needs for example: '{env_var}=APP1:suffix1,APP2:suffix2'")
+	return StrEnum(strenum_name, mappings, module=module)
 
 class AppToSuffix:
 	""" partial emuration of StrEnum """
