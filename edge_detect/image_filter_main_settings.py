@@ -4,11 +4,11 @@ import tomllib
 from typing import Any, Callable, Iterator, Sequence, Type, Literal, get_args, TYPE_CHECKING
 from dataclasses import asdict, dataclass, field, fields
 from enum import Enum, StrEnum
-from dataclass_binder import Binder
+# from dataclass_binder import Binder
 import sys
-from simple_parsing import ArgumentParser
-from deepdiff import DeepDiff
-from fancy_dataclass import version
+# from simple_parsing import ArgumentParser
+# from deepdiff import DeepDiff
+# from fancy_dataclass import version
 from dotenv import find_dotenv, load_dotenv, dotenv_values
 from os import environ as os_environ
 
@@ -41,7 +41,7 @@ except KeyError:
 	except (KeyError, TypeError) as e:
 		raise ValueError("Failed to load 'IMAGE_FILTER_APP_TO_SUFFIX' from environment or .env file.") from e
 APP_TO_SUFFIX = make_app_to_suffix_strenum(APP_TO_SUFFIX_VALUE)
-APP_NAME = Enum("APP_NAME", [app.name for app in APP_TO_SUFFIX], module='__main__')
+APP_NAME = StrEnum("APP_NAME", [app.name for app in APP_TO_SUFFIX], module='__main__')
 APP_NAMES = [app.name for app in APP_TO_SUFFIX]
 def area_param_names():
 	return ['HEADING', 'SHIFT', 'BREAKTIME', 'PAYSTUB', 'SALARY']
@@ -58,7 +58,7 @@ TYPE_CHECKING = True
 class AppSettings(Settings):
 	""" Application_name to suffix mapping must be defined in the environment variable or in '.env' file as 'IMAGE_FILTER_APP_TO_SUFFIX=<app1>:<suffix1>,<app2>:<suffix2>,<app3>:<suffix3>' """
 	if TYPE_CHECKING:
-		app: AppName | None = None
+		app: APP_NAME | None = None
 	else:
 		app: str | None = None
 	""" Application name to process OCR from its screenshots """
