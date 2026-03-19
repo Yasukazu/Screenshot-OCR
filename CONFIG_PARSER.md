@@ -61,10 +61,15 @@
 	 - Class type field is supported only for single-string argument constructor class
 	 - Configuration file is a text file(with every line as a command option) or a json file
 	```Python
+	from enum import StrEnum
 	from tap import Tap
+	NAME = StrEnum('NAME', ['tm', 'mrcr'])
 	class Config(Tap):
+		name: NAME = NAME.tm
 		find_env_file = True
 		env_file: str = '.env' 
 		"""Environment variable setting file name"""
+		def configure(self):
+			self.add_argument('--name', type=NAME, choices=[m.value for m in NAME]) # for better help message
 	args = Config().parse_args()
 	```
