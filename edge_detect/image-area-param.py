@@ -1,0 +1,6 @@
+image_area_param_taimee={
+'heading_area':[0,106,196,-1],
+'shift_area':[221,488,0,345,375],
+'breaktime_area':[490,714,0,-1],
+'paystub_area':[714,-1,0,-1],
+}

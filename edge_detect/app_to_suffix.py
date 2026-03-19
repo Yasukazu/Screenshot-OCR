@@ -61,13 +61,20 @@ def make_app_to_suffix_strenum(name_value_pair: str, strenum_name="APP_TO_SUFFIX
 class AppToSuffix:
 	""" partial emuration of StrEnum """
 	def __init__(self, app_to_suffix: str):
-		result = make_app_to_suffix_strenum(name_to_suffix=app_to_suffix, make_strenum=True, also_enum=True)
-		self.app_to_suffix = result[0]  # StrEnum
-		self.app_name = result[1]      # Enum
-	def __getitem__(self, key: str)-> Enum:
+		self.app_to_suffix = make_app_to_suffix_strenum(name_value_pair=app_to_suffix, strenum_name="APP_TO_SUFFIX")
+	def __getitem__(self, key: str)-> str:
 		""" Getter: [] access like StrEnum """
-		suffix_member = getattr(self.app_to_suffix, key.upper())
-		return getattr(self.app_name, suffix_member.name)
+		return getattr(self.app_to_suffix, key.upper()).value
+	
+	def __iter__(self):
+		""" Make AppToSuffix iterable returning enum members """
+		for member in self.app_to_suffix:
+			yield member
+	
+	def __len__(self):
+		""" Return length of enum members """
+		return len(self.app_to_suffix)
+	
 	def items(self)-> dict[str, str]:
 		""" Return items like StrEnum """
 		result = {}

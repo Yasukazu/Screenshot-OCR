@@ -1,0 +1,1 @@
+[HeadingAreaParam(ypos=0, height=111, xpos=196, width=-1), ShiftAreaParam(ypos=319, height=167, xpos=0, width=720), BreaktimeAreaParam(ypos=714, height=224, xpos=0, width=720), PaystubAreaParam(ypos=714, height=-1, xpos=0, width=-1)]

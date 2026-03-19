@@ -47,6 +47,7 @@ dependencies = [
     "typed-settings>=25.3.0",
     "typedal>=4.3.5",
     "rglob>=1.7",
+    "libcst>=1.8.6",
 ]
 
 [dependency-groups]
@@ -73,6 +74,8 @@ dev = [
     "flet[all]>=0.80.4",
     "tkeasygui>=1.0.36",
     "ruamel-yaml>=0.19.1",
+    "typed-argparse>=0.3.1",
+    "argcomplete>=3.6.3",
 ]
 
 [build-system]

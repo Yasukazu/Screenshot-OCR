@@ -19,9 +19,13 @@ def set_logger(name: str | None = None, debug=False, log_file_fullpath="", logle
 	formatter = logging.Formatter(
 		'%(asctime)s| %(levelname)-5s | %(name)s.%(funcName)s.%(lineno)d | %(message)s'
 	)
+	# logging.basicConfig( level=loglevel)
 	logger = logging.getLogger(name)
 	logger.setLevel(logging.DEBUG)
-
+	from sys import flags
+	if flags.optimize > 0:  # -O or PYTHONOPTIMIZE>0
+		loglevel = logging.WARNING
+	
 	streamHandler = logging.StreamHandler()
 	streamHandler.setFormatter(formatter)
 	streamHandler.setLevel(logging.DEBUG if debug or os.environ.get("DEBUG") == "1" else loglevel)

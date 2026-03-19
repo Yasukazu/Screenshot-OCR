@@ -73,3 +73,63 @@
 			self.add_argument('--name', type=NAME, choices=[m.value for m in NAME]) # for better help message
 	args = Config().parse_args()
 	```
+ 7. `typed_argparser`
+	- https://github.com/justanr/typed-argparser
+	- Features:
+	 - Dict type is supported
+	 - Class type field is supported only for single-string argument constructor class
+	 - Configuration file is a text file(with every line as a command option) or a json file
+	```Python
+	from typing import List, Optional, Dict, Tuple, Union
+	from typed_argparser import ArgumentClass, argfield
+	class Example1(ArgumentClass):
+		"""This example shows how to use some of the basic types in typed_argparser."""
+
+		# Positional arguments do not generate short or long options
+		opt1: Union[int, str] = argfield(help="opt1 is a mandatory argument which can be an integer or a string")
+		opt2: List[str] = argfield(help="opt2 is a mandatory argument and can be used multiple times")
+		# Optional arguments generate only long option by default if no short option is provided
+		opt3: Optional[str] = argfield(help="this is an optional argument.")
+		# Use Dict type to accept multiple key value pairs
+		opt4: Optional[Dict[str, int]] = argfield(help="arg as 'key=value' pairs can be used multiple times.")
+		# Use Tuple type to accept exactly n no. of arguments
+		opt5: Optional[Tuple[str, ...]] = argfield("-o", "--option5", nargs=4, help="accepts 4 params")
+
+	cli = Example1()
+	import sys
+	cli.parse(sys.argv[1:])
+	print(cli)
+
+	from typed_argparser.types import Args  # noqa: E402
+
+	class Example2(ArgumentClass):
+		"""This example shows how to use the `execute` decorator to execute functions based on the arguments provided."""
+
+		# Positional arguments do not generate short or long options
+		opt1: Union[int, str] = argfield(help="opt1 is a mandatory argument which can be an integer or a string")
+		opt2: List[str] = argfield(help="opt2 is a mandatory argument and can be used multiple times")
+		# Use Annotated from typing to provide arguments to types as shown below
+		opt3: Annotated[Optional[Path], Args(mode="w")] = argfield(help="this is an output file argument.")
+		# Use Dict type to accept multiple key value pairs
+		opt4: Optional[Dict[str, int]] = argfield(help="accept key value pairs. can be used multiple times.")
+
+
+	cli = Example2()
+
+	cli.parse("--opt3 output.txt 20 abc")
+
+	@cli.execute("opt1", "opt2")
+	def execute_1(opt1: str, opt2: List[str]) -> None:
+		print("This function is executed when both function arguments are provided.")
+		print(f"opt1: {opt1}, opt2: {opt2}")
+
+	from io import TextIOWrapper
+	@cli.execute("opt3")
+	def execute_2(opt3: TextIOWrapper) -> None:
+		opt3.write("This is written to the output file.")
+
+
+	@cli.execute("opt4")
+	def execute_3(opt4: Dict[str, int]) -> None:
+		print("This will not be executed as opt4 is not provided.")
+	```

@@ -1,0 +1,4 @@
+HeadingAreaParam.taimee = [0, 111, 196, -1]
+ShiftAreaParam.taimee = [319, 167, 0, 720]
+BreaktimeAreaParam.taimee = [488, 224, 0, 720]
+PaystubAreaParam.taimee = [714, -1, 0, -1]
