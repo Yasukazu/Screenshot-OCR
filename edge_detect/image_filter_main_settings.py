@@ -79,11 +79,11 @@ class AppName:
 TYPE_CHECKING = True
 class AppSettings(Settings):
 	""" Application_name to suffix mapping must be defined in the environment variable or in '.env' file as 'IMAGE_FILTER_APP_TO_SUFFIX=<app1>:<suffix1>,<app2>:<suffix2>,<app3>:<suffix3>' """
-	if TYPE_CHECKING:
+	'''if TYPE_CHECKING:
 		app: AppName | None = None
 	else:
 		app: str | None = None
-	""" Application name to process OCR from its screenshots """
+	""" Application name to process OCR from its screenshots """ '''
 
 	def configure(self):
 		self.add_argument('--app', type=APP_NAME, choices=[m.value for m in APP_NAME]) # for better help message
