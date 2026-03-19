@@ -31,7 +31,7 @@ if not DOTENV_INFO.is_valid:
 		logger.info("Loaded .env values: %s", DOTENV_INFO.values) '''
 
 MAIN_SETTINGS_FILENAME = os_environ.get("IMAGE_FILTER_MAIN_SETTINGS_FILENAME", "image-filter-main-settings.toml")
-from app_to_suffix import make_app_to_suffix_strenum, AppToSuffix, AppName
+from app_to_suffix import make_app_to_suffix_strenum, AppToSuffix # AppName
 APP_TO_SUFFIX_ENV_NAME = "IMAGE_FILTER_APP_TO_SUFFIX"
 try:
 	APP_TO_SUFFIX_VALUE = os_environ[APP_TO_SUFFIX_ENV_NAME]
@@ -51,6 +51,28 @@ from tap import Tap
 class Settings(Tap):
 	""" Base settings """
 	pass
+from app_to_suffix import make_app_name_enum
+class AppName:
+	""" partial emuration of Enum """
+	APP_NAME = make_app_name_enum(APP_TO_SUFFIX_VALUE, name="APP_NAME", module=__name__)
+
+	def __init__(self, app: str):
+		self.app = AppName.APP_NAME[app.upper()]
+
+	@classmethod
+	def __getitem__(cls, key: str)-> Enum:
+		""" Getter: [] access like Enum """
+		return getattr(cls.APP_NAME, key.upper())
+
+	def items(self)-> dict[str, str]:
+		""" Return items like Enum """
+		result = {}
+		for attr_name in dir(self.APP_NAME):
+			if not attr_name.startswith('_'):
+				attr = getattr(self.APP_NAME, attr_name)
+				if hasattr(attr, 'value'):
+					result[attr_name] = attr.value
+		return result
 # from tap import TapIgnore
 #@version((1,6))
 #@dataclass
@@ -58,7 +80,7 @@ TYPE_CHECKING = True
 class AppSettings(Settings):
 	""" Application_name to suffix mapping must be defined in the environment variable or in '.env' file as 'IMAGE_FILTER_APP_TO_SUFFIX=<app1>:<suffix1>,<app2>:<suffix2>,<app3>:<suffix3>' """
 	if TYPE_CHECKING:
-		app: APP_NAME | None = None
+		app: AppName | None = None
 	else:
 		app: str | None = None
 	""" Application name to process OCR from its screenshots """
