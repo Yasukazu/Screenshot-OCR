@@ -62,6 +62,10 @@ class AppSettings(Settings):
 	else:
 		app: str | None = None
 	""" Application name to process OCR from its screenshots """
+
+	def configure(self):
+		self.add_argument('--app', type=APP_NAME, choices=[m.value for m in APP_NAME]) # for better help message
+
 	stem_delimiter: str = '_'
 	""" Delimiter for splitting screenshot filename stem into 3 parts like:: prefix:'Screenshot', datetime:'yyyy-mm-ddThh:mm:ss', suffix:'com.example.app.name'"""
 	#app_to_suffix: AppToSuffix = AppToSuffix(make_app_to_suffix_strenum(make_strenum=False)) """ Application name to suffix mapping """
@@ -363,7 +367,7 @@ def print_toml_template(Settings:Type[Settings]=MainSettings, file=sys.stdout):
 if __name__ == '__main__':
 	# for line in Binder(AppSettings).format_toml_template(): # Need to generate an instance to get default values of default factory print(line)
 	from sys import argv
-	#app_settings = AppSettings().parse_args(argv[1:]) #config_files=['app-config.json']
+	app_settings = AppSettings().parse_args(argv[1:]) #config_files=['app-config.json']
 	main_settings = MainSettings(underscores_to_dashes=True).parse_args(argv[1:]) #config_files=['main-config.json']
 	from simple_parsing import parse as simple_parse
 	app_settings: AppSettings = simple_parse(config_class=AppSettings, config_path='app-config.yaml')#, add_config_path_arg

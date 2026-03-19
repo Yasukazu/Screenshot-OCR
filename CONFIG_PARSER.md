@@ -31,10 +31,6 @@
 	 - Enum type field: Dynamic StrEnum and Enum creation (useful for from environment variables)
 	 - Parser class with bind method for business logic: `tap.Parser(Config).bind(runner).run()`
 	 - (? how to use is not enough) Shell auto-completion based on `argcomplete`
-	```
-	 options:
-		--app APP             (__main__.APP_NAME | None, default=None)
-	```
 	```Python
 	from typing import List, Optional
 	import typed_argparse as tap
@@ -65,10 +61,15 @@
 	 - Class type field is supported only for single-string argument constructor class
 	 - Configuration file is a text file(with every line as a command option) or a json file
 	```Python
+	from enum import StrEnum
 	from tap import Tap
+	NAME = StrEnum('NAME', ['tm', 'mrcr'])
 	class Config(Tap):
+		name: NAME = NAME.tm
 		find_env_file = True
 		env_file: str = '.env' 
 		"""Environment variable setting file name"""
+		def configure(self):
+			self.add_argument('--name', type=NAME, choices=[m.value for m in NAME]) # for better help message
 	args = Config().parse_args()
 	```
