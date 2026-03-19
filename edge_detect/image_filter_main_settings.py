@@ -21,11 +21,12 @@ if parent_dir not in sys.path:
 logger = set_logger(__name__)
 from dot_env import DOTENV_INFO, ENV_PREFIX_STR
 APP_TO_SUFFIX_KEY = "APP_TO_SUFFIX"
+ENV_PREFIX_APP_TO_SUFFIX_KEY = '_'.join([ENV_PREFIX_STR, APP_TO_SUFFIX_KEY])
 try:
-	APP_TO_SUFFIX_VALUE = os_environ['_'.join([ENV_PREFIX_STR, APP_TO_SUFFIX_KEY])]
+	APP_TO_SUFFIX_VALUE = os_environ[ENV_PREFIX_APP_TO_SUFFIX_KEY]
 except KeyError as e:
 	try:
-		APP_TO_SUFFIX_VALUE = DOTENV_INFO.values['_'.join([ENV_PREFIX_STR, APP_TO_SUFFIX_KEY])]
+		APP_TO_SUFFIX_VALUE = DOTENV_INFO.values[ENV_PREFIX_APP_TO_SUFFIX_KEY]
 	except (TypeError, KeyError) as err:
 		logger.error("Failed to get '%s' from environment variable or '.env' file:%s", APP_TO_SUFFIX_KEY, err)
 		raise err
@@ -45,17 +46,20 @@ from typed_argparse import TypedArgs, arg
 logger.info("APP_TO_SUFFIX: %s", list(APP_TO_SUFFIX))
 APP_NAME = StrEnum('APP_NAME', [m.name for m in APP_TO_SUFFIX], module='__main__')
 logger.info("APP_NAME: %s", list(APP_NAME))
+
 class Settings(TypedArgs):
 	""" Base settings """
 	app: APP_NAME | None = arg(default=None, help="Application name to process OCR from its screenshots")
+	app_to_suffix: APP_TO_SUFFIX | None = arg(default=None, help="Application name to its suffix")
+
 def settings_runner(settings: Settings):
 	""" Run the settings """
-	print(f"Running settings for app[{type(settings.app)}]: {settings.app=}")
+	print(f"Running settings for app[{type(settings.app)}]: {settings.app=}\napp_to_suffix[{type(settings.app_to_suffix)}]: {settings.app_to_suffix=}")
 # from tap import TapIgnore
 #@version((1,6))
 #@dataclass
 TYPE_CHECKING = True
-class AppSettings:
+class AppSettings(Settings):
 	""" Application_name to suffix mapping must be defined in the environment variable or in '.env' file as 'IMAGE_FILTER_APP_TO_SUFFIX=<app1>:<suffix1>,<app2>:<suffix2>,<app3>:<suffix3>' """
 	if TYPE_CHECKING:
 		app: AppName | None = None
@@ -64,8 +68,8 @@ class AppSettings:
 	""" Application name to process OCR from its screenshots """
 	stem_delimiter: str = '_'
 	""" Delimiter for splitting screenshot filename stem into 3 parts like:: prefix:'Screenshot', datetime:'yyyy-mm-ddThh:mm:ss', suffix:'com.example.app.name'"""
-	app_to_suffix: AppToSuffix = AppToSuffix(make_app_to_suffix_strenum(make_strenum=False))
-	""" Application name to suffix mapping """
+	#app_to_suffix: AppToSuffix = AppToSuffix(make_app_to_suffix_strenum())#make_strenum=False))
+	#""" Application name to suffix mapping """
 
 	@property
 	def app_name(self) -> Enum|None:
@@ -365,7 +369,8 @@ def print_toml_template(Settings:Type[Settings]=MainSettings, file=sys.stdout):
 if __name__ == '__main__':
 	# for line in Binder(AppSettings).format_toml_template(): # Need to generate an instance to get default values of default factory print(line)
 	from sys import argv
-	parser = tap.Parser(Settings, usage=f"%(prog)s [--app {{{'|'.join([n.lower() for n in APP_NAMES])}}}];Set env. variable: IMAGE_FILTER_APP_TO_SUFFIX=<app_name1>:<app_suffix1>,<app_name2>:<app_suffix2>;Suffix is the last part of split-by-underscore('_') in the image file name's stem part (filename except extention like '.png').")
+	from typed_argparse import Parser
+	parser = Parser(Settings, usage=f"%(prog)s [--app {{{'|'.join([n.lower() for n in APP_NAMES])}}}];Set env. variable: {ENV_PREFIX_APP_TO_SUFFIX_KEY}=<app_name1>:<app_suffix1>,<app_name2>:<app_suffix2>;Suffix is the last part of split-by-underscore('_') in the image file name's stem part (filename part before extention:last part of filename(like '.png')).", epilog="\nDone.")
 	import argcomplete
 	argcomplete.autocomplete(parser)
 	parser.bind(settings_runner).run()
