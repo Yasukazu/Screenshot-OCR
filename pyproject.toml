@@ -48,6 +48,7 @@ dependencies = [
     "typedal>=4.3.5",
     "rglob>=1.7",
     "libcst>=1.8.6",
+    "typed-argparser>=1.0.0.post3",
 ]
 
 [dependency-groups]

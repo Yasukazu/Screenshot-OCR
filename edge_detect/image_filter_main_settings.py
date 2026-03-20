@@ -47,10 +47,24 @@ logger.info("APP_TO_SUFFIX: %s", list(APP_TO_SUFFIX))
 APP_NAME = StrEnum('APP_NAME', [m.name for m in APP_TO_SUFFIX], module='__main__')
 logger.info("APP_NAME: %s", list(APP_NAME))
 
-class Settings(TypedArgs):
+from typed_argparser import ArgumentClass, argfield
+from typed_argparser.validators import ArgumentValidator
+from typed_argparser.exceptions import ValidationError # ArgumentError, ValidatorInitError, 
+
+class AppNameValidator(ArgumentValidator):
+	choices = [m.name.lower() for m in APP_NAME]
+	'''def __init__(self):
+		self.choices = [m.name for m in APP_NAME] '''
+	def validator(self, value: str) -> None:
+		if value.lower() not in self.choices:
+			raise ValidationError(f"Invalid app name: {value}")
+
+class Settings(ArgumentClass):
 	""" Base settings """
-	app: APP_NAME | None = arg(default=None, help="Application name to process OCR from its screenshots")
-	app_to_suffix: APP_TO_SUFFIX | None = arg(default=None, help="Application name to its suffix")
+	app: str | None = argfield(default=None, help=f"Application name to process OCR from its screenshots:{{{'|'.join(AppNameValidator.choices)}}}", validator=AppNameValidator())
+	@property
+	def app_suffix(self)-> str:
+		return APP_TO_SUFFIX[self.app.upper()].value
 
 def settings_runner(settings: Settings):
 	""" Run the settings """
@@ -368,12 +382,14 @@ def print_toml_template(Settings:Type[Settings]=MainSettings, file=sys.stdout):
 
 if __name__ == '__main__':
 	# for line in Binder(AppSettings).format_toml_template(): # Need to generate an instance to get default values of default factory print(line)
+	settings = Settings()
 	from sys import argv
-	from typed_argparse import Parser
-	parser = Parser(Settings, usage=f"%(prog)s [--app {{{'|'.join([n.lower() for n in APP_NAMES])}}}];Set env. variable: {ENV_PREFIX_APP_TO_SUFFIX_KEY}=<app_name1>:<app_suffix1>,<app_name2>:<app_suffix2>;Suffix is the last part of split-by-underscore('_') in the image file name's stem part (filename part before extention:last part of filename(like '.png')).", epilog="\nDone.")
-	import argcomplete
-	argcomplete.autocomplete(parser)
-	parser.bind(settings_runner).run()
+	settings.parse(' '.join(argv[1:]))
+	# from typed_argparse import Parser
+	# parser = Parser(Settings, usage=f"%(prog)s [--app {{{'|'.join([n.lower() for n in APP_NAMES])}}}];Set env. variable: {ENV_PREFIX_APP_TO_SUFFIX_KEY}=<app_name1>:<app_suffix1>,<app_name2>:<app_suffix2>;Suffix is the last part of split-by-underscore('_') in the image file name's stem part (filename part before extention:last part of filename(like '.png')).", epilog="\nDone.")
+	# import argcomplete
+	# argcomplete.autocomplete(parser)
+	# parser.bind(settings_runner).run()
 	#app_settings = AppSettings().parse_args(argv[1:]) #config_files=['app-config.json']
 	exit(0)
 	main_settings = MainSettings(underscores_to_dashes=True).parse_args(argv[1:]) #config_files=['main-config.json']

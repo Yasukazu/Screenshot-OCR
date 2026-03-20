@@ -76,15 +76,12 @@
  7. `typed_argparser`
 	- https://github.com/justanr/typed-argparser
 	- Features:
-	 - Dict type is supported
-	 - Class type field is supported only for single-string argument constructor class
-	 - Configuration file is a text file(with every line as a command option) or a json file
+	 - Dict type support
 	```Python
 	from typing import List, Optional, Dict, Tuple, Union
 	from typed_argparser import ArgumentClass, argfield
 	class Example1(ArgumentClass):
 		"""This example shows how to use some of the basic types in typed_argparser."""
-
 		# Positional arguments do not generate short or long options
 		opt1: Union[int, str] = argfield(help="opt1 is a mandatory argument which can be an integer or a string")
 		opt2: List[str] = argfield(help="opt2 is a mandatory argument and can be used multiple times")
