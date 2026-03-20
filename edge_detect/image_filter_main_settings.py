@@ -174,16 +174,16 @@ class MainSettings(AppSettings):
 		help="Image area parameter section/table in image-area-param.ini")
 	app_border_ratio: dict[str, str]|None = argfield(default=None, #AppBorderRatio('TAIMEE:2.2,3.2') #dict[str, list[float]] = field( default_factory=lambda:{"taimee":[2.2,3.2]})
 		help="Screenshot image file horizontal border ratio list of the app to execute OCR:(specified in format as '<app_name1>:<ratio1>,<ratio2> ...')")
-	app_suffix: bool = False
-	"""Screenshot image file name has suffix(sub extention) of the same as app name i.e. "<stem>.<suffix>.<ext>" (default: True)"""
-	save_as: str = ''
-	"""Output path to save OCR text of the image file as TOML format into the image file name extention as '.ocr-<app_name>.toml' """
-	nth: int =1
-	"""Rank(default: 1) of files descending sorted(the latest, the first) by modified date as wildcard(*, ?)"""
-	glob_max: int = 60
-	"""Pick up file max as pattern found in TOML"""
-	show: bool = False
-	"""Show images to check"""
+	app_is_suffix: bool = argfield(default=False,
+			help="Screenshot image file name has suffix(sub extention) of the same as app name i.e. '<stem>.<suffix>.<ext>' (default: True)")
+	save_as: str|None = argfield(default=None,
+		help="Output file fullpath to save OCR text of the image file in TOML format into the file with name as '<stem>.ocr-<app_name>.toml' while executing OCR")
+	nth: int = argfield(default=1,
+		help="Rank(first, second, ...) of files descending sorted(the latest, the first) by modified datetime as wildcard(*, ?)")
+	glob_max: int = argfield(default=60,
+		help="Pick up files max. count found in glob pattern")
+	show: bool = argfield(default=False,
+		help="Show images to check")
 
 	bin_image: bool = False
 	"""Use binarized image for OCR"""
