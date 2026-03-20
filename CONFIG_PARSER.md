@@ -30,7 +30,7 @@
 	- Features:
 	 - Enum type field: Dynamic StrEnum and Enum creation (useful for from environment variables)
 	 - Parser class with bind method for business logic: `tap.Parser(Config).bind(runner).run()`
-	 - (? how to use is not enough) Shell auto-completion based on `argcomplete`
+	 - Shell auto-completion based on `argcomplete`
 	```Python
 	from typing import List, Optional
 	import typed_argparse as tap

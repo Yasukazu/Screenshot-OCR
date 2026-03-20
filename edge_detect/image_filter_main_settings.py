@@ -50,7 +50,11 @@ logger.info("APP_NAME: %s", list(APP_NAME))
 class Settings(TypedArgs):
 	""" Base settings """
 	app: APP_NAME | None = arg(default=None, help="Application name to process OCR from its screenshots")
-	app_to_suffix: APP_TO_SUFFIX | None = arg(default=None, help="Application name to its suffix")
+	@property
+	def app_suffix(self) -> str:
+		""" Get the suffix for self.app """
+		return APP_TO_SUFFIX[self.app].value
+	#app_suffix: str = arg(default=APP_TO_SUFFIX[], help="Application name to its suffix")
 
 def settings_runner(settings: Settings):
 	""" Run the settings """
