@@ -59,38 +59,46 @@ class AppNameValidator(ArgumentValidator):
 		if value.lower() not in self.choices:
 			raise ValidationError(f"Invalid app name: {value}")
 
+class ChoicesValidator(ArgumentValidator):
+	def __init__(self, choices: list[str]):
+		self.choices = [choice.lower() for choice in choices]
+
+	def validator(self, value: str) -> None:
+		if value.lower() not in self.choices:
+			raise ValidationError(f"Invalid choice:'{value}' in {self.choices}")
+
+# Create a constant for the glob choices to avoid type issues
+GLOB_CHOICES = ['NONE', 'GLOB', 'RGLOB']
+
 class Settings(ArgumentClass):
 	""" Base settings """
 	app: str | None = argfield(default=None, help=f"Application name to process OCR from its screenshots:{{{'|'.join(AppNameValidator.choices)}}}", validator=AppNameValidator())
+
 	@property
-	def app_suffix(self)-> str:
-		return APP_TO_SUFFIX[self.app.upper()].value
+	def app_suffix(self)-> str | None:
+		""" Get the app's suffix(last part of file stem before '_') StrEnum """
+		if self.app is None:
+			return None
+		return APP_TO_SUFFIX[self.app.upper()]
+
+	@property
+	def app_name(self)-> APP_NAME | None:
+		""" Get the app's Enum type """
+		if self.app is None:
+			return None
+		return APP_NAME[self.app.upper()]
 
 def settings_runner(settings: Settings):
 	""" Run the settings """
 	print(f"Running settings for app[{type(settings.app)}]: {settings.app=}\napp_to_suffix[{type(settings.app_to_suffix)}]: {settings.app_to_suffix=}")
+
 # from tap import TapIgnore
 #@version((1,6))
 #@dataclass
 TYPE_CHECKING = True
 class AppSettings(Settings):
 	""" Application_name to suffix mapping must be defined in the environment variable or in '.env' file as 'IMAGE_FILTER_APP_TO_SUFFIX=<app1>:<suffix1>,<app2>:<suffix2>,<app3>:<suffix3>' """
-	if TYPE_CHECKING:
-		app: AppName | None = None
-	else:
-		app: str | None = None
-	""" Application name to process OCR from its screenshots """
-	stem_delimiter: str = '_'
-	""" Delimiter for splitting screenshot filename stem into 3 parts like:: prefix:'Screenshot', datetime:'yyyy-mm-ddThh:mm:ss', suffix:'com.example.app.name'"""
-	#app_to_suffix: AppToSuffix = AppToSuffix(make_app_to_suffix_strenum())#make_strenum=False))
-	#""" Application name to suffix mapping """
-
-	@property
-	def app_name(self) -> Enum|None:
-		if self.app is None:
-			return None
-		return APP_NAME[self.app]
-
+	stem_delimiter: str = argfield(default='_', help= " Delimiter for splitting screenshot filename stem into 3 parts like:: prefix:'Screenshot', datetime:'yyyy-mm-ddThh:mm:ss', suffix:'com.example.app.name'")
 
 	@classmethod
 	def get_app_names(cls):
@@ -101,10 +109,6 @@ class AppSettings(Settings):
 	def app_names(self) -> list[str]:
 		"""Application name list"""
 		return self.get_app_names()
-
-	@classmethod
-	def get_app_name_enum(cls, module: str = '__main__')-> type[Enum]:
-		return Enum('APP_NAME', cls.get_app_names(), module=module)
 
 	def app_name_to_suffix_set(self)-> dict[str, set[str]] :
 		"""Screenshot image file suffix set: suffix is the part of file stem(filename before extention), stem delimiter is underscore (_)"""
@@ -118,7 +122,7 @@ class AppSettings(Settings):
 	@property
 	def app_name_to_stem_end(self)-> dict[str, str]:
 		"""Dictionary of 'app name' to 'stem end': 'stem' means the part of the filename before the extension"""
-		return self.app_to_suffix.items()
+		return self.app_suffix.items()
 
 GLOB_MODE_LITERAL = Literal['NONE', 'GLOB', 'RGLOB'] # Glob pattern 
 GLOB_MODE = StrEnum('GLOB', GLOB_MODE_LITERAL.__args__)
@@ -146,27 +150,30 @@ class MainSettings(AppSettings):
 	Extract/OCR paystub text from an image file: Files for OCR by 'files' option may be specified with app-name-suffix in wildcard(glob pattern matching like '--files *.<APP_NAME>*.png') or by 'shot-month' option (like '--shot_month -1' for last month, 0 for current month, other positive value for month number: Jan. is 1, Dec. is 12, ...) and 'app' option (like '--app <APP_NAME>')
 	"""
 
-	image_ext_set: set[str] = set([".png"])
-	"""Image file extension set, every extention starts with dot (default is {'.png'})"""
-	image_dir: str = "~/Documents/screenshots"
-	"""Image file root directory"""
-	shot_months: list[int] = []
-	"""Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD]) included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like "[1,2,..]"""
-	glob: GLOB_MODE_LITERAL = GLOB_MODE.RGLOB.name
-	"""Image file name pattern as glob pattern to commit OCR or to get parameters."""
-	rglob: bool = True
-	"""Search glob pattern matching Recursively in a directory tree downto every subdirectories"""
-	recurse_symlinks: bool = False
-	""" Use symbolic links for searching glob pattern"""
-	case_sensitive: bool = False
-	""" Segregate char case(capital/small) for searching glob pattern"""
-	files: list[str] = []
-	"""Image file name list to commit OCR or to get parameters. Every file name's pattern is: <prefix>_<date>_<suffix>.<ext>"""
+	image_ext_set: set[str] = argfield(default=set([".png"]),
+		help="Image file extension set, every extention starts with dot (default is {'.png'})")
+	image_dir: str = argfield(default="~/Documents/screenshots",
+		help="Image file root directory")
+	shot_months: list[int]|None = argfield(default=None,
+		help="Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD]) included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like '[1,2,..]')")
+	glob: str = argfield(default="RGLOB",
+		validator=ChoicesValidator(GLOB_CHOICES),
+		help=f"Glob mode, Image file name pattern as glob pattern to commit OCR or to get parameters, choose from {GLOB_CHOICES}")
 
-	image_area_param_section_stem: str = "image-area-param"
-	"""Image area parameter section/table in image-area-param.ini"""
-	app_border_ratio: AppBorderRatio = AppBorderRatio('TAIMEE:2.2,3.2') #dict[str, list[float]] = field( default_factory=lambda:{"taimee":[2.2,3.2]})
-	"""Screenshot image file horizontal border ratio list of the app to execute OCR:(specified in format as "<app_name1>:<ratio1>,<ratio2> ..." )"""
+	@property
+	def is_rglob(self) -> bool:
+		"""Search glob pattern matching Recursively in a directory tree downto every subdirectories"""
+		return self.glob == "RGLOB"
+	recurse_symlinks: bool = argfield(default=False,
+			help="Use symbolic links for searching glob pattern")
+	case_sensitive: bool = argfield(default=False,
+		help="Segregate char case(capital/small) for searching glob pattern")
+	files: list[str]|None = argfield(default=None,
+		help="Image file name list to commit OCR or to get parameters. Every file name's pattern is: <prefix>_<date>_<suffix>.<ext>")
+	image_area_param_section_stem: str = argfield(default="image-area-param",
+		help="Image area parameter section/table in image-area-param.ini")
+	app_border_ratio: dict[str, str]|None = argfield(default=None, #AppBorderRatio('TAIMEE:2.2,3.2') #dict[str, list[float]] = field( default_factory=lambda:{"taimee":[2.2,3.2]})
+		help="Screenshot image file horizontal border ratio list of the app to execute OCR:(specified in format as '<app_name1>:<ratio1>,<ratio2> ...')")
 	app_suffix: bool = False
 	"""Screenshot image file name has suffix(sub extention) of the same as app name i.e. "<stem>.<suffix>.<ext>" (default: True)"""
 	save_as: str = ''
