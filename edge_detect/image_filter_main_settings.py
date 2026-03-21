@@ -61,32 +61,65 @@ class AppNameValidator(ArgumentValidator):
 
 class ChoicesValidator(ArgumentValidator):
 	def __init__(self, choices: list[str]):
-		self.choices = [choice.lower() for choice in choices]
+		self.choices = [choice for choice in choices]
 
 	def validator(self, value: str) -> None:
-		if value.lower() not in self.choices:
+		if value not in self.choices:
 			raise ValidationError(f"Invalid choice:'{value}' in {self.choices}")
+class KeyValidator(ArgumentValidator):
+	def __init__(self, keys: list[str]):
+		self.keys = [key for key in keys]
 
+	def validator(self, value: dict[str, Any]) -> None:
+		for key in value.keys():
+			if key not in self.keys:
+				raise ValidationError(f"Invalid key:'{value}' in {self.keys}")
 # Create a constant for the glob choices to avoid type issues
 GLOB_CHOICES = ['NONE', 'GLOB', 'RGLOB']
-
+from app_sym import APP_SYM # app symbol to number mapping
+def get_app_sym_to_suffix() -> dict[str, str]|None:
+	""" Get the app symbol to suffix mapping using dotenv('.env' file or environment variables)"""
+	from dotenv import load_dotenv, find_dotenv
+	load_dotenv(find_dotenv())
+	screenshot_app_to_suffix = os_environ.get("SCREENSHOT_APP_TO_SUFFIX")
+	if screenshot_app_to_suffix is None:
+		return None
+	dic = {}
+	app_sym_list = [app_sym.name for app_sym in APP_SYM]
+	for mapping in screenshot_app_to_suffix.split(','):
+		try:
+			k, v = mapping.split(':')
+		except ValueError:
+			continue
+		else:
+			if k not in app_sym_list:
+				raise ValueError(f"Invalid app symbol: {k}")
+			if not v:
+				raise ValueError(f"Empty suffix for app symbol: {k}")
+			dic[k] = v
+	return dic
+from typing import Optional
 class Settings(ArgumentClass):
 	""" Base settings """
-	app: str | None = argfield(default=None, help=f"Application name to process OCR from its screenshots:{{{'|'.join(AppNameValidator.choices)}}}", validator=AppNameValidator())
+	app: Optional[str] = argfield(default=None, help=f"Application symbol to process OCR from its screenshots:{{{'|'.join(ChoicesValidator([m.name for m in APP_SYM]).choices)}}}", validator=ChoicesValidator([m.name for m in APP_SYM]))
+
+	app_sym_to_suffix: Optional[dict[str, str]] = argfield(default=get_app_sym_to_suffix(),
+		help="Application symbol to suffix mapping",
+		validator=KeyValidator([app_sym.name for app_sym in APP_SYM]))
 
 	@property
 	def app_suffix(self)-> str | None:
 		""" Get the app's suffix(last part of file stem before '_') StrEnum """
 		if self.app is None:
 			return None
-		return APP_TO_SUFFIX[self.app.upper()]
+		return self.app_sym_to_suffix[self.app.upper()]
 
 	@property
-	def app_name(self)-> APP_NAME | None:
+	def app_name(self)-> APP_SYM | None:
 		""" Get the app's Enum type """
 		if self.app is None:
 			return None
-		return APP_NAME[self.app.upper()]
+		return APP_SYM[self.app.upper()]
 
 def settings_runner(settings: Settings):
 	""" Run the settings """
