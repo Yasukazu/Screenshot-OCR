@@ -1,16 +1,13 @@
 """ APP_NAME Enum by class definition;AppName class to enulate a class member """
 from pathlib import Path
 from typing import Any, Callable, Iterator, Sequence, Type, Literal, get_args, TYPE_CHECKING
-from enum import Enum, IntEnum
+from enum import Enum
 import sys
 from dotenv import find_dotenv, load_dotenv, dotenv_values
 from os import environ as os_environ
 from enum import StrEnum
 
-class APP_SYM(IntEnum):
-	""" Application Symbol"""
-	TM = 1
-	MC = 2
+
 
 parent_dir = str(Path(__file__).resolve().parent.parent)
 if parent_dir not in sys.path:
