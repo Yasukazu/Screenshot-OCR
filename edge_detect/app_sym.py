@@ -1,5 +1,5 @@
 from enum import IntEnum
 class APP_SYM(IntEnum):
-	""" Application Symbol"""
+	""" Application Symbol to int mapping """
 	TM = 1
 	MC = 2
