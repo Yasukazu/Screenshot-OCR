@@ -39,13 +39,7 @@ APP_TO_SUFFIX = make_app_to_suffix_strenum(strenum_name=APP_TO_SUFFIX_KEY, name_
 
 MAIN_SETTINGS_FILENAME = os_environ.get("IMAGE_FILTER_MAIN_SETTINGS_FILENAME", "image-filter-main-settings.toml")
 
-def area_param_names():
-	return ['HEADING', 'SHIFT', 'BREAKTIME', 'PAYSTUB', 'SALARY']
-from fancy_dataclass import version
-from tap import Tap
-import typed_argparse as tap2
-from typed_argparse import TypedArgs, arg
-#@dataclass
+AREA_PARAM_NAME = Enum('AREA_PARAM_NAME', ['HEADING', 'SHIFT', 'BREAKTIME', 'PAYSTUB', 'SALARY'])
 logger.info("APP_TO_SUFFIX: %s", list(APP_TO_SUFFIX))
 APP_NAME = StrEnum('APP_NAME', [m.name for m in APP_TO_SUFFIX], module='__main__')
 logger.info("APP_NAME: %s", list(APP_NAME))
@@ -195,7 +189,7 @@ class MainSettings(AppSettings):
 		help="Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD]) included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like '[1,2,..]')")
 	glob: str = argfield(default="RGLOB",
 		validator=ChoicesValidator(GLOB_CHOICES),
-		help=f"Glob mode, Image file name pattern as glob pattern to commit OCR or to get parameters, choose from {GLOB_CHOICES}")
+		help=f"Glob mode, Image file name matching pattern by glob(f'*_{{app_suffix}}.{{ext}}') to commit OCR or to get parameters, choose from {GLOB_CHOICES};RGLOB: Recursively search in a directory tree downto every subdirectories")
 
 	@property
 	def is_rglob(self) -> bool:
@@ -205,7 +199,7 @@ class MainSettings(AppSettings):
 			help="Use symbolic links for searching glob pattern")
 	case_sensitive: bool = argfield(default=False,
 		help="Segregate char case(capital/small) for searching glob pattern")
-	files: list[str]|None = argfield(default=None,
+	files: Optional[list[str]] = argfield(
 		help="Image file name list to commit OCR or to get parameters. Every file name's pattern is: <prefix>_<date>_<suffix>.<ext>")
 	image_area_param_section_stem: str = argfield(default="image-area-param",
 		help="Image area parameter section/table in image-area-param.ini")
@@ -217,35 +211,23 @@ class MainSettings(AppSettings):
 		help="Output file directory where to save OCR text of the image file in TOML format into the file with name as '<stem>.ocr-<app_name>.toml' while executing OCR")
 	nth: int = argfield(default=1,
 		help="Rank(first, second, ...) of files descending sorted(the latest, the first) by modified datetime as wildcard(*, ?)")
-	glob_max: int = argfield(default=60,
+	glob_max: int = argfield(default=100,
 		help="Pick up files max. count found in glob pattern")
 	show: bool = argfield(default=False,
 		help="Show images to check")
 
-	bin_image: bool = False
-	"""Use binarized image for OCR"""
-	no_ocr: bool = False
-	"""Do not execute OCR"""
-	ocr_conf: int = 55
-	"""Confidence threshold for OCR"""
-	psm: int = 6
-	"""PSM value for Tesseract"""
-	area_param_dir: str = ''
-	"""Screenshot image area parameter config file directory"""
-	area_param_name_list: list[str] = area_param_names()
-	"""Screenshot image area parameter name list"""
-	area_param_file: str = "image-area-param.ini"
-	"""Screenshot image area parameter config file: format as INI or TOML(".ini" or ".toml" extention respectively): in [image_area_param.<app>] section, items as "<area_name>=[<p1>,<p2>,<p3>,<p4>]" (e.g. "heading=[0,106,196,-1]") """
-	ocr_filter_sqlite_db_name: str = "ocr-filter.db"
-	"""SQLite DB file is created under `image_dir`/{yyyy} directory(yyyy is like 2025)"""
-	data_year: int = 0
-	"""Year of data (like -1, 0, 2025, ...). 0 means current year, negative value is difference from current year (like -1 means last year), positive value means a.d. year number (like 2025). If this value is larger than current year, an exception might be raised."""
-	data_month: int = 0
-	"""Month of data (like -1, 0, 1, 2, ...). 0 means current month, negative value is difference from current month (like -1 means last month), positive value means month number (1: Jan, 2: Feb, ...). If this value is larger than current month, data's date is treated as the last year."""
-	show_ocr_area: bool = False
-	"""Show every area before to commit OCR"""
-	exclude_area_param_set: set[str] = set() # field(default_factory=set) # { {f'{n}' for n in image_area_param_names()} }
-	"""Exclude a set of image area parameter names"""
+	bin_image: bool = argfield(default=False, help="Use binarized image for OCR")
+	no_ocr: bool = argfield(default=False, help="Do not execute OCR")
+	ocr_conf: int = argfield(default=55, help="Confidence threshold for OCR")
+	psm: int = argfield(default=6, help="PSM value for Tesseract")
+	area_param_dir: Optional[Path] = argfield(help="Screenshot image area parameter config file directory")
+	area_param_name_list: list[str] = argfield(default=[m.name for m in AREA_PARAM_NAME], help="Screenshot image area parameter name list")
+	area_param_file: Path = argfield(default="image-area-param.ini", help='Screenshot image area parameter config file: format as INI or TOML(".ini" or ".toml" extention respectively): in [image_area_param.<app>] section, items as "<area_name>=[<p1>,<p2>,<p3>,<p4>]" (e.g. "heading=[0,106,196,-1]") ')
+	ocr_filter_sqlite_db_name: str = argfield(default="ocr-filter.db", help='SQLite DB file is created under `image_dir`/{yyyy} directory(yyyy is like 2025)')
+	data_year: int = argfield(default=0, help='Year of data (like -1, 0, 2025, ...). 0 means current year, negative value is difference from current year (like -1 means last year), positive value means a.d. year number (like 2025). If this value is larger than current year, an exception might be raised.')
+	data_month: int = argfield(default=0, help="Month of data (like -1, 0, 1, 2, ...). 0 means current month, negative value is difference from current month (like -1 means last month), positive value means month number (1: Jan, 2: Feb, ...). If this value is larger than current month, data's date is treated as the last year.")
+	show_ocr_area: bool = argfield(default=False, help="Show every area before to commit OCR")
+	exclude_area_param_set: Optional[set[str]] = argfield(help='Exclude a set of image area parameter names')
 
 	@classmethod
 	def from_dict(cls, toml_dict: dict[str, Any]) -> 'MainSettings':
