@@ -181,16 +181,19 @@ class MainSettings(AppSettings):
 	Extract/OCR paystub text from an image file: Files for OCR by 'files' option may be specified with app-name-suffix in wildcard(glob pattern matching like '--files *.<APP_NAME>*.png') or by 'shot-month' option (like '--shot_month -1' for last month, 0 for current month, other positive value for month number: Jan. is 1, Dec. is 12, ...) and 'app' option (like '--app <APP_NAME>')
 	"""
 	__version__ = "1.2.1"
+	__usage__ = f"{__program__} --<option1> {{value1}} --<option2> {{value2}} ..."
+	__epilog__ = "\nEnd.\n"
+	
 
 	image_ext_set: set[str] = argfield(default=set([".png"]),
 		help="Image file extension set, every extention starts with dot (default is {'.png'})")
-	image_dir: str = argfield(default="~/Documents/screenshots",
+	image_dir: Path = argfield(default="~/Documents/screenshots",
 		help="Image file root directory")
-	shot_months: list[int]|None = argfield(default=None,
+	shot_months: list[int]|None = argfield(
 		help="Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD]) included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like '[1,2,..]')")
 	glob: str = argfield(default="RGLOB",
 		validator=ChoicesValidator(GLOB_CHOICES),
-		help=f"Glob mode, Image file name matching pattern by glob(f'*_{{app_suffix}}.{{ext}}') to commit OCR or to get parameters, choose from {GLOB_CHOICES};RGLOB: Recursively search in a directory tree downto every subdirectories")
+		help=f"Glob mode, Image file name matching pattern by glob('*_{{app_suffix}}.{{ext}}') to commit OCR or to get parameters, choose from {GLOB_CHOICES};RGLOB: Recursively search in a directory tree downto every subdirectories")
 
 	@property
 	def is_rglob(self) -> bool:
@@ -409,12 +412,12 @@ def print_toml_template(Settings:Type[Settings]=MainSettings, file=sys.stdout):
 
 if __name__ == '__main__':
 	# for line in Binder(AppSettings).format_toml_template(): # Need to generate an instance to get default values of default factory print(line)
-	settings = Settings()
 	from sys import argv
+	'''settings = Settings()
 	settings.parse(' '.join(argv[1:]))
 	@settings.execute('app')
 	def run1(app: str):
-		print(f"Running settings for app[{app.__class__}]: settings.app={app}")
+		print(f"Running settings for app[{app.__class__}]: settings.app={app}") '''
 		#settings_runner(settings)
 	#run()
 	# from typed_argparse import Parser
@@ -423,8 +426,12 @@ if __name__ == '__main__':
 	# argcomplete.autocomplete(parser)
 	# parser.bind(settings_runner).run()
 	#app_settings = AppSettings().parse_args(argv[1:]) #config_files=['app-config.json']
-	exit(0)
-	main_settings = MainSettings(underscores_to_dashes=True).parse_args(argv[1:]) #config_files=['main-config.json']
-	from simple_parsing import parse as simple_parse
+	main_settings = MainSettings()#underscores_to_dashes=True).parse_args(argv[1:]) #config_files=['main-config.json']
+	main_settings.parse(' '.join(argv[1:]))
+	@main_settings.execute('app')
+	def run2(app: str):
+		print(f"Running main settings for app[{app.__class__}]: main_settings.app={app}")
+		#main_settings_runner(main_settings)
+	'''from simple_parsing import parse as simple_parse
 	app_settings: AppSettings = simple_parse(config_class=AppSettings, config_path='app-config.yaml')#, add_config_path_arg
-	app_settings.app_to_suffixes |= AppSettings().app_to_suffixes # add default values
+	app_settings.app_to_suffixes |= AppSettings().app_to_suffixes # add default values'''
