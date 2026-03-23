@@ -174,12 +174,13 @@ class AppBorderRatio:
 	def __getitem__(self, key):
 		""" Getter for obj[key] """
 		return self.dic[key]
-#@version((1,2,1))
 #@dataclass(kw_only=True)
 class MainSettings(AppSettings):
-	"""
+	__program__ = "ocr-filter"
+	__description__ = """
 	Extract/OCR paystub text from an image file: Files for OCR by 'files' option may be specified with app-name-suffix in wildcard(glob pattern matching like '--files *.<APP_NAME>*.png') or by 'shot-month' option (like '--shot_month -1' for last month, 0 for current month, other positive value for month number: Jan. is 1, Dec. is 12, ...) and 'app' option (like '--app <APP_NAME>')
 	"""
+	__version__ = "1.2.1"
 
 	image_ext_set: set[str] = argfield(default=set([".png"]),
 		help="Image file extension set, every extention starts with dot (default is {'.png'})")
