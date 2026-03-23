@@ -2,7 +2,7 @@
 # PYTHON_ARGCOMPLETE_OK 
 from pathlib import Path
 import tomllib
-from typing import Any, Callable, Iterator, Sequence, Type, Literal, get_args, TYPE_CHECKING
+from typing import Annotated, Any, Callable, Iterator, Sequence, Type, Literal, get_args, TYPE_CHECKING
 from dataclasses import asdict, dataclass, field, fields
 from enum import Enum, StrEnum
 #from dataclass_binder import Binder
@@ -18,6 +18,9 @@ from set_logger import set_logger
 parent_dir = str(Path(__file__).resolve().parent.parent)
 if parent_dir not in sys.path:
 	sys.path.insert(0, parent_dir) # Add to the beginning of the path
+tapr_path = Path(__file__).resolve().parent.parent / 'tapr' # 'typed_argparser')
+if tapr_path not in sys.path:
+	sys.path.insert(0, str(tapr_path))
 logger = set_logger(__name__)
 from dot_env import DOTENV_INFO, ENV_PREFIX_STR
 APP_TO_SUFFIX_KEY = "APP_TO_SUFFIX"
@@ -50,6 +53,7 @@ logger.info("APP_NAME: %s", list(APP_NAME))
 from typed_argparser import ArgumentClass, argfield
 from typed_argparser.validators import ArgumentValidator
 from typed_argparser.exceptions import ValidationError # ArgumentError, ValidatorInitError, 
+from typed_argparser.types import Args
 
 class AppNameValidator(ArgumentValidator):
 	choices = [m.name.lower() for m in APP_NAME]
@@ -101,7 +105,7 @@ def get_app_sym_to_suffix() -> dict[str, str]|None:
 from typing import Optional
 class Settings(ArgumentClass):
 	""" Base settings """
-	app: Optional[str] = argfield(default=None, help=f"Application symbol to process OCR from its screenshots:{{{'|'.join(ChoicesValidator([m.name for m in APP_SYM]).choices)}}}", validator=ChoicesValidator([m.name for m in APP_SYM]))
+	app: Optional[str] = argfield(help=f"Application symbol to process OCR from its screenshots:{{{'|'.join(ChoicesValidator([m.name for m in APP_SYM]).choices)}}};symbols are defined in `app_sym.py`.", validator=ChoicesValidator([m.name for m in APP_SYM])) # default=None,
 
 	app_sym_to_suffix: Optional[dict[str, str]] = argfield(default=get_app_sym_to_suffix(),
 		help="Application symbol to suffix mapping",
@@ -123,7 +127,7 @@ class Settings(ArgumentClass):
 
 def settings_runner(settings: Settings):
 	""" Run the settings """
-	print(f"Running settings for app[{type(settings.app)}]: {settings.app=}\napp_to_suffix[{type(settings.app_to_suffix)}]: {settings.app_to_suffix=}")
+	print(f"Running settings for app[{type(settings.app)}]: {settings.app=}\napp_to_suffix[{type(settings.app_sym_to_suffix)}]: {settings.app_sym_to_suffix=}")
 
 # from tap import TapIgnore
 #@version((1,6))
@@ -209,8 +213,8 @@ class MainSettings(AppSettings):
 		help="Screenshot image file horizontal border ratio list of the app to execute OCR:(specified in format as '<app_name1>:<ratio1>,<ratio2> ...')")
 	app_is_suffix: bool = argfield(default=False,
 			help="Screenshot image file name has suffix(sub extention) of the same as app name i.e. '<stem>.<suffix>.<ext>' (default: True)")
-	save_as: str|None = argfield(default=None,
-		help="Output file fullpath to save OCR text of the image file in TOML format into the file with name as '<stem>.ocr-<app_name>.toml' while executing OCR")
+	save_dir: Annotated[Optional[Path], Args()] = argfield(
+		help="Output file directory where to save OCR text of the image file in TOML format into the file with name as '<stem>.ocr-<app_name>.toml' while executing OCR")
 	nth: int = argfield(default=1,
 		help="Rank(first, second, ...) of files descending sorted(the latest, the first) by modified datetime as wildcard(*, ?)")
 	glob_max: int = argfield(default=60,
@@ -336,7 +340,7 @@ def search_settings_file(script_fullpath: Path|str = Path(__file__), replace=('_
 	logger.error("No proper TOML configuration file found at: %s", main_settings_file)
 	raise FileNotFoundError("No proper TOML configuration file found")
 
-from deepmerge import always_merger
+# from deepmerge import always_merger
 # result = always_merger.merge(base, next_dict)
 def load_merged_settings(by_file_settings: MainSettings, main_settings_class = MainSettings, sub_settings_class = MainSettings) -> MainSettings:
 	"""Load and merge the main settings with the sub settings(descendent of main class: 'sub' is broader than 'main') from settings file(in TOML format, 'main' settings range) and command line parameters('sub' settings range).
@@ -425,6 +429,11 @@ if __name__ == '__main__':
 	settings = Settings()
 	from sys import argv
 	settings.parse(' '.join(argv[1:]))
+	@settings.execute('app')
+	def run1(app: str):
+		print(f"Running settings for app[{app.__class__}]: settings.app={app}")
+		#settings_runner(settings)
+	#run()
 	# from typed_argparse import Parser
 	# parser = Parser(Settings, usage=f"%(prog)s [--app {{{'|'.join([n.lower() for n in APP_NAMES])}}}];Set env. variable: {ENV_PREFIX_APP_TO_SUFFIX_KEY}=<app_name1>:<app_suffix1>,<app_name2>:<app_suffix2>;Suffix is the last part of split-by-underscore('_') in the image file name's stem part (filename part before extention:last part of filename(like '.png')).", epilog="\nDone.")
 	# import argcomplete
