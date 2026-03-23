@@ -73,10 +73,11 @@
 			self.add_argument('--name', type=NAME, choices=[m.value for m in NAME]) # for better help message
 	args = Config().parse_args()
 	```
- 7. `typed_argparser`
-	- https://github.com/justanr/typed-argparser
+ 7. `typed-argparser`: a fork of `typed_argparser`
+	- https://github.com/Yasukazu/typed-argparser
 	- Features:
 	 - Dict type support
+	 - Every function defined with execution decorator(leading with `@<ArgumetClass>.execute('option_name')`) is automatically executed when all the decorator's arguments are fulfilled after parsing arguments; i.e. options are used as flags to switch these functions.
 	```Python
 	from typing import List, Optional, Dict, Tuple, Union
 	from typed_argparser import ArgumentClass, argfield
