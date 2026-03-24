@@ -34,9 +34,9 @@ except KeyError as e:
 		logger.error("Failed to get '%s' from environment variable or '.env' file:%s", APP_TO_SUFFIX_KEY, err)
 		raise err
 
-from app_to_suffix import make_app_to_suffix_strenum, AppToSuffix, AppName
-APP_TO_SUFFIX = make_app_to_suffix_strenum(strenum_name=APP_TO_SUFFIX_KEY, name_value_pair=APP_TO_SUFFIX_VALUE)
-
+# from app_to_suffix import make_app_to_suffix_strenum, AppToSuffix, AppName
+# APP_TO_SUFFIX = make_app_to_suffix_strenum(strenum_name=APP_TO_SUFFIX_KEY, name_value_pair=APP_TO_SUFFIX_VALUE)
+from app_to_suffix import APP_TO_SUFFIX
 MAIN_SETTINGS_FILENAME = os_environ.get("IMAGE_FILTER_MAIN_SETTINGS_FILENAME", "image-filter-main-settings.toml")
 
 AREA_PARAM_NAME = Enum('AREA_PARAM_NAME', ['HEADING', 'SHIFT', 'BREAKTIME', 'PAYSTUB', 'SALARY'])
@@ -134,7 +134,7 @@ class AppSettings(Settings):
 	@classmethod
 	def get_app_names(cls):
 		"""Application name list"""
-		return APP_NAMES
+		return cls.APP_NAMES
 
 	@property
 	def app_names(self) -> list[str]:
