@@ -1,13 +1,12 @@
 """ APP_NAME Enum by class definition;AppName class to enulate a class member """
 from pathlib import Path
-from typing import Any, Callable, Iterator, Sequence, Type, Literal, get_args, TYPE_CHECKING
-from enum import Enum
+from typing import Literal
 import sys
-from dotenv import find_dotenv, load_dotenv, dotenv_values
 from os import environ as os_environ
-from enum import StrEnum
+from enum import Enum, StrEnum
 
 
+from dotenv import find_dotenv, load_dotenv, dotenv_values
 
 parent_dir = str(Path(__file__).resolve().parent.parent)
 if parent_dir not in sys.path:
