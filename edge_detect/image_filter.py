@@ -75,12 +75,12 @@ else:
 	from image_filter_main_settings import MainSettings
 	MAIN_SETTINGS = MainSettings()
 
-APP_NAME = Enum('APP_NAME', MAIN_SETTINGS.app_names, module=__name__)
-
+from app_to_suffix import APP_NAME
+# APP_NAME = Enum('APP_NAME', MAIN_SETTINGS.app_names, module=__name__)
 
 class AppNameToEnum(TypedDict):
 	key: str
-	value: APP_NAME
+	value: Enum
 class ImageFilterException(Exception):
 	pass
 
@@ -987,13 +987,11 @@ def do_show_check(msg, param, img):
 		cv2.imshow(f"{msg}::{param}", img)
 		cv2.waitKey(0)
 
-from argparse import ArgumentParser
 # from dotenv import dotenv_values
 from fnmatch import fnmatch
 
 
-app_name_to_enum: AppNameToEnum 
-app_name_to_enum = {n.name.lower(): n for n in APP_NAME}  # type: ignore
+# app_name_to_enum = {n.name.lower(): n for n in APP_NAME}  # type: ignore: AppNameToEnum 
 
 class MainError(ValueError):
 	''' base error of main '''

@@ -3,6 +3,12 @@ APP_TO_SUFFIX_STR = "APP_TO_SUFFIX"
 from pathlib import Path
 from typing import Any, Callable, Iterator, Sequence, Type, Literal, get_args, TYPE_CHECKING, Union
 from enum import Enum, StrEnum
+
+class APP_TO_SUFFIX(StrEnum):
+	TAIMEE = "jp.co.taimee"
+	MERCARI = "jp.mercari.work"
+
+APP_NAME = Enum("APP_NAME", [app.name for app in APP_TO_SUFFIX]) # value starts from 1
 import sys
 from dotenv import find_dotenv, load_dotenv, dotenv_values
 from os import environ as os_environ
@@ -103,6 +109,3 @@ class AppName:
 					result[attr_name] = attr.value
 		return result
 
-class APP_TO_SUFFIX(StrEnum):
-	TAIMEE = "jp.co.taimee"
-	MERCARI = "jp.mercari.work"
