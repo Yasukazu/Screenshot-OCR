@@ -2,7 +2,7 @@
 # PYTHON_ARGCOMPLETE_OK 
 from pathlib import Path
 import tomllib
-from typing import Annotated, Any, Callable, Iterator, Sequence, Type, Literal, get_args, TYPE_CHECKING
+from typing import Annotated, Any, Callable, Iterator, Sequence, Type, Literal, get_args, TYPE_CHECKING, List
 from dataclasses import asdict, dataclass, field, fields
 from enum import Enum, StrEnum
 #from dataclass_binder import Binder
@@ -129,7 +129,7 @@ def settings_runner(settings: Settings):
 TYPE_CHECKING = True
 class AppSettings(Settings):
 	""" Application_name to suffix mapping must be defined in the environment variable or in '.env' file as 'IMAGE_FILTER_APP_TO_SUFFIX=<app1>:<suffix1>,<app2>:<suffix2>,<app3>:<suffix3>' """
-	stem_delimiter: str = argfield(default='_', help= " Delimiter for splitting screenshot filename stem into 3 parts like:: prefix:'Screenshot', datetime:'yyyy-mm-ddThh:mm:ss', suffix:'com.example.app.name'")
+	stem_delimiter: Optional[str] = argfield(default='_', help= " Delimiter for splitting screenshot filename stem into 3 parts like:: prefix:'Screenshot', datetime:'yyyy-mm-ddThh:mm:ss', suffix:'com.example.app.name'")
 
 	@classmethod
 	def get_app_names(cls):
@@ -177,21 +177,19 @@ class AppBorderRatio:
 #@dataclass(kw_only=True)
 class MainSettings(AppSettings):
 	__program__ = "ocr-filter"
-	__description__ = """
-	Extract/OCR paystub text from an image file: Files for OCR by 'files' option may be specified with app-name-suffix in wildcard(glob pattern matching like '--files *.<APP_NAME>*.png') or by 'shot-month' option (like '--shot_month -1' for last month, 0 for current month, other positive value for month number: Jan. is 1, Dec. is 12, ...) and 'app' option (like '--app <APP_NAME>')
-	"""
+	__description__ = "Extract/OCR paystub text from an image file: Files for OCR by 'files' option may be specified with app-name-suffix in wildcard(glob pattern matching like '--files *.<APP_NAME>*.png') or by 'shot-month' option (like '--shot_month -1' for last month, 0 for current month, other positive value for month number: Jan. is 1, Dec. is 12, ...) and 'app' option (like '--app <APP_NAME>')"
 	__version__ = "1.2.1"
 	__usage__ = f"{__program__} --<option1> {{value1}} --<option2> {{value2}} ..."
-	__epilog__ = "\nEnd.\n"
+	__epilog__ = "\n`MainSettings` ends.\n"
 	
 
-	image_ext_set: set[str] = argfield(default=set([".png"]),
+	image_ext_set: Optional[List[str]] = argfield(default=".png",
 		help="Image file extension set, every extention starts with dot (default is {'.png'})")
-	image_dir: Path = argfield(default="~/Documents/screenshots",
+	image_dir: Optional[str] = argfield(default="~/Documents/screenshots",
 		help="Image file root directory")
 	shot_months: list[int]|None = argfield(
 		help="Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD]) included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like '[1,2,..]')")
-	glob: str = argfield(default="RGLOB",
+	glob: Optional[str] = argfield(default="RGLOB",
 		validator=ChoicesValidator(GLOB_CHOICES),
 		help=f"Glob mode, Image file name matching pattern by glob('*_{{app_suffix}}.{{ext}}') to commit OCR or to get parameters, choose from {GLOB_CHOICES};RGLOB: Recursively search in a directory tree downto every subdirectories")
 
@@ -199,9 +197,9 @@ class MainSettings(AppSettings):
 	def is_rglob(self) -> bool:
 		"""Search glob pattern matching Recursively in a directory tree downto every subdirectories"""
 		return self.glob == "RGLOB"
-	recurse_symlinks: bool = argfield(default=False,
+	recurse_symlinks: Optional[bool] = argfield(default=False,
 			help="Use symbolic links for searching glob pattern")
-	case_sensitive: bool = argfield(default=False,
+	case_sensitive: Optional[bool] = argfield(default=False,
 		help="Segregate char case(capital/small) for searching glob pattern")
 	files: Optional[list[str]] = argfield(
 		help="Image file name list to commit OCR or to get parameters. Every file name's pattern is: <prefix>_<date>_<suffix>.<ext>")
@@ -272,7 +270,7 @@ class MainSettings(AppSettings):
 def append_doc(fd):
 	return f"{fd}:{fd.default_factory()}"
 
-MainSettings.__doc__ = MainSettings.__doc__ or '' + "\n".join([append_doc(fd) for fd in fields(MainSettings) if callable(fd.default_factory)])
+# MainSettings.__doc__ = MainSettings.__doc__ or '' + "\n".join([append_doc(fd) for fd in fields(MainSettings) if callable(fd.default_factory)])
 
 def main_settings_from_dict(toml_dict: dict[str, Any]) -> MainSettings:
 	return Binder(MainSettings).bind(toml_dict)
@@ -427,7 +425,7 @@ if __name__ == '__main__':
 	# parser.bind(settings_runner).run()
 	#app_settings = AppSettings().parse_args(argv[1:]) #config_files=['app-config.json']
 	main_settings = MainSettings()#underscores_to_dashes=True).parse_args(argv[1:]) #config_files=['main-config.json']
-	main_settings.parse(' '.join(argv[1:]))
+	main_settings.parse(argv[1:])#' '.join(
 	@main_settings.execute('app')
 	def run2(app: str):
 		print(f"Running main settings for app[{app.__class__}]: main_settings.app={app}")
