@@ -1,15 +1,18 @@
-""" MainSettings by DataclassBinder"""
+""" MainSettings by Pydantic Settings """
 # PYTHON_ARGCOMPLETE_OK 
 from pathlib import Path
 import tomllib
-from typing import Annotated, Any, Callable, Iterator, Sequence, Type, Literal, get_args, TYPE_CHECKING, List
+from typing import Annotated, Any, Callable, Iterator, Sequence, Type, Literal, get_args, TYPE_CHECKING, List, Optional
 from dataclasses import asdict, dataclass, field, fields
 from enum import Enum, StrEnum
 #from dataclass_binder import Binder
 import sys
+from os import environ as os_environ
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict, CliPositionalArg
 from simple_parsing import ArgumentParser
 from deepdiff import DeepDiff
-from os import environ as os_environ
 
 parent_dir = str(Path(__file__).resolve().parent.parent)
 if parent_dir not in sys.path:
@@ -96,10 +99,10 @@ def get_app_sym_to_suffix() -> dict[str, str]|None:
 				raise ValueError(f"Empty suffix for app symbol: {k}")
 			dic[k] = v
 	return dic
-from typing import Optional
-class Settings(ArgumentClass):
+
+class Settings(BaseSettings):
 	""" Base settings """
-	app: Optional[str] = argfield(help=f"Application symbol to process OCR from its screenshots:{{{'|'.join(ChoicesValidator([m.name for m in APP_SYM]).choices)}}};symbols are defined in `app_sym.py`.", validator=ChoicesValidator([m.name for m in APP_SYM])) # default=None,
+	app: Optional[str] = Field(help=f"Application symbol to process OCR from its screenshots:{{{'|'.join(ChoicesValidator([m.name for m in APP_SYM]).choices)}}};symbols are defined in `app_sym.py`.", validator=ChoicesValidator([m.name for m in APP_SYM])) # default=None,
 
 	app_sym_to_suffix: Optional[dict[str, str]] = argfield(default=get_app_sym_to_suffix(),
 		help="Application symbol to suffix mapping",
