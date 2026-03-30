@@ -1,18 +1,15 @@
-""" MainSettings by Pydantic Settings """
+""" MainSettings by DataclassBinder"""
 # PYTHON_ARGCOMPLETE_OK 
 from pathlib import Path
 import tomllib
-from typing import Annotated, Any, Callable, Iterator, Sequence, Type, Literal, get_args, TYPE_CHECKING, List, Optional
+from typing import Annotated, Any, Callable, Iterator, Sequence, Type, Literal, get_args, TYPE_CHECKING, List
 from dataclasses import asdict, dataclass, field, fields
 from enum import Enum, StrEnum
 #from dataclass_binder import Binder
 import sys
-from os import environ as os_environ
-
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict, CliPositionalArg
-from simple_parsing import ArgumentParser
+# from simple_parsing import ArgumentParser
 from deepdiff import DeepDiff
+from os import environ as os_environ
 
 parent_dir = str(Path(__file__).resolve().parent.parent)
 if parent_dir not in sys.path:
@@ -47,15 +44,15 @@ logger.info("APP_TO_SUFFIX: %s", list(APP_TO_SUFFIX))
 APP_NAME = StrEnum('APP_NAME', [m.name for m in APP_TO_SUFFIX], module='__main__')
 logger.info("APP_NAME: %s", list(APP_NAME))
 
-from typed_argparser import ArgumentClass, argfield
+'''from typed_argparser import ArgumentClass, Field
 from typed_argparser.validators import ArgumentValidator
 from typed_argparser.exceptions import ValidationError # ArgumentError, ValidatorInitError, 
 from typed_argparser.types import Args
 
 class AppNameValidator(ArgumentValidator):
 	choices = [m.name.lower() for m in APP_NAME]
-	'''def __init__(self):
-		self.choices = [m.name for m in APP_NAME] '''
+	def __init__(self):
+		self.choices = [m.name for m in APP_NAME]
 	def validator(self, value: str) -> None:
 		if value.lower() not in self.choices:
 			raise ValidationError(f"Invalid app name: {value}")
@@ -74,7 +71,7 @@ class KeyValidator(ArgumentValidator):
 	def validator(self, value: dict[str, Any]) -> None:
 		for key in value.keys():
 			if key not in self.keys:
-				raise ValidationError(f"Invalid key:'{value}' in {self.keys}")
+				raise ValidationError(f"Invalid key:'{value}' in {self.keys}") '''
 # Create a constant for the glob choices to avoid type issues
 GLOB_CHOICES = ['NONE', 'GLOB', 'RGLOB']
 from app_sym import APP_SYM # app symbol to number mapping
@@ -100,15 +97,20 @@ def get_app_sym_to_suffix() -> dict[str, str]|None:
 			dic[k] = v
 	return dic
 
+from typing import Optional
+from pydantic import model_validator, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 class Settings(BaseSettings):
 	""" Base settings """
-	app: Optional[str] = Field(help=f"Application symbol to process OCR from its screenshots:{{{'|'.join(ChoicesValidator([m.name for m in APP_SYM]).choices)}}};symbols are defined in `app_sym.py`.", validator=ChoicesValidator([m.name for m in APP_SYM])) # default=None,
+	model_config = SettingsConfigDict(cli_parse_args=True, env_prefix='IMAGE_FILTER_', env_file=".env", env_file_encoding="utf-8")
+	app: Optional[APP_SYM] = Field( default=None,
+		description=f"Application symbol to process OCR from its screenshots;symbols are defined in `app_sym.py`:{{{'|'.join([m.name for m in APP_SYM])}}}.")#, validator=ChoicesValidator([m.name for m in APP_SYM])) # default=None,ChoicesValidator.choices
 
-	app_sym_to_suffix: Optional[dict[str, str]] = argfield(default=get_app_sym_to_suffix(),
-		help="Application symbol to suffix mapping",
-		validator=KeyValidator([app_sym.name for app_sym in APP_SYM]))
+	app_sym_to_suffix: dict[str, str] = Field(default=get_app_sym_to_suffix(),
+		description="Application symbol to suffix mapping") #, validator=KeyValidator([app_sym.name for app_sym in APP_SYM]))
 
-	@property
+	''' @property
 	def app_suffix(self)-> str | None:
 		""" Get the app's suffix(last part of file stem before '_') StrEnum """
 		if self.app is None:
@@ -120,7 +122,7 @@ class Settings(BaseSettings):
 		""" Get the app's Enum type """
 		if self.app is None:
 			return None
-		return APP_SYM[self.app.upper()]
+		return APP_SYM[self.app.upper()] '''
 
 def settings_runner(settings: Settings):
 	""" Run the settings """
@@ -132,12 +134,12 @@ def settings_runner(settings: Settings):
 TYPE_CHECKING = True
 class AppSettings(Settings):
 	""" Application_name to suffix mapping must be defined in the environment variable or in '.env' file as 'IMAGE_FILTER_APP_TO_SUFFIX=<app1>:<suffix1>,<app2>:<suffix2>,<app3>:<suffix3>' """
-	stem_delimiter: Optional[str] = argfield(default='_', help= " Delimiter for splitting screenshot filename stem into 3 parts like:: prefix:'Screenshot', datetime:'yyyy-mm-ddThh:mm:ss', suffix:'com.example.app.name'")
+	stem_delimiter: Optional[str] = Field(default='_', description= " Delimiter for splitting screenshot filename stem into 3 parts like:: prefix:'Screenshot', datetime:'yyyy-mm-ddThh:mm:ss', suffix:'com.example.app.name'")
 
 	@classmethod
 	def get_app_names(cls):
 		"""Application name list"""
-		return cls.APP_NAMES
+		return APP_NAMES
 
 	@property
 	def app_names(self) -> list[str]:
@@ -147,7 +149,7 @@ class AppSettings(Settings):
 	def app_name_to_suffix_set(self)-> dict[str, set[str]] :
 		"""Screenshot image file suffix set: suffix is the part of file stem(filename before extention), stem delimiter is underscore (_)"""
 		dic = {}
-		for app_suffix in self.app_to_suffix:
+		for app_suffix in self.app_sym_to_suffix:
 			suffix = app_suffix.value
 			dic[app_suffix.name] = set([s for s in suffix.split('.') if s])
 		return dic
@@ -186,53 +188,53 @@ class MainSettings(AppSettings):
 	__epilog__ = "\n`MainSettings` ends.\n"
 	
 
-	image_ext_set: Optional[List[str]] = argfield(default=".png",
-		help="Image file extension set, every extention starts with dot (default is {'.png'})")
-	image_dir: Optional[str] = argfield(default="~/Documents/screenshots",
-		help="Image file root directory")
-	shot_months: list[int]|None = argfield(
-		help="Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD]) included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like '[1,2,..]')")
-	glob: Optional[str] = argfield(default="RGLOB",
-		validator=ChoicesValidator(GLOB_CHOICES),
-		help=f"Glob mode, Image file name matching pattern by glob('*_{{app_suffix}}.{{ext}}') to commit OCR or to get parameters, choose from {GLOB_CHOICES};RGLOB: Recursively search in a directory tree downto every subdirectories")
+	image_ext_set: Optional[List[str]] = Field(default=".png",
+		description="Image file extension set, every extention starts with dot (default is {'.png'})")
+	image_dir: Optional[str] = Field(default="~/Documents/screenshots",
+		description="Image file root directory")
+	shot_months: list[int]|None = Field(
+		description="Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD]) included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like '[1,2,..]')")
+	glob: Optional[str] = Field(default="RGLOB",
+		# validator=ChoicesValidator(GLOB_CHOICES),
+		description=f"Glob mode, Image file name matching pattern by glob('*_{{app_suffix}}.{{ext}}') to commit OCR or to get parameters, choose from {GLOB_CHOICES};RGLOB: Recursively search in a directory tree downto every subdirectories")
 
 	@property
 	def is_rglob(self) -> bool:
 		"""Search glob pattern matching Recursively in a directory tree downto every subdirectories"""
 		return self.glob == "RGLOB"
-	recurse_symlinks: Optional[bool] = argfield(default=False,
-			help="Use symbolic links for searching glob pattern")
-	case_sensitive: Optional[bool] = argfield(default=False,
-		help="Segregate char case(capital/small) for searching glob pattern")
-	files: Optional[list[str]] = argfield(
-		help="Image file name list to commit OCR or to get parameters. Every file name's pattern is: <prefix>_<date>_<suffix>.<ext>")
-	image_area_param_section_stem: str = argfield(default="image-area-param",
-		help="Image area parameter section/table in image-area-param.ini")
-	app_border_ratio: dict[str, str]|None = argfield(default=None, #AppBorderRatio('TAIMEE:2.2,3.2') #dict[str, list[float]] = field( default_factory=lambda:{"taimee":[2.2,3.2]})
-		help="Screenshot image file horizontal border ratio list of the app to execute OCR:(specified in format as '<app_name1>:<ratio1>,<ratio2> ...')")
-	app_is_suffix: bool = argfield(default=False,
-			help="Screenshot image file name has suffix(sub extention) of the same as app name i.e. '<stem>.<suffix>.<ext>' (default: True)")
-	save_dir: Annotated[Optional[Path], Args()] = argfield(
-		help="Output file directory where to save OCR text of the image file in TOML format into the file with name as '<stem>.ocr-<app_name>.toml' while executing OCR")
-	nth: int = argfield(default=1,
-		help="Rank(first, second, ...) of files descending sorted(the latest, the first) by modified datetime as wildcard(*, ?)")
-	glob_max: int = argfield(default=100,
-		help="Pick up files max. count found in glob pattern")
-	show: bool = argfield(default=False,
-		help="Show images to check")
+	recurse_symlinks: Optional[bool] = Field(default=False,
+			description="Use symbolic links for searching glob pattern")
+	case_sensitive: Optional[bool] = Field(default=False,
+		description="Segregate char case(capital/small) for searching glob pattern")
+	files: Optional[list[str]] = Field(
+		description="Image file name list to commit OCR or to get parameters. Every file name's pattern is: <prefix>_<date>_<suffix>.<ext>")
+	image_area_param_section_stem: str = Field(default="image-area-param",
+		description="Image area parameter section/table in image-area-param.ini")
+	app_border_ratio: dict[str, str]|None = Field(default=None, #AppBorderRatio('TAIMEE:2.2,3.2') #dict[str, list[float]] = field( default_factory=lambda:{"taimee":[2.2,3.2]})
+		description="Screenshot image file horizontal border ratio list of the app to execute OCR:(specified in format as '<app_name1>:<ratio1>,<ratio2> ...')")
+	app_is_suffix: bool = Field(default=False,
+			description="Screenshot image file name has suffix(sub extention) of the same as app name i.e. '<stem>.<suffix>.<ext>' (default: True)")
+	save_dir: Optional[Path] = Field( # Args()
+		description="Output file directory where to save OCR text of the image file in TOML format into the file with name as '<stem>.ocr-<app_name>.toml' while executing OCR")
+	nth: int = Field(default=1,
+		description="Rank(first, second, ...) of files descending sorted(the latest, the first) by modified datetime as wildcard(*, ?)")
+	glob_max: int = Field(default=100,
+		description="Pick up files max. count found in glob pattern")
+	show: bool = Field(default=False,
+		description="Show images to check")
 
-	bin_image: bool = argfield(default=False, help="Use binarized image for OCR")
-	no_ocr: bool = argfield(default=False, help="Do not execute OCR")
-	ocr_conf: int = argfield(default=55, help="Confidence threshold for OCR")
-	psm: int = argfield(default=6, help="PSM value for Tesseract")
-	area_param_dir: Optional[Path] = argfield(help="Screenshot image area parameter config file directory")
-	area_param_name_list: list[str] = argfield(default=[m.name for m in AREA_PARAM_NAME], help="Screenshot image area parameter name list")
-	area_param_file: Path = argfield(default="image-area-param.ini", help='Screenshot image area parameter config file: format as INI with ".ini" extention): in [image_area_param.<app>] section, items as "<area_name>=[<p1>,<p2>,<p3>,<p4>]" (e.g. "heading=[0,106,196,-1]") ')
-	ocr_filter_sqlite_db_name: Path = argfield(default="ocr-filter.db", help="SQLite DB file is going to be created in `image_dir` directory if not exists.")#(yyyy is like 2025)')
-	data_year: int = argfield(default=0, help='Year of data (like -1, 0, 2025, ...). 0 means current year, negative value is difference from current year (like -1 means last year), positive value means a.d. year number (like 2025). If this value is larger than current year, an exception might be raised.')
-	data_month: int = argfield(default=0, help="Month of data (like -1, 0, 1, 2, ...). 0 means current month, negative value is difference from current month (like -1 means last month), positive value means month number (1: Jan, 2: Feb, ...). If this value is larger than current month, data's date is treated as the last year.")
-	show_ocr_area: bool = argfield(default=False, help="Show every area before to commit OCR")
-	exclude_area_param_set: Optional[set[str]] = argfield(help='Exclude a set of image area parameter names')
+	bin_image: bool = Field(default=False, description="Use binarized image for OCR")
+	no_ocr: bool = Field(default=False, description="Do not execute OCR")
+	ocr_conf: int = Field(default=55, description="Confidence threshold for OCR")
+	psm: int = Field(default=6, description="PSM value for Tesseract")
+	area_param_dir: Optional[Path] = Field(description="Screenshot image area parameter config file directory")
+	area_param_name_list: list[str] = Field(default=[m.name for m in AREA_PARAM_NAME], description="Screenshot image area parameter name list")
+	area_param_file: Path = Field(default="image-area-param.ini", description='Screenshot image area parameter config file: format as INI with ".ini" extention): in [image_area_param.<app>] section, items as "<area_name>=[<p1>,<p2>,<p3>,<p4>]" (e.g. "heading=[0,106,196,-1]") ')
+	ocr_filter_sqlite_db_name: Path = Field(default="ocr-filter.db", description="SQLite DB file is going to be created in `image_dir` directory if not exists.")#(yyyy is like 2025)')
+	data_year: int = Field(default=0, description='Year of data (like -1, 0, 2025, ...). 0 means current year, negative value is difference from current year (like -1 means last year), positive value means a.d. year number (like 2025). If this value is larger than current year, an exception might be raised.')
+	data_month: int = Field(default=0, description="Month of data (like -1, 0, 1, 2, ...). 0 means current month, negative value is difference from current month (like -1 means last month), positive value means month number (1: Jan, 2: Feb, ...). If this value is larger than current month, data's date is treated as the last year.")
+	show_ocr_area: bool = Field(default=False, description="Show every area before to commit OCR")
+	exclude_area_param_set: Optional[set[str]] = Field(description='Exclude a set of image area parameter names')
 
 	@classmethod
 	def from_dict(cls, toml_dict: dict[str, Any]) -> 'MainSettings':
@@ -413,9 +415,10 @@ def print_toml_template(Settings:Type[Settings]=MainSettings, file=sys.stdout):
 
 if __name__ == '__main__':
 	# for line in Binder(AppSettings).format_toml_template(): # Need to generate an instance to get default values of default factory print(line)
-	from sys import argv
-	'''settings = Settings()
-	settings.parse(' '.join(argv[1:]))
+	from sys import argv, exit
+	settings = Settings()
+	exit(0)
+	''' settings.parse(' '.join(argv[1:]))
 	@settings.execute('app')
 	def run1(app: str):
 		print(f"Running settings for app[{app.__class__}]: settings.app={app}") '''
