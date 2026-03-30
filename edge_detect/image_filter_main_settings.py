@@ -103,7 +103,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
 	""" Base settings """
-	model_config = SettingsConfigDict(cli_parse_args=True, env_prefix='IMAGE_FILTER_', env_file=".env", env_file_encoding="utf-8")
+	model_config = SettingsConfigDict(cli_parse_args=True, env_prefix='SCREENSHOT_OCR_', env_file=".env.screenshot_ocr", env_file_encoding="utf-8", env_nested_delimiter='__')
 	app: Optional[APP_SYM] = Field( default=None,
 		description=f"Application symbol to process OCR from its screenshots;symbols are defined in `app_sym.py`:{{{'|'.join([m.name for m in APP_SYM])}}}.")#, validator=ChoicesValidator([m.name for m in APP_SYM])) # default=None,ChoicesValidator.choices
 
