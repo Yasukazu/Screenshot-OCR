@@ -2,6 +2,7 @@
 # PYTHON_ARGCOMPLETE_OK 
 from pathlib import Path
 import tomllib
+import traceback
 from typing import Annotated, Any, Callable, Iterator, Sequence, Type, Literal, get_args, TYPE_CHECKING, List
 from dataclasses import asdict, dataclass, field, fields
 from enum import Enum, StrEnum
@@ -102,17 +103,35 @@ def get_app_sym_to_suffix_from_env(env_file: str = ".env.screenshot_ocr", env_pr
 
 from typing import Optional
 from pydantic import model_validator, Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict, TomlConfigSettingsSource
 
 class Settings(BaseSettings):
 	""" Base settings """
-	model_config = SettingsConfigDict(cli_parse_args=True, env_prefix='SCREENSHOT_OCR_', env_file=".env.screenshot_ocr", env_file_encoding="utf-8", env_nested_delimiter='__')
-	app: Optional[APP_SYM] = Field( default=None,
+	model_config = SettingsConfigDict(cli_parse_args=True, env_prefix='SCREENSHOT_OCR_', env_file=".env", env_file_encoding="utf-8", env_nested_delimiter='__', extra='ignore', toml_file="config.toml")
+	app: Optional[APP_NAME] = Field( default=None,
 		description=f"Application symbol to process OCR from its screenshots;symbols are defined in `app_sym.py`:{{{'|'.join([m.name for m in APP_SYM])}}}.")#, validator=ChoicesValidator([m.name for m in APP_SYM])) # default=None,ChoicesValidator.choices
 
-	app_sym_to_suffix: dict[APP_SYM, str] = Field(
+	app_sym_to_suffix: dict[APP_NAME, str] = Field(default_factory=dict,
 		description="Application symbol to suffix mapping") #, validator=KeyValidator([app_sym.name for app_sym in APP_SYM]))default=get_app_sym_to_suffix_from_env(),
-
+	def model_post_init(self, __context):
+		toml_file = self.model_config.get('toml_file', None)
+		try:
+			print(f"TOML file used: {Path(toml_file).absolute()}")
+		except Exception as e:
+			print(f"Error getting TOML file: {e}")
+		else:
+			print(f"TOML values loaded:")
+			for field_name, field_info in self.__class__.model_fields.items():
+				value = getattr(self, field_name)
+				print(f"  {field_name}: {value}")
+		print("\n=== FIELD → ENV MAPPING ===")
+		for field_name, field in self.__class__.model_fields.items():
+			env_name = field.alias or field_name.upper()
+			value = getattr(self, field_name)
+			print(f"{field_name:<15} → {env_name:<20} = {value}")
+	@classmethod
+	def settings_customise_sources(cls, settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings, **kwargs):
+		return (settings_cls, TomlConfigSettingsSource(settings_cls), env_settings, dotenv_settings, file_secret_settings)
 	''' @property
 	def app_suffix(self)-> str | None:
 		""" Get the app's suffix(last part of file stem before '_') StrEnum """
@@ -419,7 +438,12 @@ def print_toml_template(Settings:Type[Settings]=MainSettings, file=sys.stdout):
 if __name__ == '__main__':
 	# for line in Binder(AppSettings).format_toml_template(): # Need to generate an instance to get default values of default factory print(line)
 	from sys import argv, exit
-	settings = Settings()
+	try:
+		settings = Settings()
+	except Exception as e:
+		traceback.print_exc()
+		logger.error("Failed to load settings: %s", e)
+		exit(1)
 	exit(0)
 	''' settings.parse(' '.join(argv[1:]))
 	@settings.execute('app')
