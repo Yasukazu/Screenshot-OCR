@@ -75,22 +75,25 @@ class KeyValidator(ArgumentValidator):
 # Create a constant for the glob choices to avoid type issues
 GLOB_CHOICES = ['NONE', 'GLOB', 'RGLOB']
 from app_sym import APP_SYM # app symbol to number mapping
-def get_app_sym_to_suffix() -> dict[str, str]|None:
-	""" Get the app symbol to suffix mapping using dotenv('.env' file or environment variables)"""
+def get_app_sym_to_suffix_from_env(env_file: str = ".env.screenshot_ocr", env_prefix="SCREENSHOT_OCR_", env_name="APP_SYM_TO_SUFFIX") -> dict[str, str]|None:
+	""" Get the app symbol to suffix mapping from environment variables using dotenv(environment variables is supplemented with env_file)"""
 	from dotenv import load_dotenv, find_dotenv
-	load_dotenv(find_dotenv())
-	screenshot_app_to_suffix = os_environ.get("SCREENSHOT_APP_TO_SUFFIX")
-	if screenshot_app_to_suffix is None:
-		return None
+	load_dotenv(find_dotenv(env_file))
+	try:
+		screenshot_app_to_suffix = os_environ[f"{env_prefix}{env_name}"]
+		if not screenshot_app_to_suffix:
+			raise ValueError(f"Empty environment variable {env_prefix}{env_name}")
+	except KeyError:
+		raise ValueError(f"Environment variable {env_prefix}{env_name} not found")
 	dic = {}
-	app_sym_list = [app_sym.name for app_sym in APP_SYM]
+	app_sym_set = set([app_sym.name for app_sym in APP_SYM])
 	for mapping in screenshot_app_to_suffix.split(','):
 		try:
 			k, v = mapping.split(':')
 		except ValueError:
 			continue
 		else:
-			if k not in app_sym_list:
+			if k not in app_sym_set:
 				raise ValueError(f"Invalid app symbol: {k}")
 			if not v:
 				raise ValueError(f"Empty suffix for app symbol: {k}")
@@ -107,8 +110,8 @@ class Settings(BaseSettings):
 	app: Optional[APP_SYM] = Field( default=None,
 		description=f"Application symbol to process OCR from its screenshots;symbols are defined in `app_sym.py`:{{{'|'.join([m.name for m in APP_SYM])}}}.")#, validator=ChoicesValidator([m.name for m in APP_SYM])) # default=None,ChoicesValidator.choices
 
-	app_sym_to_suffix: dict[str, str] = Field(default=get_app_sym_to_suffix(),
-		description="Application symbol to suffix mapping") #, validator=KeyValidator([app_sym.name for app_sym in APP_SYM]))
+	app_sym_to_suffix: dict[APP_SYM, str] = Field(
+		description="Application symbol to suffix mapping") #, validator=KeyValidator([app_sym.name for app_sym in APP_SYM]))default=get_app_sym_to_suffix_from_env(),
 
 	''' @property
 	def app_suffix(self)-> str | None:
