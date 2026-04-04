@@ -42,8 +42,8 @@ MAIN_SETTINGS_FILENAME = os_environ.get("IMAGE_FILTER_MAIN_SETTINGS_FILENAME", "
 
 AREA_PARAM_NAME = Enum('AREA_PARAM_NAME', ['HEADING', 'SHIFT', 'BREAKTIME', 'PAYSTUB', 'SALARY'])
 logger.info("APP_TO_SUFFIX: %s", list(APP_TO_SUFFIX))
-APP_NAME = StrEnum('APP_NAME', [m.name for m in APP_TO_SUFFIX], module='__main__')
-logger.info("APP_NAME: %s", list(APP_NAME))
+# APP_NAME = StrEnum('APP_NAME', [m.name for m in APP_TO_SUFFIX], module='__main__')
+# logger.info("APP_NAME: %s", list(APP_NAME))
 
 '''from typed_argparser import ArgumentClass, Field
 from typed_argparser.validators import ArgumentValidator
@@ -104,7 +104,7 @@ def get_app_sym_to_suffix_from_env(env_file: str = ".env.screenshot_ocr", env_pr
 from typing import Optional
 from pydantic import model_validator, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict, TomlConfigSettingsSource
-
+from app_name import APP_NAME
 class Settings(BaseSettings):
 	""" Base settings """
 	model_config = SettingsConfigDict(cli_parse_args=True, env_prefix='SCREENSHOT_OCR_', env_file=".env", env_file_encoding="utf-8", env_nested_delimiter='__', extra='ignore', toml_file="config.toml")
@@ -121,14 +121,11 @@ class Settings(BaseSettings):
 			print(f"Error getting TOML file: {e}")
 		else:
 			print(f"TOML values loaded:")
+			print("\n=== FIELD → ENV MAPPING ===")
 			for field_name, field_info in self.__class__.model_fields.items():
-				value = getattr(self, field_name)
-				print(f"  {field_name}: {value}")
-		print("\n=== FIELD → ENV MAPPING ===")
-		for field_name, field in self.__class__.model_fields.items():
-			env_name = field.alias or field_name.upper()
-			value = getattr(self, field_name)
-			print(f"{field_name:<15} → {env_name:<20} = {value}")
+				# value = getattr(self, field_name)
+				print(f"  {field_name}: {field_info}")
+
 	@classmethod
 	def settings_customise_sources(cls, settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings, **kwargs):
 		return (settings_cls, TomlConfigSettingsSource(settings_cls), env_settings, dotenv_settings, file_secret_settings)

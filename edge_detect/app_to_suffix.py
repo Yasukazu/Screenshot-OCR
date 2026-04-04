@@ -5,8 +5,8 @@ from typing import Any, Callable, Iterator, Sequence, Type, Literal, get_args, T
 from enum import Enum, StrEnum
 
 class APP_TO_SUFFIX(StrEnum):
-	TAIMEE = "jp.co.taimee"
-	MERCARI = "jp.mercari.work"
+	TM = "jp.co.taimee"
+	MC = "jp.mercari.work"
 
 APP_NAME = Enum("APP_NAME", [app.name for app in APP_TO_SUFFIX]) # value starts from 1
 import sys
