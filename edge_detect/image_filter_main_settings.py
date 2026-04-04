@@ -108,7 +108,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict, TomlConfigSettin
 from app_name import APP_NAME
 class Settings(BaseSettings):
 	""" Base settings """
-	model_config = SettingsConfigDict(cli_parse_args=True, env_prefix='SCREENSHOT_OCR_', env_file=".env", env_file_encoding="utf-8", env_nested_delimiter='__', extra='ignore', toml_file="config.toml")
+	model_config = SettingsConfigDict(cli_parse_args=True, env_prefix='SCREENSHOT_OCR_', env_nested_delimiter='__', extra='ignore', toml_file="config.toml") # env_file=".env", env_file_encoding="utf-8", 
 	app: Optional[APP_NAME] = Field( default=None,
 		description=f"Application symbol to process OCR from its screenshots;symbols are defined in `app_sym.py`:{{{'|'.join([m.name for m in APP_SYM])}}}.")#, validator=ChoicesValidator([m.name for m in APP_SYM])) # default=None,ChoicesValidator.choices
 
