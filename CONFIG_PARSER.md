@@ -1,4 +1,7 @@
-## `perprexity.ai`'s suggenstion of "Python dataclass argument parser"
+## Originally, `perprexity.ai`'s suggenstion of "Python dataclass argument parser"
+ 0. `Dynaconf`
+  -  https://www.dynaconf.com/configuration/
+  - Configuration is loaded from files and environment variables
 
  1. `argparse-dataclass`
 	- https://pypi.org/project/argparse-dataclass/
