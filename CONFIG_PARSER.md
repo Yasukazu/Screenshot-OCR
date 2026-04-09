@@ -1,7 +1,23 @@
 ## Originally, `perprexity.ai`'s suggenstion of "Python dataclass argument parser"
- 0. `Dynaconf`
+ -1. `Dynaconf`
   -  https://www.dynaconf.com/configuration/
   - Configuration is loaded from files and environment variables
+
+ 0. `Dataclass Binder`
+  - https://github.com/ProtixIT/dataclass-binder
+  - TOML template includes field-following docstring 
+  ```Python
+  from dataclasses import dataclass
+  @dataclass
+  class Config:
+    tags: Sequence[str] = ()
+    limits: Mapping[str, int]
+  config = Config()
+  from dataclass_binder import Binder
+  for line in Binder(config).format_toml_template():
+      print(line)
+  config = Binder(config).parse_toml(system_config_path)
+  ```
 
  1. `argparse-dataclass`
 	- https://pypi.org/project/argparse-dataclass/
