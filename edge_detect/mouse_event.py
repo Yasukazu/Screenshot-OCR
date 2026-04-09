@@ -95,7 +95,21 @@ class RectPos:
 	@property
 	def is_half(self):
 		return True if self.RB == Point(*Point.RESET) else False
-	''' def reset(self):
+	@property
+	def height(self):
+		return self.RB.y - self.LT.y
+	@property
+	def width(self):
+		return self.RB.x - self.LT.x
+	@property
+	def origin(self):
+		return self.LT
+	''' 
+		rp.LT[1] + y_margin, # y_offset
+		rp.RB[1] - rp.LT[1], # height
+		rp.LT[0], # x_offset
+		rp.RB[0] - rp.LT[0], # width
+	def reset(self):
 		self.LT = self.RESET
 		self.RB = self.RESET '''
 
@@ -255,6 +269,7 @@ if __name__ == "__main__":
 		param.append(BRpos[0] - TLpos[0])
 	area_param = ImageAreaParam.from_param(param) # y_offset=TLpos[1], height = BRpos[1] - TLpos[1], x_offset=BRpos[0])
 	print(f"{area_param=}")
+	print(f"{area_param.param=}")
 
 '''マウスイベントの種類は以下の通りです．
 

@@ -4,13 +4,15 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
         {
-            "name": "Python Debugger: Current File with Arguments",
+            "name": "Python Debugger: Current File args",
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "args": "${command:pickArgs}"
+            "cwd": "${workspaceFolder}",
+            "args": "-h"//--app taimee"// --shot-months 9 10"// "--shot-months", "10"]//"edge_detect/image_filter_main_settings.py" // // --glob *.taimee.png"
         }
     ]
 }

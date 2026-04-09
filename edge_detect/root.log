@@ -1,0 +1,112 @@
+[2025/09/26 17:02:59][INFO](clahe_rect.py:42) 283 contours detected.
+[2025/09/26 17:02:59][INFO](clahe_rect.py:51) src_whr is set to 145080
+[2025/09/26 17:02:59][INFO](clahe_rect.py:65) 3 cropped rects are found.
+[2025/09/26 17:10:19][INFO](clahe_rect.py:42) 283 contours detected.
+[2025/09/26 17:10:19][INFO](clahe_rect.py:51) src_whr is set to 145080
+[2025/09/26 17:10:19][INFO](clahe_rect.py:65) 3 cropped rects are found.
+[2025/09/26 17:11:33][INFO](clahe_rect.py:42) 386 contours detected.
+[2025/09/26 17:11:33][INFO](clahe_rect.py:51) src_whr is set to 145080
+[2025/09/26 17:11:33][INFO](clahe_rect.py:65) 3 cropped rects are found.
+[2025/09/26 19:28:58][INFO](clahe_rect.py:42) 283 contours detected.
+[2025/09/26 19:28:58][INFO](clahe_rect.py:51) src_whr is set to 145080
+[2025/09/26 19:28:58][INFO](clahe_rect.py:65) 3 cropped rects are found.
+[2025/09/26 21:09:14][INFO](clahe_rect.py:42) 283 contours detected.
+[2025/09/26 21:09:14][INFO](clahe_rect.py:50) src_whr is set to 145080
+[2025/09/26 21:09:15][INFO](clahe_rect.py:64) 3 cropped rects are found.
+[2025/09/26 21:09:31][DEBUG](clahe_rect.py:82) '%s' as crop filename.
+[2025/09/26 21:11:28][INFO](clahe_rect.py:42) 283 contours detected.
+[2025/09/26 21:11:28][INFO](clahe_rect.py:50) src_whr is set to 145080
+[2025/09/26 21:11:28][INFO](clahe_rect.py:64) 3 cropped rects are found.
+[2025/09/26 21:11:33][DEBUG](clahe_rect.py:82) 'org-data-2025-09/202509-crop.png' as crop filename.
+[2025/09/26 21:17:27][INFO](clahe_rect.py:42) 283 contours detected.
+[2025/09/26 21:17:27][INFO](clahe_rect.py:50) src_whr is set to 145080
+[2025/09/26 21:17:27][INFO](clahe_rect.py:64) 3 cropped rects are found.
+[2025/09/26 21:17:32][DEBUG](clahe_rect.py:82) 'png-crop.png' as crop filename.
+[2025/09/26 21:17:58][INFO](clahe_rect.py:42) 283 contours detected.
+[2025/09/26 21:17:58][INFO](clahe_rect.py:50) src_whr is set to 145080
+[2025/09/26 21:17:58][INFO](clahe_rect.py:64) 3 cropped rects are found.
+[2025/09/26 21:18:00][DEBUG](clahe_rect.py:82) 'org-data-2025-09/202509.jr-crop.png' as crop filename.
+[2025/09/26 21:19:12][INFO](clahe_rect.py:42) 386 contours detected.
+[2025/09/26 21:19:12][INFO](clahe_rect.py:50) src_whr is set to 145080
+[2025/09/26 21:19:12][INFO](clahe_rect.py:64) 3 cropped rects are found.
+[2025/09/26 21:19:15][DEBUG](clahe_rect.py:82) 'org-data-2025-09/202509.maruju-crop.png' as crop filename.
+[2025/09/26 21:44:18][INFO](clahe_rect.py:43) 386 contours detected.
+[2025/09/26 21:44:18][INFO](clahe_rect.py:51) src_whr is set to 145080
+[2025/09/26 21:44:18][INFO](clahe_rect.py:65) 3 cropped rects are found.
+[2025/09/26 21:46:32][INFO](clahe_rect.py:47) 386 contours detected.
+[2025/09/26 21:46:32][INFO](clahe_rect.py:55) src_whr is set to 145080
+[2025/09/26 21:46:32][INFO](clahe_rect.py:69) 3 cropped rects are found.
+[2025/09/26 21:47:00][INFO](clahe_rect.py:47) 386 contours detected.
+[2025/09/26 21:47:00][INFO](clahe_rect.py:55) src_whr is set to 145080
+[2025/09/26 21:47:00][INFO](clahe_rect.py:69) 3 cropped rects are found.
+[2025/09/26 21:50:05][INFO](clahe_rect.py:52) 283 contours detected.
+[2025/09/26 21:50:05][INFO](clahe_rect.py:60) src_whr is set to 145080
+[2025/09/26 21:50:05][INFO](clahe_rect.py:74) 3 cropped rects are found.
+[2025/09/26 21:51:35][DEBUG](clahe_rect.py:92) 'org-data-2025-09/202509.jr-crop.png' as crop filename.
+[2025/09/26 21:54:30][INFO](clahe_rect.py:54) 1169 contours detected.
+[2025/09/26 21:54:30][INFO](clahe_rect.py:62) src_whr is set to 145080
+[2025/09/26 21:54:30][INFO](clahe_rect.py:76) 3 cropped rects are found.
+[2025/09/26 21:54:38][DEBUG](clahe_rect.py:94) 'org-data-2025-09/202509.jr-crop.png' as crop filename.
+[2025/09/26 21:55:10][INFO](clahe_rect.py:54) 1131 contours detected.
+[2025/09/26 21:55:10][INFO](clahe_rect.py:62) src_whr is set to 145080
+[2025/09/26 21:55:10][INFO](clahe_rect.py:76) 3 cropped rects are found.
+[2025/09/26 22:09:49][INFO](clahe_rect.py:51) 1224 contours detected.
+[2025/09/26 22:09:49][INFO](clahe_rect.py:54) area_thresh is set to 18135
+[2025/09/26 22:09:49][INFO](clahe_rect.py:56) 11 contours remains after filtering.
+[2025/09/26 22:09:49][INFO](clahe_rect.py:64) src_whr is set to 145080
+[2025/09/26 22:09:49][INFO](clahe_rect.py:78) 3 cropped rects are found.
+[2025/09/26 22:13:10][INFO](clahe_rect.py:51) 1224 contours detected.
+[2025/09/26 22:13:10][INFO](clahe_rect.py:54) area_thresh is set to 18135
+[2025/09/26 22:13:10][INFO](clahe_rect.py:56) 11 contours remains after filtering.
+[2025/09/26 22:13:10][INFO](clahe_rect.py:64) src_whr is set to 145080
+[2025/09/26 22:13:10][INFO](clahe_rect.py:78) 4 cropped rects are found.
+[2025/09/26 22:19:14][INFO](clahe_rect.py:51) 1224 contours detected.
+[2025/09/26 22:19:14][INFO](clahe_rect.py:54) area_thresh is set to 18135
+[2025/09/26 22:19:14][INFO](clahe_rect.py:56) 11 contours remains after filtering.
+[2025/09/26 22:19:14][INFO](clahe_rect.py:64) src_whr is set to 145080
+[2025/09/26 22:19:14][INFO](clahe_rect.py:78) 4 cropped rects are found.
+[2025/09/26 22:20:59][INFO](clahe_rect.py:51) 1224 contours detected.
+[2025/09/26 22:20:59][INFO](clahe_rect.py:54) area_thresh is set to 18135
+[2025/09/26 22:20:59][INFO](clahe_rect.py:56) 11 contours remains after filtering.
+[2025/09/26 22:20:59][INFO](clahe_rect.py:64) src_whr is set to 145080
+[2025/09/26 22:20:59][INFO](clahe_rect.py:78) 4 cropped rects are found.
+[2025/09/26 22:22:18][INFO](clahe_rect.py:51) 626 contours detected.
+[2025/09/26 22:22:18][INFO](clahe_rect.py:54) area_thresh is set to 18135
+[2025/09/26 22:22:18][INFO](clahe_rect.py:56) 5 contours remains after filtering.
+[2025/09/26 22:22:18][INFO](clahe_rect.py:64) src_whr is set to 145080
+[2025/09/26 22:22:18][INFO](clahe_rect.py:78) 3 cropped rects are found.
+[2025/09/26 22:25:31][INFO](clahe_rect.py:51) 905 contours detected.
+[2025/09/26 22:25:31][INFO](clahe_rect.py:54) area_thresh is set to 9067
+[2025/09/26 22:25:31][INFO](clahe_rect.py:56) 12 contours remains after filtering.
+[2025/09/26 22:25:31][INFO](clahe_rect.py:64) src_whr is set to 145080
+[2025/09/26 22:25:31][INFO](clahe_rect.py:78) 4 cropped rects are found.
+[2025/09/26 22:29:10][INFO](clahe_rect.py:51) 905 contours detected.
+[2025/09/26 22:29:10][INFO](clahe_rect.py:54) area_thresh is set to 9067
+[2025/09/26 22:29:10][INFO](clahe_rect.py:56) 12 contours remains after filtering.
+[2025/09/26 22:29:10][INFO](clahe_rect.py:66) src_whr is set to 145080
+[2025/09/26 22:29:10][INFO](clahe_rect.py:80) 5 cropped rects are found.
+[2025/09/26 22:31:35][INFO](clahe_rect.py:51) 905 contours detected.
+[2025/09/26 22:31:35][INFO](clahe_rect.py:54) area_thresh is set to 9067
+[2025/09/26 22:31:35][INFO](clahe_rect.py:56) 12 contours remains after filtering.
+[2025/09/26 22:31:35][INFO](clahe_rect.py:66) src_whr is set to 72540
+[2025/09/26 22:31:35][INFO](clahe_rect.py:80) 6 cropped rects are found.
+[2025/09/26 22:34:47][INFO](clahe_rect.py:51) 905 contours detected.
+[2025/09/26 22:34:47][INFO](clahe_rect.py:54) area_thresh is set to 9067
+[2025/09/26 22:34:47][INFO](clahe_rect.py:56) 12 contours remains after filtering.
+[2025/09/26 22:34:47][INFO](clahe_rect.py:66) src_whr is set to 72540
+[2025/09/26 22:34:47][INFO](clahe_rect.py:80) 6 cropped rects are found.
+[2025/09/26 22:37:24][INFO](clahe_rect.py:51) 1458 contours detected.
+[2025/09/26 22:37:24][INFO](clahe_rect.py:54) area_thresh is set to 9067
+[2025/09/26 22:37:24][INFO](clahe_rect.py:56) 7 contours remains after filtering.
+[2025/09/26 22:37:24][INFO](clahe_rect.py:66) src_whr is set to 72540
+[2025/09/26 22:37:24][INFO](clahe_rect.py:80) 3 cropped rects are found.
+[2025/09/26 22:38:20][INFO](clahe_rect.py:51) 314 contours detected.
+[2025/09/26 22:38:20][INFO](clahe_rect.py:54) area_thresh is set to 9067
+[2025/09/26 22:38:20][INFO](clahe_rect.py:56) 10 contours remains after filtering.
+[2025/09/26 22:38:20][INFO](clahe_rect.py:66) src_whr is set to 72540
+[2025/09/26 22:38:20][INFO](clahe_rect.py:80) 6 cropped rects are found.
+[2025/09/27 01:16:41][INFO](clahe_rect.py:51) 314 contours detected.
+[2025/09/27 01:16:41][INFO](clahe_rect.py:54) area_thresh is set to 9067
+[2025/09/27 01:16:41][INFO](clahe_rect.py:56) 10 contours remains after filtering.
+[2025/09/27 01:16:41][INFO](clahe_rect.py:66) src_whr is set to 72540
+[2025/09/27 01:16:41][INFO](clahe_rect.py:80) 6 cropped rects are found.

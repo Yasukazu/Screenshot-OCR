@@ -1,0 +1,7 @@
+[image-area-param.taimee]
+heading = [106, 102, 197, 499]
+breaktime = [593, 187, 12, 322]
+paystub = [823, 617, 8, 698]
+salary = [1366, 71, 18, 686]
+shift = [333, 233, 12, 248, Point(x=391, y=333), Point(x=703, y=566)]
+

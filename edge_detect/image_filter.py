@@ -1,3 +1,4 @@
+from os import environ as os_environ
 from os import getcwd
 from os import path as os_path
 from configparser import ConfigParser
@@ -8,15 +9,14 @@ from pathlib import Path
 from datetime import date
 from typing import Iterator, Sequence, NamedTuple
 from dataclasses import astuple, dataclass, field
-from enum import Enum, StrEnum, auto
+from enum import Enum, auto
 from datetime import date as Date
 import sys
 import atexit
 from tomlkit import TOMLDocument
-from dotenv import load_dotenv
-
-from cv2 import UMat
+from dotenv import load_dotenv, find_dotenv
 import cv2
+from cv2 import UMat
 from returns.result import safe #, attempt, Result, Failure, Success
 from returns.pipeline import is_successful
 # from returns.primitives.exceptions import UnwrapFailedError
@@ -29,23 +29,58 @@ import matplotlib.pyplot as plt
 from inspect import isclass
 from peewee import OperationalError
 from fancy_dataclass import TOMLDataclass
+import tomllib
 
 cwd = Path(__file__).resolve().parent
 sys.path.insert(0, str(cwd.parent))
+from edge_detect.image_filter_main_settings import MainSettings
+from edge_detect.image_filter_main_settings import load_main_settings_safely, search_settings_file
 from set_logger import set_logger
-logger = set_logger(__name__)
+from logging import INFO as LOG_LEVEL_INFO
+from logging import WARN as LV_WARN
+logger = set_logger(__name__, loglevel=LV_WARN)
+MAIN_SETTINGS_FILENAME = "image-filter-main-settings.toml"
+ENV_FILENAME = ".env"
+env_path = find_dotenv(ENV_FILENAME)  # Searches up the tree from __file__ or cwd
+if env_path:
+	load_dotenv(env_path)
+	try:
+		MAIN_SETTINGS_PATH = os_environ["IMAGE_FILTER_MAIN_SETTINGS_PATH"]
+	except KeyError:
+		logger.warning("No 'IMAGE_FILTER_MAIN_SETTINGS_PATH' in environment variables, try to find file in current directory and upward directories of filename: %s", MAIN_SETTINGS_FILENAME)
+		MAIN_SETTINGS_PATH = search_settings_file(MAIN_SETTINGS_FILENAME)
+else:
+	logger.warning("No 'dotenv' file loaded since no file found: %s", ENV_FILENAME)
+	MAIN_SETTINGS_PATH = search_settings_file(MAIN_SETTINGS_FILENAME)
+_load_result = load_main_settings_safely(MAIN_SETTINGS_PATH)
+MAIN_SETTINGS_BY_FILE = False
+if is_successful(_load_result):
+	MAIN_SETTINGS = _load_result.unwrap()
+	MAIN_SETTINGS_BY_FILE = True
+else:
+	logger.warning("Failed to load MainSettings from a configuration file: %s. Loading the original MainSettings class as a fallback.", MAIN_SETTINGS_PATH)
+	match(exception:=_load_result.failure()):
+		case FileNotFoundError():
+			logger.warning("File not found")
+		case OSError():
+			logger.warning("File system error")
+		case tomllib.TOMLDecodeError():
+			logger.warning("TOML configuration file is malformed or contains invalid syntax")
+		case KeyError():
+			logger.warning("Key Configuration error in main settings")
+		case ValueError():
+			logger.warning("Value Configuration error in main settings")
+		case _:
+			logger.warning("Error from an exception: %s", exception)
+	from image_filter_main_settings import MainSettings
+	MAIN_SETTINGS = MainSettings()
 
-class APP_NAME(StrEnum):
-	''' name of app: value is stem end '''
-	TAIMEE = auto() # '_jp.co.taimee'
-	MERCARI = auto() # '_jp.mercari.work.android'
-
-	def __str__(self):
-		return self.name.lower()
+from app_to_suffix import APP_NAME
+# APP_NAME = Enum('APP_NAME', MAIN_SETTINGS.app_names, module=__name__)
 
 class AppNameToEnum(TypedDict):
 	key: str
-	value: APP_NAME
+	value: Enum
 class ImageFilterException(Exception):
 	pass
 
@@ -159,7 +194,7 @@ class ImageAreaParam(TOMLDataclass):
 		return cls(param[0], param[1], param[2], param[3], x_offset_width_list)
 		''' match len(param):
 			case num if num in range(1, 4):
-				
+
 			case _:
 				return cls(*param) '''
 
@@ -179,7 +214,7 @@ class ImageAreaParam(TOMLDataclass):
 		from mouse_event import get_area, QuitKeyException
 
 		try:
-			rect_list = get_area(f"{cls.__name__}", image) # TLpos, BRpos 
+			rect_list = get_area(f"{cls.__name__}", image) # TLpos, BRpos
 			left = rect_list.popleft()
 			TLpos, BRpos = astuple(left)
 			param = [TLpos[1], BRpos[1] - TLpos[1], BRpos[0], BRpos[0] - TLpos[0]]
@@ -195,7 +230,7 @@ class ImageAreaParam(TOMLDataclass):
 	@property
 	def param(self)-> list[int]:
 		# if len(self.x_offset_width_list) > 0:
-		x_offset_width_chain = [i if i else -1 for x in self.x_offset_width_list for i in x]
+		x_offset_width_chain = [i if i else -1 for x in list(self.x_offset_width_list) for i in (x.x_offset, x.width)] # astuple
 		if x_offset_width_chain:
 			return [self.y_offset, self.height or -1, self.x_offset, self.width or -1, *x_offset_width_chain]
 		return [self.y_offset, self.height or -1, self.x_offset, self.width or -1]
@@ -343,7 +378,7 @@ class ShiftAreaParam(ImageAreaParam):
 					continue
 				if zeros == last_zeros:
 					stable = True
-					break 
+					break
 				last_zeros = zeros
 			return b if (b > 0 and stable) else -1
 		b = both_side_diff()
@@ -355,7 +390,7 @@ class ShiftAreaParam(ImageAreaParam):
 
 	@classmethod
 	def from_image(cls, image: np.ndarray, offset_range: range, image_check:bool=False) -> "ShiftAreaParam":
-		from .image_area_param import XOffsetWidth
+		#from .image_area_param import XOffsetWidth
 		left, right = cls.check_image(image=image[offset_range.start:offset_range.stop, :], image_check=image_check)
 		return cls(y_offset=offset_range.start, height=offset_range.stop - offset_range.start, x_offset=0, width=left, x_offset_width_list=[XOffsetWidth(right, -1)])
 
@@ -429,8 +464,8 @@ class ImageFilterAreas:
 	paystub: PaystubAreaParam # meisai
 	salary: SalaryAreaParam # kyuuyo
 	y_offset: int = 0
-
-class ImageAreaParamName(StrEnum):
+from enum import IntEnum
+class ImageAreaParamName(IntEnum):
 	HEADING = auto() # HeadingAreaParam
 	SHIFT = auto() # ShiftAreaParam
 	BREAKTIME = auto() # BreaktimeAreaParam
@@ -845,7 +880,7 @@ def trim_heading(
 
 
 def get_split_shifts(
-	image: np.ndarray, params: dict[ImageFilterParam, int] = {}, set_params=True, 
+	image: np.ndarray, params: dict[ImageFilterParam, int] = {}, set_params=True,
 return_as_cuts: bool = False, center_rate = 0.5
 ) -> tuple[np.ndarray, np.ndarray] | ShiftAreaParam:
 	"""Split image into left and right;black-filled shape's x position is center_rate;
@@ -927,7 +962,7 @@ def get_horizontal_border_bunches(bin_image: np.ndarray, y_offset:int=0, bunch_t
 				raise NotEnoughBordersException("Not enough borders found!")
 			else:
 				return # break
-			
+
 		# for n, e in enumerate(bunch.elems): bunch.elems[n] = e + y_offset
 		yield BorderOffset(bunch, last_offset)
 		# y_offset += bunch.elems[-1] + 1
@@ -952,14 +987,11 @@ def do_show_check(msg, param, img):
 		cv2.imshow(f"{msg}::{param}", img)
 		cv2.waitKey(0)
 
-from argparse import ArgumentParser
 # from dotenv import dotenv_values
-import tomllib
 from fnmatch import fnmatch
 
 
-app_name_to_enum: AppNameToEnum 
-app_name_to_enum = {n.name.lower(): n for n in APP_NAME}  # type: ignore
+# app_name_to_enum = {n.name.lower(): n for n in APP_NAME}  # type: ignore: AppNameToEnum
 
 class MainError(ValueError):
 	''' base error of main '''
@@ -1017,12 +1049,12 @@ class Settings(BaseSettings):
 		return self.image_ext
 
 from configparser import ConfigParser, NoSectionError, SectionProxy
-from configargparse import ArgParser, CompositeConfigParser, TomlConfigParser, IniConfigParser, ConfigparserConfigFileParser
+from configargparse import ArgParser, CompositeConfigParser, RawTextHelpFormatter, TomlConfigParser, IniConfigParser, ConfigparserConfigFileParser
 from os.path import join as os_path_join
 from typing import Any
 from dotenv import dotenv_values, find_dotenv
 
-class ConfigFileExt(StrEnum):	
+class ConfigFileExt(Enum):
 	TOML = auto()
 	INI = auto()
 	CFG = auto()
@@ -1039,6 +1071,7 @@ COMMON_ENV_FILE_NAME = COMMON_ENV_FILE_STEM + ENV_FILE_EXT
 ENV_FILE_STEMS = ["image-filter", "ocr-filter"]
 ENV_FILE_NAMES = [n + ENV_FILE_EXT for n in ENV_FILE_STEMS]
 ENV_PREFIXES = ["IMAGE_FILTER_", "OCR_FILTER_"]
+ENV_PREFIX = ENV_PREFIXES[0]
 def startswith_prefixes(s, prefixes=ENV_PREFIXES):
 	for prefix in prefixes:
 		if s.startswith(prefix):
@@ -1046,51 +1079,43 @@ def startswith_prefixes(s, prefixes=ENV_PREFIXES):
 
 CONFIG_FILE_STEM = "image-filter"
 IMAGE_AREA_PARAM_STR = "image_area_param"
-def main(
-	config_dir = '', config_file_stem = CONFIG_FILE_STEM, config_file_ext_enum = ConfigFileExt, image_area_param_file_stem = IMAGE_AREA_PARAM_STR.replace('_', '-'),
-	env_files = ENV_FILE_NAMES,
-	common_env_file = COMMON_ENV_FILE_NAME,
-	env_prefixes = ENV_PREFIXES,
+from os import environ as os_environ
+# @tst.cli(MainSettings, "image_filter")
+
+@dataclass
+class OptionalMainSettings(MainSettings):
+	""" OptionalMainSettings is a descendant of MainSettings: print TOML format option is added
+	# To find the configuration file(TOML format), it searches up directory tree from this Python script file(__file__)'s current directory.
+	Configuration filename is "image-filter-main-settings.toml".
+	unless an environ variable 'IMAGE_FILTER_MAIN_SETTINGS_PATH' points to a configuration file ('.env' file acts as an environment variable table).
+	"""
+
+	toml_template: bool = False
+	""" Print TOML format template of MainSettings"""
+
+
+def main(main_settings: MainSettings=MAIN_SETTINGS,
+	config_file: str = __file__,
+	config_dir: str = '',
+	env_files: list[str] = ENV_FILE_NAMES,
+	common_env_file: str = COMMON_ENV_FILE_NAME,
 	usecwd: bool = False,
 ): #abspath(dirname(__file__)) "image-filter.env"
+	from image_filter_main_settings import load_merged_settings
 	try:
-		config_dir = Path(config_dir) if config_dir else Path(get_current_path(usecwd))
-		if str(config_dir)[0] == '~':
-			config_dir = config_dir.expanduser()
-	except ValueError:
-		raise ValueError("Invalid config_dir")
-	if not config_dir.is_dir():
-		raise ValueError("Invalid config_dir")
-	dotenv_path = ''
-	# class NoCommonEnvFile(Exception): pass
-	used_env_files = []
-	clean_env_values = {}
-	env_values = {}
-	for env_file in env_files:
-		if (dotenv_path := find_dotenv( filename = env_file, usecwd = usecwd)):
-			try:
-				with open(dotenv_path) as rf:
-					_env_values = dotenv_values(stream=rf) #, override=True) # f"{config_dir}/{env_file}")
-					clean_env_values = {str(k): str(v) for k, v in _env_values.items() if v is not None}
-					if clean_env_values:
-						env_values |= clean_env_values
-						used_env_files.append(env_file)
-			except IOError:
-				logger.warning("Failed to load environment values from environment file '%s': Using default environment values.", dotenv_path)
-	if (dotenv_path := find_dotenv( filename = common_env_file, usecwd = usecwd)):
-		try:
-			with open(dotenv_path) as rf:
-				_env_values = dotenv_values(stream=rf) #, override=True) # f"{config_dir}/{env_file}")
-				clean_env_values2 = {str(k): str(v) for k, v in _env_values.items() if startswith_prefixes(k) and k not in clean_env_values and v is not None} # Convert all keys and values to strings explicitly
-				if clean_env_values2:
-					env_values |= clean_env_values2
-					used_env_files.append(common_env_file)
-		except IOError:
-			logger.warning("Failed to load environment values from environment file '%s': Using default environment values.", dotenv_path)
-	if used_env_files:
-		from os import environ as os_environ
-		os_environ.update(env_values)
-		logger.info("Environment values updated from %s as: %s", used_env_files, env_values)
+		# main_settings_file = search_settings_file(config_file, replace=['_', '-'])
+		# logger.info("main_settings_file: %s", main_settings_file)
+		args = load_merged_settings(main_settings, main_settings_class=MainSettings, sub_settings_class=OptionalMainSettings)
+		# config_dir = Path(config_dir) if config_dir else Path.cwd() if usecwd else Path(__file__).parent
+		# if str(config_dir)[0] == '~':
+		#	config_dir = config_dir.expanduser()
+	except Exception as e:
+		logger.error("Failed to load main settings.", exc_info=True)
+		raise ValueError("Invalid config_dir") from e
+	if args.toml_template:
+		from image_filter_main_settings import print_toml_template
+		print_toml_template(MainSettings)
+		return
 	from taimee_filter import TaimeeFilter
 	APP_NAME_TO_FILTER_CLASS = {APP_NAME.TAIMEE: TaimeeFilter}
 	OCR_FILTER = "ocr-filter"
@@ -1374,50 +1399,89 @@ def main(
 				TL[1], BR[1] - TL[1], TL[0], BR[0] - TL[0]
 			)
 
+
 	if not args.files:
-		try:
-			suffix_list = [APP_NAME(args.app).value]
-
-		except ValueError:
-			suffix_list = []
-		from path_chooser import ImageFileFeeder
-
-		file_feeder = ImageFileFeeder(suffix_list=suffix_list)
-		dir_file_date_list = []
-		try:
-			dir_file_date_list = list(
-				file_feeder.feed(
-					Path(args.image_dir),
-					month_list=args.shot_month or [m + 1 for m in range(12)],
-				)
-			)
-		except TypeError:
-			logger.error("Invalid image_dir: %s", args.image_dir)
-			raise ConfigError("Invalid image_dir: %s" % args.image_dir)
+		logger.info("No files selected")
+		raise ValueError("No files selected")
+	def is_screenshot_file(file: Path, app: APP_NAME|None)-> bool:
+		if not file.is_file() or not file.exists():
+			return False
+		if file.suffix not in args.image_ext_set:
+			return False
+		if app:
+			if app.name.lower() in [s.strip('.') for s in file.suffixes[:-1]]:
+				return True
+			else:
+				return False
+		if set([s.strip('.') for s in file.suffixes[:-1]]) & set([n.name.lower() for n in APP_NAME]):
+			return True
+		return False
+	args.files = [f for f in args.files if is_screenshot_file(Path(f), args.app)]
+	args.files.sort(key=lambda x: Path(x).stat().st_mtime, reverse=True)
+	try:
+		_file = args.files[args.nth - 1]
+		image_file = image_path_dir / _file if image_path_dir else Path(_file).expanduser()
+	except IndexError:
+		# image_file = file_list[0]
+		if args.files:
+			raise ValueError(f"Index out of range for file_list by {args.nth=}")
 		else:
-			logger.info(
-				"%s files are chosen by feeder with date: %s",
-				len(dir_file_date_list),
-				[
-					d.isoformat()
-					for d in set([d for _, fd in dir_file_date_list for f, d in fd])
-				],
-			)
-		args.files = sorted(
-			set([(Path(dr) / f) for dr, fd in dir_file_date_list for f, _ in fd]),
-			key=lambda f: ImageFileFeeder.pick_date(f.stem) or date.min,
-			reverse=True,
-		)
-	if not args.files:
-		logger.info("No files are chosen by feeder")
-		raise ConfigError("No files are chosen by feeder")
+			image_file = None
+			logger.info("No file selected")
+	else:
+		logger.info("Selected file: %s", image_file.name)
+		if not image_file.exists():
+			sys.exit("Error: image_file not found: %s" % image_file)
 
+	image = cv2.imread(
+		str(image_file), cv2.IMREAD_GRAYSCALE
+	)  # cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
+	if image is None:
+		raise ValueError("Error: Could not load image: %s" % image_file)
+	bin_image = None
+	# check ratios
+
+	y_margin = 0
+	if args.app == APP_NAME.TAIMEE:
+		from ocr_filter import OCRFilter
+
+		y_margin, borders, bin_image = OCRFilter.get_borders(image)
+		image_border_ratios = OCRFilter.convert_border_offset_ranges_to_ratio_list(
+			borders
+		)
+		# extract border ratio from app_border_ratio
+		is_image_border_ratio_OK = True
+		for area_name, v in args.app_border_ratio.items():
+			if area_name == args.app:
+				config_border_ratios = [float(i) for i in v]
+				for n, r in enumerate(config_border_ratios):
+					if abs(1 - r / image_border_ratios[n]) > 0.1:
+						logger.warning(
+							"Warning: image_border_ratio differs significantly from config_border_ratio %s",
+							r,
+						)
+						is_image_border_ratio_OK = False # TODO: not used this variable
+						logger.info(
+							"No use of default filter parameters due to border ratio mismatch for %s",
+							args.app
+						)
+
+	try:
+		app_filter_class = APP_NAME_TO_FILTER_CLASS[args.app]
+	except KeyError:
+		from ocr_filter import OCRFilter
+		app_filter_class = OCRFilter
+		# specific_filter_for_app = False
+	# else: specific_filter_for_app = True
+
+	param_dict: dict[ImageAreaParamName, ImageAreaParam] = {}
+	section = None
+	param_config = None
 	_image_area_params: SectionProxy | None = None
-	# IMAGE_AREA_PARAM_SECTION_STEM: str = "image_area_param"
 
 	@safe
 	def get_image_area_params_section(
-		app=args.app,
+		app=args.app.name.lower(),
 		section_stem=args.image_area_param_section_stem,
 		area_param_file=args.area_param_file,
 	) -> SectionProxy:
@@ -1458,28 +1522,35 @@ def main(
 		else:
 			return _image_area_params
 
-	image_area_params: SectionProxy | None = None
-	if args.area_param_file:
-		try:
-			area_param_config = ConfigParser()
-			area_param_config.read(args.area_param_file)
-			image_area_params = area_param_config[
-				f"image_area_param.{args.app.name.lower()}"
-			]
-		except Exception as e:
-			logger.warning(
-				f"Failed to read area parameter file {args.area_param_file}: {e}"
-			)
-			area_param_config = None
-		else:
-			logger.info(
-				"Area parameter file is read: %s as %s",
-				args.area_param_file,
-				image_area_params,
-			)
-	# image_config_filename = (args.file) #.resolve()Path
-	# filter_config_doc: TOMLDocument | None = None
 
+	# try:
+	area_params_section = get_image_area_params_section()
+	if is_successful(area_params_section):
+		param_str_dict = area_params_section.unwrap()
+		for k, v in param_str_dict.items():
+			try:
+				param = ImageAreaParam.from_str(v)
+				param_dict[
+				ImageAreaParamName[k.upper()]] = param
+			except ValueError as e:
+				logger.error("Failed to genarate an image area param '%s' obj from filter parameter [%s]: %s", k, v, e)
+			else:
+				logger.info("Filter parameter for %s is read as: %s", k, param)
+	else:
+		exception = area_params_section.failure()  # case ConfigKeyException():
+		if isinstance(exception, ConfigKeyException):
+			assert (
+				".".join([e for e in (args.image_area_param_section_stem, args.app.name.lower()) if e is not None])
+				== exception.key
+			)
+			assert isinstance(exception.config, ConfigParser)
+			param_config = exception.config
+			logger.warning(
+				"Going to get filter parameters manually due to config error for %s",
+				args.app
+			)
+		else:
+			logger.error("Failed to get filter parameters: %s", exception)
 	def fill_area_param_dict(
 		area_param_dict: dict[ImageAreaParamName, ImageAreaParam] = {},
 		image: np.ndarray | None = None,
@@ -1496,148 +1567,30 @@ def main(
 				logger.info("Try to get area params from image: %s", image.shape)
 				from mouse_event import get_area, QuitKeyException
 				try:
-					TL, BR = get_area(area_name.name, image)
+					areas = get_area(area_name.name, image)
 				except QuitKeyException:
 					logger.warning(
 						"Failed to get area from image for %s", area_name.name
 					)
 					continue
 				else:
+					rp = areas.popleft() # RectPos
+					#if len(areas) > 1: offset_width_list = areas[1:]
 					param_obj = ImageAreaParam(
-						TL[1] + y_margin, BR[1] - TL[1], TL[0], BR[0] - TL[0]
+						rp.origin.y + y_margin, #LT[1]: y_offset
+						rp.height, #rp.RB[1] - rp.LT[1]
+						rp.origin.x, #rp.LT[0], : x_offset
+						rp.width, #rp.RB[0] - rp.LT[0]
+						[XOffsetWidth(a.origin.x, a.width) for a in areas] # x_offset_width_list
 					)
 					area_param_dict[area_name] = param_obj
 		return area_param_dict
 
-	is_file_list_loaded = False
-
-	# from os import scan_dir
-	def get_args_files(file_list: list[Path] = []):
-		nonlocal is_file_list_loaded
-		if not is_file_list_loaded:
-			if args.files:
-				file_list += [
-					Path(f)
-					for f in args.files
-					if Path(f).is_file()
-					and Path(f).suffix in args.image_ext
-					and "." + args.app.name.lower() in Path(f).suffixes
-				]
-				is_file_list_loaded = True
-				return file_list
-			_file_list = []
-			# with scan_dir(args.image_dir) as ee:
-			for e in Path(args.image_dir).iterdir():
-				if e.is_file and e.suffix in args.image_ext:
-					for stem_end in app_to_stem_end_set(args.app):
-						if e.stem.endswith(stem_end):
-							_file_list.append((e, e.stat().st_mtime))
-
-			file_list += [
-				m[0] for m in sorted(_file_list, key=lambda f: f[1], reverse=True)
-			]
-			is_file_list_loaded = True
-			logger.info("Loaded file_list of %d files: %s", len(file_list), file_list)
-		return file_list
-
-	def is_wild_card(file_name):
-		for c in "*?[]":
-			if c in file_name:
-				return True
-		return False
-
-	image_path_dir: Path | None = None
-	# if image_path_dir and not image_path_dir.exists(): sys.exit("Image dir. does not exist: %s" % image_path_dir)
-
-	try:
-		_file = get_args_files()[args.nth - 1]
-		image_file = image_path_dir / _file if image_path_dir else Path(_file).expanduser()
-	except IndexError:
-		# image_file = file_list[0]
-		sys.exit(f"Index out of range for file_list by {args.nth=}")
-	logger.info("Selected file: %s", image_file.name)
-	if not image_file.exists():
-		sys.exit("Error: image_file not found: %s" % image_file)
-
-	image = cv2.imread(
-		str(image_file), cv2.IMREAD_GRAYSCALE
-	)  # cv2.cvtColor(, cv2.COLOR_BGR2GRAY)
-	if image is None:
-		raise ValueError("Error: Could not load image: %s" % image_file)
-	bin_image = None
-	# check ratios
-	is_image_border_ratio_OK = None
-	if args.app == APP_NAME.TAIMEE:
-		from ocr_filter import OCRFilter
-
-		y_margin, borders, bin_image = OCRFilter.get_borders(image)
-		image_border_ratios = OCRFilter.convert_border_offset_ranges_to_ratio_list(
-			borders
-		)
-		# extract border ratio from app_border_ratio
-		is_image_border_ratio_OK = True
-		for ratio in args.app_border_ratio.split(' '):
-			area_name, v = ratio.split(":")
-			if area_name == args.app.name.lower():
-				config_border_ratios = [float(i) for i in v.split(",")]
-				for n, r in enumerate(config_border_ratios):
-					if abs(1 - r / image_border_ratios[n]) > 0.1:
-						logger.warning(
-							"Warning: image_border_ratio differs significantly from config_border_ratio %s",
-							r,
-						)
-						is_image_border_ratio_OK = False
-						# filter_area_param_dict = {}
-						logger.info(
-							"No use of default filter parameters due to border ratio mismatch for %s",
-							args.app.name.lower(),
-						)
-
-	try:
-		app_filter_class = APP_NAME_TO_FILTER_CLASS[args.app]
-	except KeyError:
-		from ocr_filter import OCRFilter
-		app_filter_class = OCRFilter
-		# specific_filter_for_app = False
-	# else: specific_filter_for_app = True
-
-	param_dict: dict[ImageAreaParamName, ImageAreaParam] = {}
-	section = None
-	param_config = None
-	# try:
-	area_params_section = get_image_area_params_section()
-	if is_successful(area_params_section):
-		param_str_dict = area_params_section.unwrap()
-		for k, v in param_str_dict.items():
-			try:
-					param = ImageAreaParam.from_str(v)
-					param_dict[
-				ImageAreaParamName(k)] = param
-			except ValueError as e:
-				logger.error("Failed to genarate an image area param '%s' obj from filter parameter [%s]: %s", k, v, e)
-			else:
-				logger.info("Filter parameter for %s is read as: %s", k, param)
-	else:
-		exception = area_params_section.failure()  # case ConfigKeyException():
-		if isinstance(exception, ConfigKeyException):
-			assert (
-				".".join([args.image_area_param_section_stem + "." + args.app])
-				== exception.key
-			)
-			assert isinstance(exception.config, ConfigParser)
-			param_config = exception.config
-			logger.warning(
-				"Going to get filter parameters manually due to config error for %s",
-				args.app.name.lower(),
-			)
-		else:
-			logger.error("Failed to get filter parameters: %s", exception)
-
 	# if not param_dict:
-	param_dict = fill_area_param_dict(param_dict, image=bin_image[y_margin:, :], exclude_set=args.exclude_area_param_set) #, y_margin=y_margin)
-	section = ".".join([args.image_area_param_section_stem + "." + args.app])
+	param_dict = fill_area_param_dict(param_dict, image=image[y_margin:, :], exclude_set=args.exclude_area_param_set) #, y_margin=y_margin)
+	section = ".".join([args.image_area_param_section_stem + "." + args.app.name.lower()])
 	area_param_config = param_config if param_config is not None else ConfigParser()
-	area_param_config[section] = {k: f"{v.param}" for k, v in param_dict.items()}
+	area_param_config[section] = {k.name.lower(): f"{v.param}" for k, v in param_dict.items()}
 
 	# make a function to save the param_config to a config file
 	def save_param_dict_atexit():
@@ -1676,7 +1629,7 @@ def main(
 
 		ocr_area_name = f"ocr-{area_name.name}"
 		# area_tbl = table() area_tbl.add(comment(area_name)) area_tbl.add(nl())
-		area_dict = {}
+		# area_dict = {}
 		col_list = []
 		print(f"[{ocr_area_name}]")
 		for col, ocr_area in enumerate(
@@ -1704,16 +1657,12 @@ def main(
 				df_list.append(line)  # '\n'.join(line))
 			ocr_text_lines = [" ".join(df["text"]) for df in df_list]
 			if args.ocr_filter_sqlite_db_name and area_name == ImageAreaParamName.SHIFT:
-				# from tool_pyocr import MDateError
-				month_day_hours = (
-					app_filter_class.extract_month_day_and_hours_from_shift_area_text(
-						ocr_text_lines
-					)
-				)
-				if is_successful(month_day_hours):
-					month_day, hours = month_day_hours.unwrap()
-				else:
+				from tool_pyocr import MDateError
+				try:
+					month_day, hours = app_filter_class.extract_month_day_and_hours_from_shift_area_text( ocr_text_lines)
+				except (MDateError, AttributeError):
 					month_day = None
+					hours = None
 			print(f"{col_str}={ocr_text_lines}")
 			col_list.append(ocr_text_lines)
 			doc_dict[area_name] = "\n".join(["\t".join(col) for col in col_list])
@@ -1722,6 +1671,19 @@ def main(
 			for p, col in enumerate(col_list):
 				# col_str = f"p{p+1}"
 				area_dict[p] = '\n'.join(col) """
+	def get_data_year(month: int = 0):
+		if args.data_year == 0:
+			cur_month = Date.today().month
+			if month <= 0:
+				month = cur_month + month
+			if not(1 <= month <= 12):
+				raise ValueError("month must be in range(1, 13) or 0 or less than 0")
+			cur_year = Date.today().year
+			if month <= cur_month:
+				return cur_year
+			else:
+				return cur_year - 1
+		return args.data_year
 	if args.ocr_filter_sqlite_db_name and month_day is not None:
 		from ocr_filter_model import insert_ocr_data
 		try:
@@ -1742,8 +1704,8 @@ def main(
 				logger.info("Inserted OCR data [%s] into database: %s", inserted_item, db_fullpath)
 		# else: doc_dict[area_name] = '\n'.join(col_list[0])
 		# doc.add(area_tbl)
-	if args.save:
-		save_path = Path(args.save) / f"{image_file.stem}.ocr-{args.app}'.toml'"
+	if args.save_dir:
+		save_path = Path(args.save_dir) / f"{image_file.stem}.ocr-{args.app}'.toml'"
 		if save_path.exists():
 			yn = input(
 				f"\nThe file path to save the image file area configuration:{save_path} already exists. Overwrite?(Enter 'Yes' or 'Affirmative' if you want to overwparser.parse_args()rite)"
@@ -1758,56 +1720,6 @@ def main(
 			wf.write(toml_text)
 		logger.info("Saved toml file into: %s\n%s", save_path, toml_text)
 
-	if args.make:
-		make_path = (
-			Path(args.make + ".toml")
-			if not args.make.endswith(".toml")
-			else Path(args.make)
-		)  # Path(args.toml)
-
-		from tomlkit.toml_file import TOMLFile
-		from tomlkit import table
-
-		config_file: TOMLFile | None = None
-		if make_path.exists():
-			try:
-				config_file = TOMLFile(make_path)  # get_filter_config()
-				org_config = config_file.read()
-			except Exception as e:
-				logger.error("Failed to load existing TOML file %s: %s", make_path, e)
-				raise MakeError(
-					f"Failed to load existing TOML file {make_path}: {e}"
-				) from e
-			else:
-				logger.info("config is loaded from: %s", make_path)
-		else:
-			org_config = TOMLDocument()
-			logger.info("config is created")
-		# from io import StringIO
-		# sio = StringIO()
-		# with make_path.open('w') as wf: # dump(doc, wf)
-		# label = f"[ocr-filter.{str(app_name)}]"
-		# print(label, file=wf)
-		# print(f"[ocr-filter.{label}]", file=wf)
-		from tomlkit import container as TKContainer
-
-		ocr_filter_table = (
-			org_config.get(OCR_FILTER)
-			or org_config.add(OCR_FILTER, table())[OCR_FILTER]
-		)
-		org_area_dict: dict = ocr_filter_table[args.app] if ocr_filter_table else {}
-		for key, param in app_filter.param_dict.items():
-			different = False
-			area_name = key.name.lower()
-		# logger.info("Image area parameters are saved into %s\nas: %s", make_path, sio.read())
-		# print("[ocr-filter.taimee]")
-		# print(sio.read())
-	# --toml ocr-filter
-	"""[ocr-filter.taimee]
-HeadingAreaParam = [0, 111, 196, -1]
-ShiftAreaParam = [219, 267, 345, 373]
-BreaktimeAreaParam = [488, 224, 0, 720]
-PaystubAreaParam = [714, -1, 0, -1]"""
 
 def _is_interactive():
 	"""Decide whether this is running in a REPL or IPython notebook"""

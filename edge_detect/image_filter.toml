@@ -1,0 +1,12 @@
+[image_filter]
+image_ext = ".png"
+image_dir = "~/github/screen/DATA/"
+app_border_ratio = {taimee=[2.2,3.2]}
+app_stem_end={ taimee= "_jp.co.taimee", mercari= "_jp.mercari.work.android"}
+app_suffix_set={ taimee=["taimee"], mercari=["mercari","work"]}
+area_param_dir = "~/Documents/screen/"
+#[file_name.taimee]
+#stem_end = "_jp.co.taimee"
+#[file_name.mercari]
+#stem_end = "_jp.mercari.work.android"
+

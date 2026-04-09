@@ -58,7 +58,8 @@ if __name__ == '__main__':
 	#@dataclass
 	class ArgParser(Tap):
 		find_env_file = True
-		env_file: str = '.env' # environment variable file name
+		env_file: str = '.env' 
+		"""Environment variable setting file name"""
 
 	args = ArgParser().parse_args()
 

@@ -1,0 +1,107 @@
+{
+    "app": "TAIMEE",
+    "app_border_ratio": {
+        "_string": "<__main__.AppBorderRatio object at 0x7f756dfb5810>",
+        "_type": "python_object (type = AppBorderRatio)",
+        "_value": "gASVTgAAAAAAAACMCF9fbWFpbl9flIwOQXBwQm9yZGVyUmF0aW+Uk5QpgZR9lIwDZGljlH2UjAZUQUlNRUWUXZQoR0ABmZmZmZmaR0AJmZmZmZmaZXNzYi4="
+    },
+    "app_name": {
+        "_string": "APP_NAME.TAIMEE",
+        "_type": "python_object (type = APP_NAME)",
+        "_value": "gASVHwAAAAAAAACMCF9fbWFpbl9flIwIQVBQX05BTUWUk5RLAYWUUpQu"
+    },
+    "app_name_to_stem_end": {
+        "MERCARI": "jp.mercari.work",
+        "TAIMEE": "jp.co.taimee"
+    },
+    "app_name_to_suffix_set": {
+        "_string": "<bound method AppSettings.app_name_to_suffix_set of <class '__main__.MainSettings'>>",
+        "_type": "python_object (type = method)",
+        "_value": "gASVUQAAAAAAAACMCGJ1aWx0aW5zlIwHZ2V0YXR0cpSTlIwIX19tYWluX1+UjAxNYWluU2V0dGluZ3OUk5SMFmFwcF9uYW1lX3RvX3N1ZmZpeF9zZXSUhpRSlC4="
+    },
+    "app_names": [
+        "TAIMEE",
+        "MERCARI"
+    ],
+    "app_suffix": false,
+    "area_param_dir": "",
+    "area_param_file": "image-area-param.ini",
+    "area_param_name_list": [
+        "HEADING",
+        "SHIFT",
+        "BREAKTIME",
+        "PAYSTUB",
+        "SALARY"
+    ],
+    "bin_image": false,
+    "case_sensitive": false,
+    "data_month": 0,
+    "data_year": 0,
+    "exclude_area_param_set": {
+        "_type": "set",
+        "_value": []
+    },
+    "files": [],
+    "get_app_name": {
+        "_string": "<bound method MainSettings.get_app_name of MainSettings(prog='image_filter_main_settings.py', usage=None, description=\"\\nExtract/OCR paystub text from an image file: Files for OCR by 'files' option may be specified with app-name-suffix in wildcard(glob pattern matching like '--files *.<APP_NAME>*.png') or by 'shot-month' option (like '--shot_month -1' for last month, 0 for current month, other positive value for month number: Jan. is 1, Dec. is 12, ...) and 'app' option (like '--app <APP_NAME>')\\n\", formatter_class=<class 'argparse.HelpFormatter'>, conflict_handler='error', add_help=True)>",
+        "_type": "python_object (type = method)",
+        "_value": "gASVJAQAAAAAAACMCGJ1aWx0aW5zlIwHZ2V0YXR0cpSTlIwIX19tYWluX1+UjAxNYWluU2V0dGluZ3OUk5QpgZR9lCiMHWltYWdlX2FyZWFfcGFyYW1fc2VjdGlvbl9zdGVtlIwQaW1hZ2UtYXJlYS1wYXJhbZSMEWdldF9hcHBfbmFtZV9lbnVtlGgCaAVoCoaUUpSMCnRvbWxfbGluZXOUaAJoBWgNhpRSlIwFcmdsb2KUiIwIb2NyX2NvbmaUSzeMBHNob3eUiYwJYmluX2ltYWdllImMA3BzbZRLBowGbm9fb2NylImMC3Nob3RfbW9udGhzlF2UKEsJSwpljAhhcHBfbmFtZZRoA4wIQVBQX05BTUWUk5RLAYWUUpSMCWRhdGFfeWVhcpRLAIwKZ2xvYl9maWxlc5RoAmgGaB6GlFKUjApkYXRhX21vbnRolEsAjAphcHBfc3VmZml4lImMBGdsb2KUjAVSR0xPQpSMGW9jcl9maWx0ZXJfc3FsaXRlX2RiX25hbWWUjA1vY3ItZmlsdGVyLmRilIwQcmVjdXJzZV9zeW1saW5rc5SJjA9hcmVhX3BhcmFtX2ZpbGWUjBRpbWFnZS1hcmVhLXBhcmFtLmluaZSMFGFwcF9uYW1lX3RvX3N0ZW1fZW5klH2UKIwGVEFJTUVFlIwManAuY28udGFpbWVllIwHTUVSQ0FSSZSMD2pwLm1lcmNhcmkud29ya5R1jBBhcHBfYm9yZGVyX3JhdGlvlGgDjA5BcHBCb3JkZXJSYXRpb5STlCmBlH2UjANkaWOUfZSMBlRBSU1FRZRdlChHQAGZmZmZmZpHQAmZmZmZmZplc3NijANudGiUSwGMFmV4Y2x1ZGVfYXJlYV9wYXJhbV9zZXSUj5SMDnN0ZW1fZGVsaW1pdGVylIwBX5SMDWdldF9hcHBfbmFtZXOUaAJoBWg+hpRSlIwJYXBwX25hbWVzlF2UKGgsaC5ljA1zaG93X29jcl9hcmVhlImMBWZpbGVzlF2UjAxnZXRfYXBwX25hbWWUaAJoBmhGhpRSlIwJaW1hZ2VfZGlylIwXfi9Eb2N1bWVudHMvc2NyZWVuc2hvdHOUjA5hcmVhX3BhcmFtX2RpcpSMAJSMB3NhdmVfYXOUaEyMCGdsb2JfbWF4lEs8jBRhcmVhX3BhcmFtX25hbWVfbGlzdJRdlCiMB0hFQURJTkeUjAVTSElGVJSMCUJSRUFLVElNRZSMB1BBWVNUVUKUjAZTQUxBUlmUZYwOY2FzZV9zZW5zaXRpdmWUiYwDYXBwlGgsjBZhcHBfbmFtZV90b19zdWZmaXhfc2V0lGgCaAVoWIaUUpSMDWltYWdlX2V4dF9zZXSUj5QojAQucG5nlJCMCWxvYWRfdG9tbJRoAmgFaF6GlFKUdWJoRoaUUpQu"
+    },
+    "get_app_name_enum": {
+        "_string": "<bound method AppSettings.get_app_name_enum of <class '__main__.MainSettings'>>",
+        "_type": "python_object (type = method)",
+        "_value": "gASVTAAAAAAAAACMCGJ1aWx0aW5zlIwHZ2V0YXR0cpSTlIwIX19tYWluX1+UjAxNYWluU2V0dGluZ3OUk5SMEWdldF9hcHBfbmFtZV9lbnVtlIaUUpQu"
+    },
+    "get_app_names": {
+        "_string": "<bound method AppSettings.get_app_names of <class '__main__.MainSettings'>>",
+        "_type": "python_object (type = method)",
+        "_value": "gASVSAAAAAAAAACMCGJ1aWx0aW5zlIwHZ2V0YXR0cpSTlIwIX19tYWluX1+UjAxNYWluU2V0dGluZ3OUk5SMDWdldF9hcHBfbmFtZXOUhpRSlC4="
+    },
+    "glob": "RGLOB",
+    "glob_files": {
+        "_string": "<bound method MainSettings.glob_files of MainSettings(prog='image_filter_main_settings.py', usage=None, description=\"\\nExtract/OCR paystub text from an image file: Files for OCR by 'files' option may be specified with app-name-suffix in wildcard(glob pattern matching like '--files *.<APP_NAME>*.png') or by 'shot-month' option (like '--shot_month -1' for last month, 0 for current month, other positive value for month number: Jan. is 1, Dec. is 12, ...) and 'app' option (like '--app <APP_NAME>')\\n\", formatter_class=<class 'argparse.HelpFormatter'>, conflict_handler='error', add_help=True)>",
+        "_type": "python_object (type = method)",
+        "_value": "gASVJAQAAAAAAACMCGJ1aWx0aW5zlIwHZ2V0YXR0cpSTlIwIX19tYWluX1+UjAxNYWluU2V0dGluZ3OUk5QpgZR9lCiMHWltYWdlX2FyZWFfcGFyYW1fc2VjdGlvbl9zdGVtlIwQaW1hZ2UtYXJlYS1wYXJhbZSMEWdldF9hcHBfbmFtZV9lbnVtlGgCaAVoCoaUUpSMCnRvbWxfbGluZXOUaAJoBWgNhpRSlIwFcmdsb2KUiIwIb2NyX2NvbmaUSzeMBHNob3eUiYwJYmluX2ltYWdllImMA3BzbZRLBowGbm9fb2NylImMC3Nob3RfbW9udGhzlF2UKEsJSwpljAhhcHBfbmFtZZRoA4wIQVBQX05BTUWUk5RLAYWUUpSMCWRhdGFfeWVhcpRLAIwKZ2xvYl9maWxlc5RoAmgGaB6GlFKUjApkYXRhX21vbnRolEsAjAphcHBfc3VmZml4lImMBGdsb2KUjAVSR0xPQpSMGW9jcl9maWx0ZXJfc3FsaXRlX2RiX25hbWWUjA1vY3ItZmlsdGVyLmRilIwQcmVjdXJzZV9zeW1saW5rc5SJjA9hcmVhX3BhcmFtX2ZpbGWUjBRpbWFnZS1hcmVhLXBhcmFtLmluaZSMFGFwcF9uYW1lX3RvX3N0ZW1fZW5klH2UKIwGVEFJTUVFlIwManAuY28udGFpbWVllIwHTUVSQ0FSSZSMD2pwLm1lcmNhcmkud29ya5R1jBBhcHBfYm9yZGVyX3JhdGlvlGgDjA5BcHBCb3JkZXJSYXRpb5STlCmBlH2UjANkaWOUfZSMBlRBSU1FRZRdlChHQAGZmZmZmZpHQAmZmZmZmZplc3NijANudGiUSwGMFmV4Y2x1ZGVfYXJlYV9wYXJhbV9zZXSUj5SMDnN0ZW1fZGVsaW1pdGVylIwBX5SMDWdldF9hcHBfbmFtZXOUaAJoBWg+hpRSlIwJYXBwX25hbWVzlF2UKGgsaC5ljA1zaG93X29jcl9hcmVhlImMBWZpbGVzlF2UjAxnZXRfYXBwX25hbWWUaAJoBmhGhpRSlIwJaW1hZ2VfZGlylIwXfi9Eb2N1bWVudHMvc2NyZWVuc2hvdHOUjA5hcmVhX3BhcmFtX2RpcpSMAJSMB3NhdmVfYXOUaEyMCGdsb2JfbWF4lEs8jBRhcmVhX3BhcmFtX25hbWVfbGlzdJRdlCiMB0hFQURJTkeUjAVTSElGVJSMCUJSRUFLVElNRZSMB1BBWVNUVUKUjAZTQUxBUlmUZYwOY2FzZV9zZW5zaXRpdmWUiYwDYXBwlGgsjBZhcHBfbmFtZV90b19zdWZmaXhfc2V0lGgCaAVoWIaUUpSMDWltYWdlX2V4dF9zZXSUj5QojAQucG5nlJCMCWxvYWRfdG9tbJRoAmgFaF6GlFKUdWJoHoaUUpQu"
+    },
+    "glob_max": 60,
+    "image_area_param_section_stem": "image-area-param",
+    "image_dir": "~/Documents/screenshots",
+    "image_ext_set": {
+        "_type": "set",
+        "_value": [
+            ".png"
+        ]
+    },
+    "load_toml": {
+        "_string": "<bound method MainSettings.load_toml of <class '__main__.MainSettings'>>",
+        "_type": "python_object (type = method)",
+        "_value": "gASVRAAAAAAAAACMCGJ1aWx0aW5zlIwHZ2V0YXR0cpSTlIwIX19tYWluX1+UjAxNYWluU2V0dGluZ3OUk5SMCWxvYWRfdG9tbJSGlFKULg=="
+    },
+    "no_ocr": false,
+    "nth": 1,
+    "ocr_conf": 55,
+    "ocr_filter_sqlite_db_name": "ocr-filter.db",
+    "psm": 6,
+    "recurse_symlinks": false,
+    "reproducibility": {
+        "command_line": "python /home/yasukazu/github/screen/edge_detect/image_filter_main_settings.py --app TAIMEE --shot-months 9 10",
+        "git_has_uncommitted_changes": "True",
+        "git_root": "/home/yasukazu/github/screen",
+        "git_url": "https://github.com/Yasukazu/Screenshot-OCR/tree/df919aee31e5a69398c5f717dcb63566c7db40bb",
+        "time": "Thu Mar 12 13:01:32 2026"
+    },
+    "rglob": true,
+    "save_as": "",
+    "shot_months": [
+        9,
+        10
+    ],
+    "show": false,
+    "show_ocr_area": false,
+    "stem_delimiter": "_",
+    "toml_lines": {
+        "_string": "<bound method MainSettings.toml_lines of <class '__main__.MainSettings'>>",
+        "_type": "python_object (type = method)",
+        "_value": "gASVRQAAAAAAAACMCGJ1aWx0aW5zlIwHZ2V0YXR0cpSTlIwIX19tYWluX1+UjAxNYWluU2V0dGluZ3OUk5SMCnRvbWxfbGluZXOUhpRSlC4="
+    }
+}

@@ -17,7 +17,7 @@ try:
 	with (cwd / "ocr-filter.env").open() as envf:
 		load_dotenv(stream=envf)
 except FileNotFoundError as e:
-	logger.error(f"Failed to load environment variables: {e}")
+	logger.error("Failed to load environment variables: %s", e)
 	sys_exit(1)
 from os import environ
 try:
@@ -25,13 +25,13 @@ try:
 	# OCR_FILTER_DATA_MONTH = int(environ["OCR_FILTER_DATA_MONTH"])
 	OCR_FILTER_SQLITE_DB_PATH = Path(environ["OCR_FILTER_SQLITE_DB_DIR"]).expanduser() / environ["OCR_FILTER_DAL_DB_NAME"]
 except KeyError as e:
-	logger.error(f"Key error to load environment variables: {e}")
+	logger.error("Key error to load environment variables: %s", e)
 	sys_exit(2)
 except ValueError as e:
-	logger.error(f"Invalid value of environment variables: {e}")
+	logger.error("Invalid value of environment variables: %s", e)
 	sys_exit(3)
 except (TypeError) as e:
-	logger.error(f"Invalid type(like None) to set value from environment variables: {e}")
+	logger.error("Invalid type(like None) to set value from environment variables: %s", e)
 	sys_exit(4)
 
 if not OCR_FILTER_SQLITE_DB_PATH.exists():
@@ -39,10 +39,11 @@ if not OCR_FILTER_SQLITE_DB_PATH.exists():
 
 schm = f"sqlite://{environ['OCR_FILTER_DAL_DB_NAME']}"
 
-def make_db(schm: str = f"sqlite://{environ['OCR_FILTER_DAL_DB_NAME']}", folder=environ["OCR_FILTER_SQLITE_DB_DIR"], check_same_thread=True) -> DAL:
-	return DAL(schm=schm, folder=folder, check_same_thread=check_same_thread)
+def make_sqlite_db(file: str = environ['OCR_FILTER_DAL_DB_NAME'], folder=environ["OCR_FILTER_SQLITE_DB_DIR"]) -> DAL:
+	schm="sqlite://" + file
+	return DAL(schm, folder=folder)
 
-def get_tables(db: DAL = make_db()) -> tuple[DAL.Table, DAL.Table, DAL.Table]:
+def get_tables(db: DAL = make_sqlite_db()) -> tuple[DAL.Table, DAL.Table, DAL.Table]:
 	try:
 		app_table = db.app
 	except AttributeError:

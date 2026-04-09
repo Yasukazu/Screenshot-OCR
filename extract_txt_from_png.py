@@ -2,8 +2,8 @@ from pathlib import Path
 import subprocess
 
 cmd = 'tesseract' # -l jpn+eng 
-
-def run_cmd(input_path, output_txt_path, lang='jpn+eng'):
+CMD_LANG = 'eng+jpn'
+def run_cmd(input_path, output_txt_path, lang=CMD_LANG):
 	try:
 		# OCRmyPDF command with optimization options
 		command = [cmd, '-l', lang, input_path, output_txt_path] # '--pdf-renderer', 'hocr', '--optimize', '0', 
