@@ -7,9 +7,9 @@ logger = set_logger(__name__)
 if __name__ == '__main__':
 	from argparse import ArgumentParser
 	from sys import exit as sys_exit
-	from sys import argv
+	''' from sys import argv
 	if len(argv) < 2:
-		argv += ['-h']
+		argv += ['-h'] '''
 	MAIN_SETTINGS_PATH_STR = "SCREENSHOT_OCR_MAIN_SETTINGS_PATH"
 	MAIN_SETTINGS_PATH_DEFAULT = "main-settings.toml"
 	parser = ArgumentParser(epilog="=== End of help ===", prog="screenshot-ocr", description=f"Screenshot OCR program: configuration file(in TOML format) fullpath is set by environment variable {MAIN_SETTINGS_PATH_STR}, or use default {MAIN_SETTINGS_PATH_DEFAULT} "	)

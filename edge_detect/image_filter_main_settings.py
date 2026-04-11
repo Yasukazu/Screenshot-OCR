@@ -99,7 +99,7 @@ class MainSettings:
 	area_param_file: str = "image-area-param.ini"
 	"""Screenshot image area parameter config file: format as INI or TOML(".ini" or ".toml" extention respectively): in [image_area_param.<app>] section, items as "<area_name>=[<p1>,<p2>,<p3>,<p4>]" (e.g. "heading=[0,106,196,-1]") """
 	ocr_filter_sqlite_db_name: str = "ocr-filter.db"
-	"""SQLite DB file is created under `image_dir`/{yyyy} directory(yyyy is like 2025)"""
+	"""SQLite DB file is created under `image-dir`/{yyyy} directory(yyyy is like 2025)"""
 	data_year: int = 0
 	"""Year of data (like -1, 0, 2025, ...). 0 means current year, negative value is difference from current year (like -1 means last year), positive value means a.d. year number (like 2025). If this value is larger than current year, an exception might be raised."""
 	data_month: int = 0
