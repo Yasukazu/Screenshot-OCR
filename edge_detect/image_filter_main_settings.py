@@ -6,6 +6,7 @@ from dataclasses import dataclass, field, fields
 from enum import Enum
 from dataclass_binder import Binder
 from set_logger import set_logger
+from functools import cached_property
 
 logger = set_logger(__name__)
 # import typed_settings as tst
@@ -19,6 +20,10 @@ def area_param_names():
 	return ['HEADING', 'SHIFT', 'BREAKTIME', 'PAYSTUB', 'SALARY']
 def default_factories():
 	return [app_names, area_param_names]
+
+from typing import Literal
+case_mode = Literal['upper', 'lower']
+
 @dataclass(kw_only=True)
 class MainSettings:
 	"""
@@ -28,14 +33,20 @@ class MainSettings:
 	@classmethod
 	def from_dict(cls, toml_dict: dict[str, Any]) -> 'MainSettings':
 		return Binder(MainSettings).bind(toml_dict)
-	def __post_init__(self):
-		if set(self.app_name_to_suffix.keys()) != set(self.app_names):
-			raise ValueError("app_name_to_suffx.keys not equals to app_names!")
+	#def __post_init__(self):
+		# raise ValueError("app_name_to_suffx.keys not equals to app_names!")
+
+	def app_names(self, case: case_mode = 'upper'):
+		"""Application name list"""
+		return [k.strip().upper() if case == 'upper' else k.strip().lower() for k in self.app_name_to_suffix.keys() if k.strip()]
+
+
+	def app_names_as_enum(self, name='APP_NAME', module=__name__, case: case_mode='upper'):
+		return Enum(name, self.app_names(case=case), module=module)
 
 	app_name_to_suffix: dict[str, str] = field(default_factory=lambda: {"TM":"jp.co.taimee", "MC":"jp.mercari.work."})
 	""" Screenshot image file SUFFIX starts with value of this dict: SUFFIX is the part of filename before extention, delimited by underscore;BLOG pattern may be like: '*_{SUFFIX}*.png' """
-	app_names: list[str] = field(default_factory=lambda: ['TM', 'MC'])
-	"""Application name list"""
+	# app_names: list[str] = field(default_factory=lambda: ['TM', 'MC'])
 	app: str|None = None #: choices={', '.join(app_names())} 
 	"""Application name of the screenshot to execute OCR"""
 	def app_name_enum(self, module)-> type[Enum]:
@@ -61,14 +72,15 @@ class MainSettings:
 	"""Image area parameter section/table in image-area-param.ini"""
 	app_border_ratio: dict[str, list[float]] = field( default_factory=lambda:{"taimee":[2.2,3.2]})
 	"""Screenshot image file horizontal border ratio list of the app to execute OCR:(specified in format as "<app_name1>:<ratio1>,<ratio2> ..." )"""
-	app_suffix: bool = False
 	"""Screenshot image file name has suffix(sub extention) of the same as app name i.e. "<stem>.<suffix>.<ext>" (default: True)"""
 	save: str = ''
 	"""Output path to save OCR text of the image file as TOML format into the image file name extention as '.ocr-<app_name>.toml' """
 	nth: int =1
 	"""Rank(default: 1) of files descending sorted(the latest, the first) by modified date as wildcard(*, ?)"""
 	glob_max: int = 60
-	"""Pick up file max as pattern found in TOML"""
+	"""Pick up file max as glob pattern """
+	app_suffix: bool = False
+	"""Screenshot image file name has suffix(sub extention) of the same as app name i.e. "<stem>.<suffix>.<ext>" (default: True)"""
 	show: bool = False
 	"""Show images to check"""
 
