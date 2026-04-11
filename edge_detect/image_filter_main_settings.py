@@ -28,9 +28,13 @@ class MainSettings:
 	@classmethod
 	def from_dict(cls, toml_dict: dict[str, Any]) -> 'MainSettings':
 		return Binder(MainSettings).bind(toml_dict)
-	app_name_to_suffix: dict[str, set[str]] = field(default_factory=lambda: {"taimee":{"co", "taimee"}, "mercari":{"mercari", "work"}})
-	"""Screenshot image file suffix set: suffix is the part of filename before extention, delimiter is dot (.)"""
-	app_names: list[str] = field(default_factory=lambda: ['TAIMEE', 'MERCARI'])
+	def __post_init__(self):
+		if set(self.app_name_to_suffix.keys()) != set(self.app_names):
+			raise ValueError("app_name_to_suffx.keys not equals to app_names!")
+
+	app_name_to_suffix: dict[str, str] = field(default_factory=lambda: {"TM":"jp.co.taimee", "MC":"jp.mercari.work."})
+	""" Screenshot image file SUFFIX starts with value of this dict: SUFFIX is the part of filename before extention, delimited by underscore;BLOG pattern may be like: '*_{SUFFIX}*.png' """
+	app_names: list[str] = field(default_factory=lambda: ['TM', 'MC'])
 	"""Application name list"""
 	app: str|None = None #: choices={', '.join(app_names())} 
 	"""Application name of the screenshot to execute OCR"""
