@@ -38,14 +38,14 @@ class MainSettings:
 
 	def app_names(self, case: case_mode = 'upper'):
 		"""Application name list"""
-		return [k.strip().upper() if case == 'upper' else k.strip().lower() for k in self.app_name_to_suffix.keys() if k.strip()]
+		return [k.strip().upper() if case == 'upper' else k.strip().lower() for k in self.app_name_to_stem_end.keys() if k.strip()]
 
 
 	def app_names_as_enum(self, name='APP_NAME', module=__name__, case: case_mode='upper'):
 		return Enum(name, self.app_names(case=case), module=module)
 
-	app_name_to_suffix: dict[str, str] = field(default_factory=lambda: {"TM":"jp.co.taimee", "MC":"jp.mercari.work."})
-	""" Screenshot image file SUFFIX starts with value of this dict: SUFFIX is the part of filename before extention, delimited by underscore;BLOG pattern may be like: '*_{SUFFIX}*.png' """
+	app_name_to_stem_end: dict[str, str] = field(default_factory=lambda: {"TM":"jp.co.taimee", "MC":"jp.mercari.work.*"})
+	"""('stem' means the part of the filename before the extension)Screenshot image filestem ends with value of this dict: filestem is the part of filename before its extention, delimited by underscore;BLOG pattern may be like: '*_{stem_end}.png' """
 	# app_names: list[str] = field(default_factory=lambda: ['TM', 'MC'])
 
 	app: str|None = None #: choices={', '.join(app_names())} 
@@ -54,11 +54,9 @@ class MainSettings:
 	def app_name_enum(self, module=__name__)-> type[Enum]:
 		return Enum('APP_NAME', self.app_names, module=module)
 
-	app_name_to_stem_end: dict[str, str] = field(default_factory=lambda: {'taimee': '_jp.co.taimee', 'mercari': '_jp.mercari.work.android'})
-	"""Dictionary of 'app name' to 'stem end': 'stem' means the part of the filename before the extension"""
-
 	image_ext_set: set[str] = field(default_factory=lambda:set([".png"]))
 	"""Image file extension set, every extention starts with dot (default is {'.png'})"""
+
 	image_dir: str = "~/Documents/screenshots"
 	"""Image file root directory"""
 	shot_month: list[int] = field(default_factory=list)
