@@ -47,9 +47,11 @@ class MainSettings:
 	app_name_to_suffix: dict[str, str] = field(default_factory=lambda: {"TM":"jp.co.taimee", "MC":"jp.mercari.work."})
 	""" Screenshot image file SUFFIX starts with value of this dict: SUFFIX is the part of filename before extention, delimited by underscore;BLOG pattern may be like: '*_{SUFFIX}*.png' """
 	# app_names: list[str] = field(default_factory=lambda: ['TM', 'MC'])
+
 	app: str|None = None #: choices={', '.join(app_names())} 
 	"""Application name of the screenshot to execute OCR"""
-	def app_name_enum(self, module)-> type[Enum]:
+
+	def app_name_enum(self, module=__name__)-> type[Enum]:
 		return Enum('APP_NAME', self.app_names, module=module)
 
 	app_name_to_stem_end: dict[str, str] = field(default_factory=lambda: {'taimee': '_jp.co.taimee', 'mercari': '_jp.mercari.work.android'})
@@ -142,4 +144,15 @@ def load_main_settings(fullpath: Path, table: str = "")-> MainSettings:
 
 if __name__ == '__main__':
 	#print(MainSettings.__doc__)
-	print('\n'.join(main_settings_toml_lines()))
+	from argparse import ArgumentParser
+	parser = ArgumentParser()
+	parser.add_argument('--as-class', action='store_false', help='print TOML template of MainSettings as class')
+	args = parser.parse_args()
+	if args.as_class:
+		print("=== MainSettings as class ===")
+		for t in Binder(MainSettings).format_toml_template():
+			print(t)
+	else:
+		print("=== MainSettings as instance ===")
+		for t in Binder(MainSettings()).format_toml_template():
+			print(t)
