@@ -142,10 +142,16 @@ def load_main_settings(fullpath: Path, table: str = "")-> MainSettings:
 	main_settings = Binder(MainSettings).bind(config[table] if table else config)
 	return main_settings
 
+from sys import stdout
+def print_toml_template(settings: type[MainSettings]=MainSettings, as_class=False, out=stdout):
+		for t in Binder(settings if as_class else settings()).format_toml_template():
+			print(t, file=out)
+
 if __name__ == '__main__':
 	#print(MainSettings.__doc__)
 	from argparse import ArgumentParser
 	parser = ArgumentParser()
+	parser.add_argument('--print-template', action='store_false', help='print TOML template of MainSettings')
 	parser.add_argument('--as-class', action='store_false', help='print TOML template of MainSettings as class')
 	args = parser.parse_args()
 	if args.as_class:
@@ -156,3 +162,4 @@ if __name__ == '__main__':
 		print("=== MainSettings as instance ===")
 		for t in Binder(MainSettings()).format_toml_template():
 			print(t)
+
