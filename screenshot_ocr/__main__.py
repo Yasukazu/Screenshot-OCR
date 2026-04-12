@@ -15,6 +15,8 @@ if __name__ == '__main__':
 	parser = ArgumentParser(epilog="=== End of help ===", prog="screenshot-ocr", description=f"Screenshot OCR program: configuration file(in TOML format) fullpath is set by environment variable {MAIN_SETTINGS_PATH_STR}, or use default {MAIN_SETTINGS_PATH_DEFAULT} "	)
 	parser.add_argument('--print-template', action='store_true', help='print TOML template of MainSettings; remove leading "#" to specify any item')
 	parser.add_argument('--as-class', action='store_true', help='print TOML template of MainSettings as class')
+	parser.add_argument('--help-settings', action='store_true', help='print descriptions of fields in Settings class')
+
 	args, unknown_args = parser.parse_known_args()
 	from edge_detect.image_filter_main_settings import MainSettings
 	if args.print_template:
@@ -35,9 +37,13 @@ if __name__ == '__main__':
 	main_settings = Binder(MainSettings).parse_toml(main_settings_path)
 	logger.info("Main settings loaded: %s", main_settings)
 	from simple_parsing import ArgumentParser as SimpleArgumentParser
-	simple_parser = SimpleArgumentParser()
-	simple_parser.add_arguments(MainSettings, dest="main_settings")
-	s_args, s_unknown_args = simple_parser.parse_known_args()
+	arg_parser = SimpleArgumentParser()
+	arg_parser.add_arguments(MainSettings, dest="main_settings")
+	if args.help_settings:
+		arg_parser.print_help()
+		sys_exit(0)
+
+	s_args, s_unknown_args = arg_parser.parse_known_args()
 	logger.info("Arguments parsed: %s", s_args)
 	unknown_opts = [o.strip('-') for o in unknown_args if o.startswith('--')]
 	for k, v in vars(s_args.main_settings).items():
