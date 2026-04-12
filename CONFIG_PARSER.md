@@ -23,7 +23,7 @@
 	```
 
  2. `Simple-Parsing`
-	- https://github.com/lebrice/Simple-Parsing
+	- Repository: https://github.com/lebrice/SimpleParsing
 	```Python
 	"""Example adapted from https://github.com/eladrich/pyrallis#my-first-pyrallis-example-"""
 	import simple_parsing
