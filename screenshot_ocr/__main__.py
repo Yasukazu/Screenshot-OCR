@@ -71,13 +71,19 @@ if __name__ == '__main__':
 		if k in unknown_opts:
 			setattr(main_settings, k, v)
 			logger.info("  %s: %s (overridden by command line)", k, v)
-	from enum import StrEnum
+	from enum import StrEnum, Enum
 	from pathlib import Path
-	APP_NAMES = StrEnum('APP_NAME', [main_settings.app.upper()] if main_settings.app else main_settings.app_names())
-	logger.info("Available app names: %s", [name.name for name in APP_NAMES])	
-	for name in APP_NAMES:
+	APP_NAMES = StrEnum('APP_NAMES', {k.upper(): v for k, v in main_settings.app_name_to_stem_end.items()})
+	# APP_NAME = StrEnum('APP_NAME', [k.upper() for k in main_settings.app_name_to_stem_end.keys()])
+	try:
+		app_name_list = [APP_NAMES[main_settings.app.upper()]] if main_settings.app else list(APP_NAMES)
+	except KeyError as e:
+		logger.error("'app' is not in `app_name_to_stem_end`: %s", e)
+		sys_exit(1)
+	logger.info("Available app names: %s", app_name_list)	
+	for name in app_name_list:
 		logger.info("processing %s", name)
-		stem_end = main_settings.app_name_to_stem_end[name.name].strip(main_settings.stem_delimiter)
+		stem_end = name.value.strip(main_settings.stem_delimiter)
 		for ext in main_settings.image_ext_set:
 			if (_ext := ext.strip('.')):
 				wildcard = "**/" if main_settings.glob_recursive else ""

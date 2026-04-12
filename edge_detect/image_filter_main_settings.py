@@ -39,7 +39,7 @@ class MainSettings(Serializable):
 		# raise ValueError("app_name_to_suffx.keys not equals to app_names!")
 
 	def app_names(self, case: case_mode = 'upper'):
-		"""Application name list"""
+		"""Application name list from app_name_to_stem_end dict keys"""
 		return [k.strip().upper() if case == 'upper' else k.strip().lower() for k in self.app_name_to_stem_end.keys() if k.strip()]
 
 
