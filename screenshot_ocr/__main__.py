@@ -50,4 +50,16 @@ if __name__ == '__main__':
 		if k in unknown_opts:
 			setattr(main_settings, k, v)
 			logger.info("  %s: %s (overridden by command line)", k, v)
-	
+	from enum import StrEnum
+	from pathlib import Path
+	APP_NAMES = StrEnum('APP_NAME', [main_settings.app.upper()] if main_settings.app else main_settings.app_names())
+	logger.info("Available app names: %s", [name.name for name in APP_NAMES])	
+	for name in APP_NAMES:
+		logger.info("processing %s", name)
+		stem_end = main_settings.app_name_to_stem_end[name.name].strip(main_settings.stem_delimiter)
+		for ext in main_settings.image_ext_set:
+			if (_ext := ext.strip('.')):
+				wildcard = "**/" if main_settings.glob_recursive else ""
+				blog_pattern = f"{wildcard}*{main_settings.stem_delimiter}{stem_end}.{_ext}"
+				for path in Path(main_settings.image_dir).expanduser().glob(blog_pattern):
+					logger.info("  found: %s", path)

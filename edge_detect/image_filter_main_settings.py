@@ -49,6 +49,9 @@ class MainSettings:
 	"""('stem' means the part of the filename before the extension)Screenshot image filestem ends with value of this dict: filestem is the part of filename before its extention, delimited by underscore;BLOG pattern may be like: '*_{stem_end}.png' """
 	# app_names: list[str] = field(default_factory=lambda: ['TM', 'MC'])
 
+	stem_delimiter: str = "_"
+	"""Delimiter in stem of filename: PREFIX_DATE_SUFFIX"""
+
 	app: Optional[str] = None #: choices={', '.join(app_names())} 
 	"""Application name of the screenshot to execute OCR"""
 
