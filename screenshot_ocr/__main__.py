@@ -34,13 +34,13 @@ if __name__ == '__main__':
 	from dataclass_binder import Binder
 	main_settings = Binder(MainSettings).parse_toml(main_settings_path)
 	logger.info("Main settings loaded: %s", main_settings)
-	from simple_parsing import ArgumentParser as SimpleArgumentParser
-	simple_parser = SimpleArgumentParser()
-	simple_parser.add_arguments(MainSettings, dest="main_settings")
-	s_args, s_unknown_args = simple_parser.parse_known_args()
+	from argparse_dataclass import ArgumentParser as DataclassArgumentParser
+	arg_parser = DataclassArgumentParser(MainSettings) # ValueError: str | None is not callable
+	# arg_parser.add_arguments(MainSettings, dest="main_settings")
+	s_args, s_unknown_args = arg_parser.parse_known_args()
 	logger.info("Arguments parsed: %s", s_args)
 	unknown_opts = [o.strip('-') for o in unknown_args if o.startswith('--')]
-	for k, v in vars(s_args.main_settings).items():
+	for k, v in vars(s_args).items():
 		if k in unknown_opts:
 			setattr(main_settings, k, v)
 			logger.info("  %s: %s (overridden by command line)", k, v)

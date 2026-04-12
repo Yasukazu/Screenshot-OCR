@@ -1,12 +1,13 @@
 """ MainSettings by DataclassBinder"""
 from pathlib import Path
 import tomllib
-from typing import Any, Callable, Iterator
+from typing import Any, Callable, Iterator, Optional
 from dataclasses import dataclass, field, fields
 from enum import Enum
 from dataclass_binder import Binder
 from set_logger import set_logger
 from functools import cached_property
+
 
 logger = set_logger(__name__)
 # import typed_settings as tst
@@ -48,7 +49,7 @@ class MainSettings:
 	"""('stem' means the part of the filename before the extension)Screenshot image filestem ends with value of this dict: filestem is the part of filename before its extention, delimited by underscore;BLOG pattern may be like: '*_{stem_end}.png' """
 	# app_names: list[str] = field(default_factory=lambda: ['TM', 'MC'])
 
-	app: str|None = None #: choices={', '.join(app_names())} 
+	app: Optional[str] = None #: choices={', '.join(app_names())} 
 	"""Application name of the screenshot to execute OCR"""
 
 	def app_name_enum(self, module=__name__)-> type[Enum]:
