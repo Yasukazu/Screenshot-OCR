@@ -16,11 +16,20 @@ if __name__ == '__main__':
 	parser.add_argument('--print-template', action='store_true', help='print TOML template of MainSettings; remove leading "#" to specify any item')
 	parser.add_argument('--as-class', action='store_true', help='print TOML template of MainSettings as class')
 	parser.add_argument('--help-settings', action='store_true', help='print descriptions of fields in Settings class')
+	parser.add_argument('--print-settings', choices=['toml','json', 'yaml'], help='print into json/yaml format of Settings class')
 
 	args, unknown_args = parser.parse_known_args()
 	from edge_detect.image_filter_main_settings import MainSettings
 	if args.print_template:
 		print_toml_template(MainSettings, as_class=args.as_class)
+		sys_exit(0)
+	if args.print_settings:
+		if args.print_settings == 'toml':
+			print_toml_template(MainSettings, as_class=args.as_class)
+		elif args.print_settings == 'json':
+			print(MainSettings().dumps_json())
+		elif args.print_settings == 'yaml':
+			print(MainSettings().dumps_yaml())
 		sys_exit(0)
 	from os import environ
 	class EmptyPathError(Exception):

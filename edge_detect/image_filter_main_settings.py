@@ -24,16 +24,16 @@ def default_factories():
 
 from typing import Literal
 case_mode = Literal['upper', 'lower']
-
+from simple_parsing.helpers import Serializable
 @dataclass(kw_only=True)
-class MainSettings:
+class MainSettings(Serializable):
 	"""
 	Extract/OCR paystub text from an image file: Files for OCR by 'files' option may be specified with app-name-suffix in wildcard(glob pattern matching like '--files *.<APP_NAME>*.png') or by 'shot-month' option (like '--shot_month -1' for last month, 0 for current month, other positive value for month number: Jan. is 1, Dec. is 12, ...) and 'app' option (like '--app taimee')
 	"""
 
-	@classmethod
+	'''@classmethod
 	def from_dict(cls, toml_dict: dict[str, Any]) -> 'MainSettings':
-		return Binder(MainSettings).bind(toml_dict)
+		return Binder(MainSettings).bind(toml_dict) '''
 	#def __post_init__(self):
 		# raise ValueError("app_name_to_suffx.keys not equals to app_names!")
 

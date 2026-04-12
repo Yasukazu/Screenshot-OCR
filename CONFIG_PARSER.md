@@ -31,9 +31,13 @@
 		config_class=TrainConfig, args=args, config_path="config-file.yaml"
 	)
 	```
-	- Features:
+	- Pros:
+	 - Docstring of field is used for help message
 	 - loading from / saving to: YAML / JSON file
-	 - Enum type field in dataclass
+	 - Enum type support in dataclass
+	- Cons:
+	 - for serialization, need to inherit `Serializable` then `Binder` causes 'subclasses' KeyError
+	 - No support for TOML format
 
  3. `dataparsers`
 	```Python
