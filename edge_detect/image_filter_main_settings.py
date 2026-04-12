@@ -1,12 +1,14 @@
 """ MainSettings by DataclassBinder"""
 from pathlib import Path
 import tomllib
-from typing import Any, Callable, Iterator, Optional
+from typing import Any, Callable, Iterator, Literal, Optional
 from dataclasses import dataclass, field, fields
 from enum import Enum
 from dataclass_binder import Binder
 from set_logger import set_logger
 from functools import cached_property
+from simple_parsing.helpers import Serializable
+# from simple_parsing.helpers.serializable import yaml_serialization
 
 
 logger = set_logger(__name__)
@@ -22,9 +24,8 @@ def area_param_names():
 def default_factories():
 	return [app_names, area_param_names]
 
-from typing import Literal
 case_mode = Literal['upper', 'lower']
-from simple_parsing.helpers import Serializable
+# @yaml_serialization
 @dataclass(kw_only=True)
 class MainSettings(Serializable):
 	"""
