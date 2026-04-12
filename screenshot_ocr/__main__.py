@@ -49,10 +49,23 @@ if __name__ == '__main__':
 		# sys_exit(1)
 		main_settings = MainSettings()
 	else:
-		main_settings = MainSettings.load(main_settings_path, drop_extra_fields=True)
+		if main_settings_path.parts[0] == '~':
+			main_settings_path = main_settings_path.expanduser()
+		match main_settings_path.suffix.lower():
+			case '.yaml':
+				from serde.yaml import from_yaml
+				yaml_str = main_settings_path.read_text()
+				main_settings = from_yaml(MainSettings, yaml_str)
+			case '.json':
+				from serde.json import from_json
+				json_str = main_settings_path.read_text()
+				main_settings = from_json(MainSettings, json_str)
+			case '.toml':
+				from dataclass_binder import Binder
+				main_settings = Binder(MainSettings).parse_toml(main_settings_path)
+			case _:
+				raise ValueError(f"Unsupported file format: {main_settings_path.suffix}")
 		logger.info("Main settings loaded from %s: %s", main_settings_path, main_settings)
-	# from dataclass_binder import Binder
-	# main_settings = Binder(MainSettings).parse_toml(main_settings_path)
 	# from simple_parsing import parse_known_args
 	# main_settings, unknown_args = parse_known_args(MainSettings) # config_path=main_settings_path)
 	# logger.info("Main settings loaded: %s", main_settings)
