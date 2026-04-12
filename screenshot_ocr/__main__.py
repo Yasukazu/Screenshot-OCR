@@ -36,12 +36,13 @@ if __name__ == '__main__':
 	from dataclass_binder import Binder
 	main_settings = Binder(MainSettings).parse_toml(main_settings_path)
 	logger.info("Main settings loaded: %s", main_settings)
-	from argparse_dataclass import ArgumentParser as DataclassArgumentParser
-	arg_parser = DataclassArgumentParser(MainSettings) # ValueError: str | None is not callable
-	# arg_parser.add_arguments(MainSettings, dest="main_settings")
+	from simple_parsing import ArgumentParser as SimpleArgumentParser
+	arg_parser = SimpleArgumentParser()
+	arg_parser.add_arguments(MainSettings, dest="main_settings")
 	if args.help_settings:
 		arg_parser.print_help()
 		sys_exit(0)
+
 	s_args, s_unknown_args = arg_parser.parse_known_args()
 	logger.info("Arguments parsed: %s", s_args)
 	unknown_opts = [o.strip('-') for o in unknown_args if o.startswith('--')]
