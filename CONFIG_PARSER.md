@@ -38,6 +38,7 @@
 	- Cons:
 	 - for serialization, need to inherit `Serializable` then `Binder` causes 'subclasses' KeyError
 	 - No support for TOML format
+	 - YAML load error in kebab case field names
 
  3. `dataparsers`
 	```Python

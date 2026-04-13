@@ -3,13 +3,23 @@ import logging.handlers
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv, find_dotenv
+DOTENV_FILE = '.env'
+found_dotenv = find_dotenv(DOTENV_FILE)
+DOTENV_LOADED = load_dotenv(found_dotenv)
+from os import environ
+LOG_NAME = 'APP_LOG'
+try:
+	LOG_FILE = environ['APP_LOG']
+except KeyError:
+	LOG_FILE = LOG_NAME.replace('_', '.').lower()
 
-def set_logger(name: str | None = None, debug=False, log_file_fullpath="") -> logging.Logger:#~/logs/app.log
+def set_logger(name: str = __name__, debug=False, log_file_fullpath=LOG_FILE) -> logging.Logger:#~/logs/app.log
 	"""
 	Set up a logger with both console and file handlers.
 	
 	Args:
-		name: Logger name
+		name: Logger name (default: __name__)
 		debug: Whether to enable debug level logging
 		log_file_fullpath: Full path to log file (e.g., "~/logs/app.log")
 	
@@ -22,10 +32,10 @@ def set_logger(name: str | None = None, debug=False, log_file_fullpath="") -> lo
 	logger = logging.getLogger(name)
 	logger.setLevel(logging.DEBUG)
 
-	streamHandler = logging.StreamHandler()
-	streamHandler.setFormatter(formatter)
-	streamHandler.setLevel(logging.DEBUG if debug or os.environ.get("DEBUG") == "1" else logging.INFO)
-	logger.addHandler(streamHandler)
+	console_handler = logging.StreamHandler()
+	console_handler.setFormatter(formatter)
+	console_handler.setLevel(logging.DEBUG if debug or os.environ.get("DEBUG") == "1" else logging.WARNING)
+	logger.addHandler(console_handler)
 
 	if log_file_fullpath:
 		log_file_path = Path(log_file_fullpath).expanduser()

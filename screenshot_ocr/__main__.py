@@ -1,9 +1,12 @@
+import logging
 from sys import path as sys_path
 from pathlib import Path
 sys_path.insert(0, str(Path(__file__).parent))
 from edge_detect.image_filter_main_settings import print_toml_template
-from set_logger import set_logger
-logger = set_logger(__name__)
+dir_name = Path(__file__).parent.stem
+logger = logging.getLogger(dir_name).getChild(__name__)
+# from set_logger import set_logger
+# logger = set_logger(__name__)
 if __name__ == '__main__':
 	from argparse import ArgumentParser
 	from sys import exit as sys_exit
