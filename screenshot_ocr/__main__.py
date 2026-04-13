@@ -4,7 +4,7 @@ from sys import path as sys_path
 from pathlib import Path
 sys_path.insert(0, str(Path(__file__).parent))
 # from edge_detect.image_filter_main_settings import print_toml_template
-dir_name = Path(__file__).parent.stem
+# dir_name = Path(__file__).parent.stem
 logger = _logger.getChild(__name__) # logging.getLogger(dir_name)
 # from set_logger import set_logger
 # logger = set_logger(__name__)
@@ -94,7 +94,7 @@ if __name__ == '__main__':
 			logger.info("  %s: %s (overridden by command line)", k, v)
 	from enum import StrEnum, Enum
 	from pathlib import Path
-	APP_NAMES = StrEnum('APP_NAMES', {k.upper(): v for k, v in main_settings.app_name_to_stem_end.items()})
+	APP_NAMES = StrEnum('APP_NAMES', {k.upper(): v for k, v in main_settings.app_name_to_stem_end.items() if v and k})
 	# APP_NAME = StrEnum('APP_NAME', [k.upper() for k in main_settings.app_name_to_stem_end.keys()])
 	try:
 		app_name_list = [APP_NAMES[main_settings.app.upper()]] if main_settings.app else list(APP_NAMES)
@@ -107,7 +107,7 @@ if __name__ == '__main__':
 		stem_end = name.value.strip(main_settings.stem_delimiter)
 		for ext in main_settings.image_ext_set:
 			if (_ext := ext.strip('.')):
-				wildcard = "**/" if main_settings.glob_recursive else ""
-				blog_pattern = f"{wildcard}*{main_settings.stem_delimiter}{stem_end}.{_ext}"
-				for path in Path(main_settings.image_dir).expanduser().glob(blog_pattern):
+				wildcard = "**/*" if main_settings.glob_recursive else "*"
+				pattern = f"{wildcard}{main_settings.stem_delimiter}{stem_end}.{_ext}"
+				for path in Path(main_settings.image_dir).expanduser().glob(pattern):
 					logger.info("  found: %s", path)

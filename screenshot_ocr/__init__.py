@@ -11,7 +11,6 @@ log_filename = datetime.now().strftime(f"{LOGGING_NAME}_%Y-%m-%d.log")
 logger = logging.getLogger(LOGGING_NAME)#.getChild(__name__)
 logger.setLevel(logging.DEBUG)
 
-# ハンドラ（出力先）の設定
 console_handler = logging.StreamHandler(stderr)
 console_handler.setLevel(logging.WARNING)
 formatter = logging.Formatter(
