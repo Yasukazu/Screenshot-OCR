@@ -26,6 +26,10 @@ def default_factories():
 
 case_mode = Literal['upper', 'lower']
 # @yaml_serialization
+from serde import serialize, deserialize
+
+@serialize
+@deserialize
 @dataclass(kw_only=True)
 class MainSettings(Serializable):
 	"""
@@ -56,14 +60,15 @@ class MainSettings(Serializable):
 	app: Optional[str] = None #: choices={', '.join(app_names())} 
 	"""Application name of the screenshot to execute OCR"""
 
+	image_dir: Optional[Path] = None # "~/Documents/screenshots"
+
+	"""Image file root directory"""
 	def app_name_enum(self, module=__name__)-> type[Enum]:
 		return Enum('APP_NAME', self.app_names, module=module)
 
 	image_ext_set: set[str] = field(default_factory=lambda:set([".png"]))
 	"""Image file extension set, every extention starts with dot (default is {'.png'})"""
 
-	image_dir: str = "~/Documents/screenshots"
-	"""Image file root directory"""
 	shot_month: list[int] = field(default_factory=list)
 	"""Choose Screenshot file by its month (MM part of [YYYY-MM-DD or YYYYMMDD]) included in filename stem. {Jan. is 01, Dec. is 12}(specified in a list like "[1,2,..]"""
 	glob_pattern: str = "*.png"

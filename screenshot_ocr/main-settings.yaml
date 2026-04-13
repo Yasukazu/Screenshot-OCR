@@ -1,0 +1,39 @@
+app: ""
+app-name-to-stem-end:
+  TM: _jp.co.taimee
+  MC: _jp.mercari.work.android
+image-ext-set:
+  - .png
+  - .jpg
+image-dir: ~/Documents/screen
+shot-month: []
+glob-pattern: "*.png"
+glob-recursive: true
+files: []
+image-area-param-section-stem: image-area-param
+app-border-ratio:
+  TM:
+    - 2.2
+    - 3.2
+save: ""
+nth: 0
+glob-max: 60
+app-suffix: false
+show: false
+bin-image: false
+no-ocr: false
+ocr-conf: 55
+psm: 6
+area-param-dir: ""
+area-param-name-list:
+  - HEADING
+  - SHIFT
+  - BREAKTIME
+  - PAYSTUB
+  - SALARY
+area-param-file: image-area-param.ini
+ocr-filter-sqlite-db-name: ocr-filter.db
+data-year: 0
+data-month: 0
+show-ocr-area: false
+exclude-area-param-set: []

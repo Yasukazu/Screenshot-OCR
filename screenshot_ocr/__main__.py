@@ -61,8 +61,11 @@ if __name__ == '__main__':
 				json_str = main_settings_path.read_text()
 				main_settings = from_json(MainSettings, json_str)
 			case '.toml':
-				from dataclass_binder import Binder
-				main_settings = Binder(MainSettings).parse_toml(main_settings_path)
+				# from dataclass_binder import Binder
+				# main_settings = Binder(MainSettings).parse_toml(main_settings_path)
+				from serde.toml import from_toml
+				toml_str = main_settings_path.read_text()
+				main_settings = from_toml(MainSettings, toml_str)
 			case _:
 				raise ValueError(f"Unsupported file format: {main_settings_path.suffix}")
 		logger.info("Main settings loaded from %s: %s", main_settings_path, main_settings)
