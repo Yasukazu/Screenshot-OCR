@@ -1,10 +1,11 @@
+from . import logger as _logger
 import logging
 from sys import path as sys_path
 from pathlib import Path
 sys_path.insert(0, str(Path(__file__).parent))
-from edge_detect.image_filter_main_settings import print_toml_template
+# from edge_detect.image_filter_main_settings import print_toml_template
 dir_name = Path(__file__).parent.stem
-logger = logging.getLogger(dir_name).getChild(__name__)
+logger = _logger.getChild(__name__) # logging.getLogger(dir_name)
 # from set_logger import set_logger
 # logger = set_logger(__name__)
 if __name__ == '__main__':
@@ -63,6 +64,7 @@ if __name__ == '__main__':
 				from serde.json import from_json
 				json_str = main_settings_path.read_text()
 				main_settings = from_json(MainSettings, json_str)
+				logger.info("Main settings loaded from %s: %s", main_settings_path, main_settings)
 			case '.toml':
 				# from dataclass_binder import Binder
 				# main_settings = Binder(MainSettings).parse_toml(main_settings_path)
