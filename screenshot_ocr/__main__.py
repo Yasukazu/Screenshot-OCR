@@ -1,32 +1,43 @@
 from . import logger as _logger
-import logging
-from sys import path as sys_path
+from argparse import ArgumentParser
+# import logging
+# from sys import path as sys_path
 from pathlib import Path
-sys_path.insert(0, str(Path(__file__).parent))
+from enum import StrEnum, Enum
+from simple_parsing import ArgumentParser as SimpleArgumentParser
+from simple_parsing import parse as simple_parse
+# sys_path.insert(0, str(Path(__file__).parent))
 # from edge_detect.image_filter_main_settings import print_toml_template
 # dir_name = Path(__file__).parent.stem
 logger = _logger.getChild(__name__) # logging.getLogger(dir_name)
 # from set_logger import set_logger
 # logger = set_logger(__name__)
-if __name__ == '__main__':
-	from argparse import ArgumentParser
+MAIN_SETTINGS_PATH_STR = "SCREENSHOT_OCR_MAIN_SETTINGS_PATH"
+MAIN_SETTINGS_PATH_DEFAULT = "main-settings.yaml"
+def main():
 	from sys import exit as sys_exit
 	''' from sys import argv
 	if len(argv) < 2:
 		argv += ['-h'] '''
-	MAIN_SETTINGS_PATH_STR = "SCREENSHOT_OCR_MAIN_SETTINGS_PATH"
-	MAIN_SETTINGS_PATH_DEFAULT = "main-settings.yaml"
 	parser = ArgumentParser(epilog="=== End of help ===", prog="screenshot-ocr", description=f"Screenshot OCR program: configuration file(in TOML format) fullpath is set by environment variable {MAIN_SETTINGS_PATH_STR}, or use default {MAIN_SETTINGS_PATH_DEFAULT} "	)
-	parser.add_argument('--help-settings', action='store_true', help='print Settings')
-	parser.add_argument('--print-settings', choices=['json', 'yaml'], help='print into json/yaml format of Settings class')
-	parser.add_argument('--settings-path', type=Path, help='fullpath of Settings class in json/yaml format')
+	parser.add_argument('-s', '--help-settings', action='store_true', help='print Settings')
+	parser.add_argument('-t', '--print-settings-template', action='store_true', help='print as json format of Settings class') #choices=['json', 'yaml'], 
+	parser.add_argument('-f', '--settings-file', type=Path, help='fullpath of Settings class in json format')
 
 	args, unknown_args = parser.parse_known_args()
 	from edge_detect.image_filter_main_settings import MainSettings
-	class PrintSettingsExit(Exception):
+	if args.help_settings:
+		_ = simple_parse(MainSettings, args=['-h'])
+		'''arg_parser = SimpleArgumentParser()
+		arg_parser.add_arguments(MainSettings, dest="main_settings")
+		arg_parser.print_help()'''
+	elif args.print_settings_template:
+		print(MainSettings().dumps_json())
+		sys_exit(0)
+	'''class PrintSettingsExit(Exception):
 		pass
 	try:
-		match args.print_settings:
+		match args.print_settings_template:
 			case 'json':
 				print(MainSettings().dumps_json())
 				raise PrintSettingsExit()
@@ -36,12 +47,12 @@ if __name__ == '__main__':
 			case _:
 				pass
 	except PrintSettingsExit:
-		sys_exit(0)
+		sys_exit(0) '''
 	from os import environ
 	class EmptyPathError(Exception):
 		pass
 	try:
-		main_settings_path = args.settings_path or Path(environ[MAIN_SETTINGS_PATH_STR])
+		main_settings_path = args.settings_file or Path(environ[MAIN_SETTINGS_PATH_STR])
 		if not main_settings_path:
 			raise EmptyPathError()
 		logger.info("Using main settings path from environment variable %s as %s",MAIN_SETTINGS_PATH_STR, main_settings_path)
@@ -77,7 +88,6 @@ if __name__ == '__main__':
 	# from simple_parsing import parse_known_args
 	# main_settings, unknown_args = parse_known_args(MainSettings) # config_path=main_settings_path)
 	# logger.info("Main settings loaded: %s", main_settings)
-	from simple_parsing import ArgumentParser as SimpleArgumentParser
 	# from simple_parsing import parse_known_args as simple_parse_known_args
 	# s_args, s_unknown_args = simple_parse_known_args(MainSettings)
 	arg_parser = SimpleArgumentParser()
@@ -92,12 +102,10 @@ if __name__ == '__main__':
 		if k in unknown_opts:
 			setattr(main_settings, k, v)
 			logger.info("  %s: %s (overridden by command line)", k, v)
-	from enum import StrEnum, Enum
-	from pathlib import Path
 	APP_NAMES = StrEnum('APP_NAMES', {k.upper(): v for k, v in main_settings.app_name_to_stem_end.items() if v and k})
 	# APP_NAME = StrEnum('APP_NAME', [k.upper() for k in main_settings.app_name_to_stem_end.keys()])
 	try:
-		app_name_list = [APP_NAMES[main_settings.app.upper()]] if main_settings.app else list(APP_NAMES)
+		app_name_list = [getattr(APP_NAMES, main_settings.app.upper())] if main_settings.app else list(APP_NAMES)
 	except KeyError as e:
 		logger.error("'app' is not in `app_name_to_stem_end`: %s", e)
 		sys_exit(1)
@@ -111,3 +119,6 @@ if __name__ == '__main__':
 				pattern = f"{wildcard}{main_settings.stem_delimiter}{stem_end}.{_ext}"
 				for path in Path(main_settings.image_dir).expanduser().glob(pattern):
 					logger.info("  found: %s", path)
+
+if __name__ == '__main__':
+	main()
