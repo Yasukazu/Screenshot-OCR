@@ -21,7 +21,7 @@ def main():
 		argv += ['-h'] '''
 	parser = ArgumentParser(epilog="=== End of help ===", prog="screenshot-ocr", description=f"Screenshot OCR program: configuration file(in TOML format) fullpath is set by environment variable {MAIN_SETTINGS_PATH_STR}, or use default {MAIN_SETTINGS_PATH_DEFAULT} "	)
 	parser.add_argument('-s', '--help-settings', action='store_true', help='print Settings')
-	parser.add_argument('-t', '--print-settings-template', action='store_true', help='print as json format of Settings class') #choices=['json', 'yaml'], 
+	parser.add_argument('-t', '--print-settings-template', help='print json or yaml format of Settings class', choices=['json', 'yaml']) # action='store_true',  
 	parser.add_argument('-f', '--settings-file', type=Path, help='fullpath of Settings class in json format')
 
 	args, unknown_args = parser.parse_known_args()
@@ -32,22 +32,20 @@ def main():
 		arg_parser.add_arguments(MainSettings, dest="main_settings")
 		arg_parser.print_help()'''
 	elif args.print_settings_template:
-		print(MainSettings().dumps_json())
-		sys_exit(0)
-	'''class PrintSettingsExit(Exception):
-		pass
-	try:
-		match args.print_settings_template:
-			case 'json':
-				print(MainSettings().dumps_json())
-				raise PrintSettingsExit()
-			case 'yaml':
-				print(MainSettings().dumps_yaml())
-				raise PrintSettingsExit()
-			case _:
-				pass
-	except PrintSettingsExit:
-		sys_exit(0) '''
+		class PrintSettingsExit(Exception):
+			pass
+		try:
+			match args.print_settings_template:
+				case 'json':
+					print(MainSettings().dumps_json())
+					raise PrintSettingsExit()
+				case 'yaml':
+					print(MainSettings().dumps_yaml())
+					raise PrintSettingsExit()
+				case _:
+					pass
+		except PrintSettingsExit:
+			sys_exit(0)
 	from os import environ
 	class EmptyPathError(Exception):
 		pass
@@ -67,23 +65,10 @@ def main():
 		if main_settings_path.parts[0] == '~':
 			main_settings_path = main_settings_path.expanduser()
 		match main_settings_path.suffix.lower():
-			case '.yaml':
-				from serde.yaml import from_yaml
-				yaml_str = main_settings_path.read_text()
-				main_settings = from_yaml(MainSettings, yaml_str)
-			case '.json':
-				from serde.json import from_json
-				json_str = main_settings_path.read_text()
-				main_settings = from_json(MainSettings, json_str)
-				logger.info("Main settings loaded from %s: %s", main_settings_path, main_settings)
-			case '.toml':
-				# from dataclass_binder import Binder
-				# main_settings = Binder(MainSettings).parse_toml(main_settings_path)
-				from serde.toml import from_toml
-				toml_str = main_settings_path.read_text()
-				main_settings = from_toml(MainSettings, toml_str)
+			case '.yaml' | '.yml' | '.json' | '.jsn':
+				main_settings = MainSettings.load(main_settings_path)
 			case _:
-				raise ValueError(f"Unsupported file format: {main_settings_path.suffix}")
+				raise ValueError(f"Unsupported file extension: {main_settings_path.suffix}")
 		logger.info("Main settings loaded from %s: %s", main_settings_path, main_settings)
 	# from simple_parsing import parse_known_args
 	# main_settings, unknown_args = parse_known_args(MainSettings) # config_path=main_settings_path)

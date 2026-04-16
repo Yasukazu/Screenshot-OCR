@@ -1,12 +1,11 @@
 """ MainSettings by DataclassBinder"""
 from pathlib import Path
 import tomllib
-from typing import Any, Callable, Iterator, Literal, Optional
+from typing import Any, Iterator, Literal, Optional
 from dataclasses import dataclass, field, fields
 from enum import Enum
 from dataclass_binder import Binder
 from set_logger import set_logger
-from functools import cached_property
 from simple_parsing.helpers import Serializable
 # from simple_parsing.helpers.serializable import yaml_serialization
 
@@ -26,10 +25,9 @@ def default_factories():
 
 case_mode = Literal['upper', 'lower']
 # @yaml_serialization
-from serde import serialize, deserialize
-
-@serialize
-@deserialize
+#from serde import serialize, deserialize
+# @serialize
+# @deserialize
 @dataclass(kw_only=True)
 class MainSettings(Serializable):
 	"""
