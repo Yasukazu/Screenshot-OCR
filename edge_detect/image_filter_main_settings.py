@@ -59,8 +59,11 @@ class MainSettings(Serializable):
 	"""Application name of the screenshot to execute OCR"""
 
 	image_dir: Optional[Path] = None # "~/Documents/screenshots"
-
 	"""Image file root directory"""
+
+	output_dir: Optional[Path] = None
+	"""Output directory for processed images"""
+
 	def app_name_enum(self, module=__name__)-> type[Enum]:
 		return Enum('APP_NAME', self.app_names, module=module)
 
