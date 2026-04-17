@@ -13,7 +13,7 @@
             "args": "${command:pickArgs}",
             "cwd": "${workspaceFolder}",
             "env": {
-                "SCREENSHOT_OCR_MAIN_SETTINGS_PATH": "${workspaceFolder}/screenshot_ocr/main-settings.json"
+                "SCREENSHOT_OCR_MAIN_SETTINGS_PATH": "${workspaceFolder}/screenshot_ocr/main-settings.yaml"
             }
         }
     ]

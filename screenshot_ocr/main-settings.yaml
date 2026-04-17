@@ -6,6 +6,7 @@ image-ext-set:
   - .png
   - .jpg
 image-dir: ~/Documents/screen
+output-dir: ~/Documents/screen-output
 shot-month: []
 glob-pattern: "*.png"
 glob-recursive: true
