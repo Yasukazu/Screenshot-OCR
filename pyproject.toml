@@ -1,8 +1,8 @@
 [project]
-name = "taimi-screen"
+name = "screenshot-ocr"
 version = "1.1.1"
-description = "generate PDF from taimi screenshots"
-authors = [{ name = "Yasukazu ", email = "yasukazu@makyno.jp" }]
+description = "OCR, register into database and make PDF document from screenshot image files"
+authors = [{ name = "Yasukazu Mkn", email = "mkn@yskz.dev" }]
 requires-python = ">=3.12"
 readme = "README.md"
 dependencies = [
@@ -47,6 +47,8 @@ dependencies = [
     "typed-settings>=25.3.0",
     "typedal>=4.3.5",
 ]
+[project.scripts]
+screenshot-ocr = "screenshot_ocr.__main__:main"
 
 [dependency-groups]
 dev = [
@@ -83,3 +85,4 @@ package = false
 [[tool.uv.index]]
 name = "pypi"
 url = "https://pypi.org/simple"
+

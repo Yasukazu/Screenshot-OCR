@@ -3,9 +3,9 @@ from argparse import ArgumentParser
 # import logging
 # from sys import path as sys_path
 from pathlib import Path
-from enum import StrEnum, Enum
+from enum import StrEnum, Enu
 from simple_parsing import ArgumentParser as SimpleArgumentParser
-from simple_parsing import parse as simple_parse
+from simple_parsing import parse, parse_known_args
 # sys_path.insert(0, str(Path(__file__).parent))
 # from edge_detect.image_filter_main_settings import print_toml_template
 # dir_name = Path(__file__).parent.stem
@@ -14,27 +14,41 @@ logger = _logger.getChild(__name__) # logging.getLogger(dir_name)
 # logger = set_logger(__name__)
 MAIN_SETTINGS_PATH_STR = "SCREENSHOT_OCR_MAIN_SETTINGS_PATH"
 MAIN_SETTINGS_PATH_DEFAULT = "main-settings.yaml"
+
+class PrintSettingsExit(Exception):
+	pass
+
+class EmptyPathError(Exception):
+	pass
+
+from sys import exit as sys_exit
+
 def main():
-	from sys import exit as sys_exit
+	try:
+		_main()
+	except EmptyPathError:
+		logger.error("Main settings path is empty")
+		sys_exit(1)
+	except PrintSettingsExit:
+		sys_exit(0)
+
+def _main():
 	''' from sys import argv
 	if len(argv) < 2:
 		argv += ['-h'] '''
-	parser = ArgumentParser(epilog="=== End of help ===", prog="screenshot-ocr", description=f"Screenshot OCR program: configuration file(in TOML format) fullpath is set by environment variable {MAIN_SETTINGS_PATH_STR}, or use default {MAIN_SETTINGS_PATH_DEFAULT} "	)
-	parser.add_argument('-s', '--help-settings', action='store_true', help='print Settings')
+	parser = ArgumentParser(epilog="=== End of help ===", prog="screenshot-ocr", description=f"Screenshot OCR program: configuration file(in TOML format) fullpath is set by environment variable {MAIN_SETTINGS_PATH_STR}, or use default {MAIN_SETTINGS_PATH_DEFAULT} ", usage='%(prog)s [options]')
+	parser.add_argument('-s', '--help-settings', action='store_true', help='print Settings options')
 	parser.add_argument('-t', '--print-settings-template', help='print json or yaml format of Settings class', choices=['json', 'yaml']) # action='store_true',  
-	parser.add_argument('-f', '--settings-file', type=Path, help='fullpath of Settings class in json format')
+	parser.add_argument('-f', '--settings-file', type=Path, help='fullpath of Settings class in json or yaml format, while extention should be .json or .yaml respectively')
 
 	args, unknown_args = parser.parse_known_args()
 	from edge_detect.image_filter_main_settings import MainSettings
 	if args.help_settings:
-		_ = simple_parse(MainSettings, args=['-h'])
-		'''arg_parser = SimpleArgumentParser()
-		arg_parser.add_arguments(MainSettings, dest="main_settings")
-		arg_parser.print_help()'''
-	elif args.print_settings_template:
-		class PrintSettingsExit(Exception):
-			pass
 		try:
+			parse(MainSettings, argv=["--help"])
+		except SystemExit:
+			raise PrintSettingsExit()
+	elif args.print_settings_template:
 			match args.print_settings_template:
 				case 'json':
 					print(MainSettings().dumps_json())
@@ -44,11 +58,7 @@ def main():
 					raise PrintSettingsExit()
 				case _:
 					pass
-		except PrintSettingsExit:
-			sys_exit(0)
 	from os import environ
-	class EmptyPathError(Exception):
-		pass
 	try:
 		main_settings_path = args.settings_file or Path(environ[MAIN_SETTINGS_PATH_STR])
 		if not main_settings_path:
@@ -75,16 +85,16 @@ def main():
 	# logger.info("Main settings loaded: %s", main_settings)
 	# from simple_parsing import parse_known_args as simple_parse_known_args
 	# s_args, s_unknown_args = simple_parse_known_args(MainSettings)
-	arg_parser = SimpleArgumentParser()
+	'''arg_parser = SimpleArgumentParser()
 	arg_parser.add_arguments(MainSettings, dest="main_settings")
 	if args.help_settings:
 		arg_parser.print_help()
-		sys_exit(0)
-	s_args, s_unknown_args = arg_parser.parse_known_args()
+		sys_exit(0)'''
+	s_args, s_unknown_args = parse_known_args(MainSettings)
 	logger.info("Arguments parsed: %s", s_args)
-	unknown_opts = [o.strip('-') for o in unknown_args if o.startswith('--')]
-	for k, v in vars(s_args.main_settings).items():
-		if k in unknown_opts:
+	# unknown_opts = [o.strip('-') for o in unknown_args if o.startswith('--')]
+	for k, v in vars(s_args).items():
+		if v != getattr(main_settings, k): # if k in unknown_opts:
 			setattr(main_settings, k, v)
 			logger.info("  %s: %s (overridden by command line)", k, v)
 	APP_NAMES = StrEnum('APP_NAMES', {k.upper(): v for k, v in main_settings.app_name_to_stem_end.items() if v and k})
