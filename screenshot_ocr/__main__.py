@@ -2,8 +2,9 @@ from . import logger as _logger
 from argparse import ArgumentParser
 # import logging
 # from sys import path as sys_path
+import re
 from pathlib import Path
-from enum import StrEnum, Enu
+from enum import StrEnum, Enum
 from simple_parsing import ArgumentParser as SimpleArgumentParser
 from simple_parsing import parse, parse_known_args
 # sys_path.insert(0, str(Path(__file__).parent))
@@ -19,6 +20,8 @@ class PrintSettingsExit(Exception):
 	pass
 
 class EmptyPathError(Exception):
+	pass
+class PathNotFoundError(Exception):
 	pass
 
 from sys import exit as sys_exit
@@ -39,7 +42,7 @@ def _main():
 	parser = ArgumentParser(epilog="=== End of help ===", prog="screenshot-ocr", description=f"Screenshot OCR program: configuration file(in TOML format) fullpath is set by environment variable {MAIN_SETTINGS_PATH_STR}, or use default {MAIN_SETTINGS_PATH_DEFAULT} ", usage='%(prog)s [options]')
 	parser.add_argument('-s', '--help-settings', action='store_true', help='print Settings options')
 	parser.add_argument('-t', '--print-settings-template', help='print json or yaml format of Settings class', choices=['json', 'yaml']) # action='store_true',  
-	parser.add_argument('-f', '--settings-file', type=Path, help='fullpath of Settings class in json or yaml format, while extention should be .json or .yaml respectively')
+	parser.add_argument('-f', '--settings-file', type=Path, help=f'fullpath of Settings class in json or yaml format, while extention should be .json or .yaml respectively. Default is set by environment variable "{MAIN_SETTINGS_PATH_STR}" or `{MAIN_SETTINGS_PATH_DEFAULT}` in current directory.')
 
 	args, unknown_args = parser.parse_known_args()
 	from edge_detect.image_filter_main_settings import MainSettings
@@ -65,7 +68,7 @@ def _main():
 			raise EmptyPathError()
 		logger.info("Using main settings path from environment variable %s as %s",MAIN_SETTINGS_PATH_STR, main_settings_path)
 	except (KeyError, EmptyPathError) as err:
-		main_settings_path = Path(MAIN_SETTINGS_PATH_DEFAULT)
+		main_settings_path = Path().cwd() / MAIN_SETTINGS_PATH_DEFAULT
 		logger.info("Using default main settings path %s since %s", main_settings_path, err)
 	if not main_settings_path.exists():
 		logger.warning("MainSettings config file %s does not exist; using default settings", main_settings_path)
@@ -75,8 +78,20 @@ def _main():
 		if main_settings_path.parts[0] == '~':
 			main_settings_path = main_settings_path.expanduser()
 		match main_settings_path.suffix.lower():
-			case '.yaml' | '.yml' | '.json' | '.jsn':
-				main_settings = MainSettings.load(main_settings_path)
+			case '.yaml' | '.yml' :
+				#| '.json' | '.jsn':
+				from yaml import safe_load
+				with main_settings_path.open('r') as f:
+					main_settings_dict = safe_load(f)
+				main_settings_dict = transform_keys(main_settings_dict)
+				main_settings = MainSettings(**main_settings_dict)
+				#| '.json' | '.jsn':
+				# main_settings = MainSettings.load(main_settings_path)
+			case '.json' | '.jsn':
+				from json import load as json_load
+				with main_settings_path.open('r') as f:
+					main_settings_dict = json_load(f)
+				main_settings = MainSettings(**main_settings_dict)
 			case _:
 				raise ValueError(f"Unsupported file extension: {main_settings_path.suffix}")
 		logger.info("Main settings loaded from %s: %s", main_settings_path, main_settings)
@@ -92,9 +107,9 @@ def _main():
 		sys_exit(0)'''
 	s_args, s_unknown_args = parse_known_args(MainSettings)
 	logger.info("Arguments parsed: %s", s_args)
-	# unknown_opts = [o.strip('-') for o in unknown_args if o.startswith('--')]
+	cmd_opts = set([o.strip('-') for o in unknown_args if o.startswith('--')])
 	for k, v in vars(s_args).items():
-		if v != getattr(main_settings, k): # if k in unknown_opts:
+		if k in cmd_opts:
 			setattr(main_settings, k, v)
 			logger.info("  %s: %s (overridden by command line)", k, v)
 	APP_NAMES = StrEnum('APP_NAMES', {k.upper(): v for k, v in main_settings.app_name_to_stem_end.items() if v and k})
@@ -105,6 +120,10 @@ def _main():
 		logger.error("'app' is not in `app_name_to_stem_end`: %s", e)
 		sys_exit(1)
 	logger.info("Available app names: %s", app_name_list)	
+	if main_settings.output_dir and main_settings.output_dir[0] == '~':
+		output_dir = Path(main_settings.output_dir).expanduser()
+	else:
+		output_dir = None
 	for name in app_name_list:
 		logger.info("processing %s", name)
 		stem_end = name.value.strip(main_settings.stem_delimiter)
@@ -114,6 +133,28 @@ def _main():
 				pattern = f"{wildcard}{main_settings.stem_delimiter}{stem_end}.{_ext}"
 				for path in Path(main_settings.image_dir).expanduser().glob(pattern):
 					logger.info("  found: %s", path)
+					if output_dir:
+						exec_ocr(path, output_dir)
+from subprocess import run
+def exec_ocr(path: Path, output_dir: Path):
+	# ndlocr-lite --sourceimg digidepo_1287221_00000002.jpg --output tmpdir 
+	'''if (not isinstance(path, Path)) or (not isinstance(output_dir, Path)):
+		logger.error("path or output_dir is not specified")
+		raise ValueError("path or output_dir is not specified") '''
+	if not path.exists() or not output_dir.exists():
+		logger.error("output_dir is not specified")
+		raise PathNotFoundError("path or output_dir does not exist")
+	run(['ndlocr-lite', '--sourceimg', str(path), '--output', str(output_dir)])
+def kebab_to_snake(key):
+	"""Converts a string from kebab-case to snake_case."""
+	return re.sub(r'-', '_', key)
 
+def transform_keys(data):
+	"""Recursively transforms dictionary keys."""
+	if isinstance(data, dict):
+		return {kebab_to_snake(k): transform_keys(v) for k, v in data.items()}
+	elif isinstance(data, list):
+		return [transform_keys(i) for i in data]
+	return data
 if __name__ == '__main__':
 	main()
