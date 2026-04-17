@@ -136,15 +136,13 @@ def _main():
 					if output_dir:
 						exec_ocr(path, output_dir)
 from subprocess import run
-def exec_ocr(path: Path, output_dir: Path):
-	# ndlocr-lite --sourceimg digidepo_1287221_00000002.jpg --output tmpdir 
-	'''if (not isinstance(path, Path)) or (not isinstance(output_dir, Path)):
-		logger.error("path or output_dir is not specified")
-		raise ValueError("path or output_dir is not specified") '''
-	if not path.exists() or not output_dir.exists():
-		logger.error("output_dir is not specified")
-		raise PathNotFoundError("path or output_dir does not exist")
-	run(['ndlocr-lite', '--sourceimg', str(path), '--output', str(output_dir)])
+def exec_ocr(input_file: Path, output_dir: Path, visualize: bool = True):
+	'''Execute ndlocr-lite command'''
+	if not input_file.exists():
+		logger.error("input-file does not exist: %s", input_file)
+		raise PathNotFoundError(f"input-file does not exist: {input_file}")
+	output_dir.mkdir(parents=True, exist_ok=True)
+	run(['ndlocr-lite', '--sourceimg', str(input_file), '--output', str(output_dir)] + (['--viz', 'True'] if visualize else []))
 def kebab_to_snake(key):
 	"""Converts a string from kebab-case to snake_case."""
 	return re.sub(r'-', '_', key)
